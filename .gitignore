@@ -1,0 +1,17 @@
+# Spring Boot
+apps/server/.gradle/
+apps/server/build/
+apps/server/*.jar
+apps/server/out/
+apps/server/.idea/
+
+# React Native
+apps/mobile/node_modules/
+apps/mobile/.expo/
+apps/mobile/dist/
+apps/mobile/.env
+
+# 공통
+.DS_Store
+*.env
+*.env.local
