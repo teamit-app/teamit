@@ -1,0 +1,8 @@
+spring:
+  profiles:
+    active: local
+  application:
+    name: teamit
+
+server:
+  port: 8080

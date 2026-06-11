@@ -4,6 +4,8 @@ apps/server/build/
 apps/server/*.jar
 apps/server/out/
 apps/server/.idea/
+apps/server/src/main/resources/application-local.yml
+apps/server/src/main/resources/application-prod.yml
 
 # React Native
 apps/mobile/node_modules/
