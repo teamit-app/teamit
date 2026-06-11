@@ -1,2 +1,2 @@
 # teamit
-Data-driven team matching platform
+데이터 기반 나와 딱 맞는 팀 매칭 서비스
