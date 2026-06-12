@@ -1,5 +1,4 @@
-// TODO: 백엔드 연결 시 실제 fetch 호출로 교체
-// Base URL: https://api.teamit.app/api/v1
+import { apiRequest } from './api';
 
 export interface BasicInfoRequest {
   nickname: string;
@@ -21,16 +20,48 @@ export interface EducationRequest {
   subMajor: string | null;
 }
 
+interface BasicInfoResponseData {
+  userId: number;
+  nickname: string;
+  name: string;
+  gender: string;
+  birthDate: string;
+}
+
+interface RegionsResponseData {
+  regions: Array<{ id: number; sido: string; sigungu: string | null }>;
+}
+
+interface EducationResponseData {
+  educationId: number;
+  schoolName: string;
+  status: string;
+  major: string;
+  verified: boolean;
+}
+
+// POST /users/onboarding/basic
 export const submitBasicInfo = async (data: BasicInfoRequest): Promise<number> => {
-  // POST /users/onboarding/basic → returns userId
-  return 1; // dummy userId
+  const result = await apiRequest<BasicInfoResponseData>('/users/onboarding/basic', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+  return result.userId;
 };
 
+// POST /users/{userId}/regions
 export const submitRegions = async (userId: number, regions: RegionItem[]): Promise<void> => {
-  // POST /users/{userId}/regions
+  await apiRequest<RegionsResponseData>(`/users/${userId}/regions`, {
+    method: 'POST',
+    body: JSON.stringify({ regions }),
+  });
 };
 
+// POST /users/{userId}/educations
 export const submitEducation = async (userId: number, data: EducationRequest): Promise<number> => {
-  // POST /users/{userId}/educations → returns educationId
-  return 1; // dummy educationId
+  const result = await apiRequest<EducationResponseData>(`/users/${userId}/educations`, {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+  return result.educationId;
 };
