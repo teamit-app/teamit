@@ -1,11 +1,19 @@
 import { View, Text, StyleSheet } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors } from '../../src/constants/colors';
+import { ScreenHeader } from '../../src/components/common/ScreenHeader';
 
 export default function ProfileScreen() {
+  const insets = useSafeAreaInsets();
+
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>내정보</Text>
-      {/* TODO: 프로필, 경험, 기술스택, 매칭 프로필, 나의 매칭 구현 */}
+    <View style={[styles.container, { paddingTop: insets.top }]}>
+      <ScreenHeader title="내정보" />
+      <View style={styles.body}>
+        <Text style={styles.icon}>👤</Text>
+        <Text style={styles.title}>내정보 기능을 준비 중이에요</Text>
+        <Text style={styles.subtitle}>프로필 · 경험 · 기술스택이 곧 제공될 예정이에요</Text>
+      </View>
     </View>
   );
 }
@@ -13,13 +21,27 @@ export default function ProfileScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.backgroundLight,
-    paddingHorizontal: 20,
-    paddingTop: 60,
+    backgroundColor: Colors.white,
+  },
+  body: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 40,
+  },
+  icon: {
+    fontSize: 44,
+    marginBottom: 16,
   },
   title: {
-    fontSize: 24,
+    fontSize: 16,
     fontWeight: '700',
-    color: Colors.textDark,
+    color: Colors.dark,
+  },
+  subtitle: {
+    fontSize: 13,
+    color: Colors.grayMedium,
+    marginTop: 8,
+    textAlign: 'center',
   },
 });

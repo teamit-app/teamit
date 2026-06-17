@@ -1,18 +1,11 @@
 import { Tabs } from 'expo-router';
-import { Colors } from '../../src/constants/colors';
+import { TabBar } from '../../src/components/common/TabBar';
 
 export default function TabLayout() {
   return (
     <Tabs
-      screenOptions={{
-        headerShown: false,
-        tabBarActiveTintColor: Colors.primary,
-        tabBarInactiveTintColor: Colors.textGray,
-        tabBarStyle: {
-          backgroundColor: Colors.backgroundWhite,
-          borderTopColor: Colors.border,
-        },
-      }}
+      tabBar={(props) => <TabBar {...props} />}
+      screenOptions={{ headerShown: false }}
     >
       <Tabs.Screen name="home" options={{ title: '홈' }} />
       <Tabs.Screen name="explore" options={{ title: '탐색' }} />

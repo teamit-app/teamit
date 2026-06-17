@@ -3,9 +3,12 @@ export const Colors = {
   primary:   '#FF6B1C',   // Primary
   dark:      '#212121',   // Dark
   gray:      '#757575',   // Gray
-  lightGray: '#E0E0E0',   // Light Gray
-  ogTint:    '#FFF2EB',   // OG Tint (brand light background)
+  grayMedium:'#9E9E9E',   // Text (3단계)
+  grayLight: '#B8B8B8',   // Text (4단계)
+  lightGray: '#E0E0E0',   // Light Gray / Border
+  ogTint:    '#FFF2EB',   // OG Tint (브랜드 라이트 배경 · Sub)
   white:     '#FFFFFF',   // White
+  pageBg:    '#F7F7F7',   // Background (라이트 그레이)
 
   // ── 시맨틱 alias (기존 코드 호환) ───────────────────────────
   textDark:        '#212121',

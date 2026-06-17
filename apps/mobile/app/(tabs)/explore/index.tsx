@@ -1,0 +1,178 @@
+import React, { useEffect, useState } from 'react';
+import { View, Text, ScrollView, TouchableOpacity, ActivityIndicator, StyleSheet } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { router } from 'expo-router';
+import { Colors } from '../../../src/constants/colors';
+import { ScreenHeader } from '../../../src/components/common/ScreenHeader';
+import { SegmentedTabs } from '../../../src/components/explore/SegmentedTabs';
+import { SearchBar } from '../../../src/components/explore/SearchBar';
+import { FilterPills } from '../../../src/components/explore/FilterPills';
+import { ContestCard } from '../../../src/components/explore/ContestCard';
+import { TalentCard } from '../../../src/components/explore/TalentCard';
+import { useExploreStore } from '../../../src/store/useExploreStore';
+import { ContestStatus } from '../../../src/types/contest';
+
+type MainTab = 'POOL' | 'CONTEST';
+type StatusFilter = 'ALL' | ContestStatus;
+
+const STATUS_OPTIONS: { key: StatusFilter; label: string }[] = [
+  { key: 'ALL', label: '전체' },
+  { key: 'ONGOING', label: '진행중' },
+  { key: 'DEADLINE_SOON', label: '마감임박' },
+];
+
+export default function ExploreScreen() {
+  const insets = useSafeAreaInsets();
+  const [mainTab, setMainTab] = useState<MainTab>('POOL');
+  const [keyword, setKeyword] = useState('');
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>('ALL');
+
+  const talents = useExploreStore((s) => s.talents);
+  const contests = useExploreStore((s) => s.contests);
+  const isLoading = useExploreStore((s) => s.isLoading);
+  const loadData = useExploreStore((s) => s.loadData);
+  const toggleTalentHeart = useExploreStore((s) => s.toggleTalentHeart);
+  const toggleContestHeart = useExploreStore((s) => s.toggleContestHeart);
+
+  useEffect(() => {
+    loadData();
+  }, []);
+
+  const filteredTalents = talents.filter((talent) =>
+    keyword.trim().length === 0
+      ? true
+      : talent.nickname.includes(keyword) ||
+        talent.skills.some((skill) => skill.skillName.toLowerCase().includes(keyword.toLowerCase())),
+  );
+
+  const filteredContests = contests.filter((contest) => {
+    const matchesKeyword =
+      keyword.trim().length === 0 ||
+      contest.title.includes(keyword) ||
+      contest.organizer.includes(keyword) ||
+      contest.categoryLabel.includes(keyword);
+    const matchesStatus = statusFilter === 'ALL' || contest.status === statusFilter;
+    return matchesKeyword && matchesStatus;
+  });
+
+  if (isLoading && talents.length === 0 && contests.length === 0) {
+    return (
+      <View style={[styles.container, { paddingTop: insets.top }]}>
+        <ScreenHeader
+          title="탐색"
+          rightElement={<Text style={styles.heartIcon}>♡</Text>}
+        />
+        <View style={styles.loadingWrap}>
+          <ActivityIndicator size="large" color={Colors.primary} />
+        </View>
+      </View>
+    );
+  }
+
+  return (
+    <View style={[styles.container, { paddingTop: insets.top }]}>
+      <ScreenHeader
+        title="탐색"
+        rightElement={
+          <TouchableOpacity
+            onPress={() => router.push(`/explore/likes?tab=${mainTab}`)}
+            hitSlop={8}
+          >
+            <Text style={styles.heartIcon}>♡</Text>
+          </TouchableOpacity>
+        }
+      />
+
+      <View style={styles.tabSwitchWrap}>
+        <SegmentedTabs
+          options={[
+            { key: 'POOL', label: '인재풀' },
+            { key: 'CONTEST', label: '공모전' },
+          ]}
+          value={mainTab}
+          onChange={setMainTab}
+        />
+      </View>
+
+      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+        <SearchBar
+          placeholder={mainTab === 'POOL' ? '이름, 역할, 스킬로 검색' : '공모전 이름, 주최기관, 분야 검색'}
+          value={keyword}
+          onChangeText={setKeyword}
+        />
+
+        {mainTab === 'CONTEST' && (
+          <View style={styles.filterRow}>
+            <FilterPills
+              options={STATUS_OPTIONS}
+              value={statusFilter}
+              onChange={setStatusFilter}
+              trailingLabel="분야별"
+            />
+          </View>
+        )}
+
+        <View style={styles.list}>
+          {mainTab === 'POOL'
+            ? filteredTalents.map((talent) => (
+                <TalentCard
+                  key={talent.userId}
+                  talent={talent}
+                  onPressHeart={() => toggleTalentHeart(talent.userId)}
+                />
+              ))
+            : filteredContests.map((contest) => (
+                <ContestCard
+                  key={contest.contestId}
+                  contest={contest}
+                  variant="full"
+                  onPressHeart={() => toggleContestHeart(contest.contestId)}
+                />
+              ))}
+        </View>
+
+        <Text style={styles.footerHint}>
+          우측 상단 하트에서 저장한 {mainTab === 'POOL' ? '팀원을' : '공모전을'} 확인할 수 있어요
+        </Text>
+      </ScrollView>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: Colors.pageBg,
+  },
+  heartIcon: {
+    fontSize: 22,
+    color: Colors.dark,
+  },
+  tabSwitchWrap: {
+    paddingHorizontal: 20,
+    paddingTop: 16,
+    paddingBottom: 4,
+  },
+  content: {
+    paddingHorizontal: 20,
+    paddingTop: 16,
+    paddingBottom: 32,
+  },
+  filterRow: {
+    marginTop: 14,
+  },
+  list: {
+    marginTop: 16,
+  },
+  footerHint: {
+    fontSize: 12,
+    color: Colors.grayLight,
+    textAlign: 'center',
+    marginTop: 4,
+  },
+  loadingWrap: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+});

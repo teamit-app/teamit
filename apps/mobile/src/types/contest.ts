@@ -1,9 +1,23 @@
+export type ContestCategory =
+  | 'IT'
+  | 'STARTUP'
+  | 'DESIGN'
+  | 'SOCIAL'
+  | 'ENGINEERING'
+  | 'ARTS'
+  | 'ETC';
+
+export type ContestStatus = 'ONGOING' | 'DEADLINE_SOON' | 'CLOSED';
+
 export interface Contest {
-  id: number;
+  contestId: number;
   title: string;
   organizer: string;
-  deadline: string;
-  categories: string[];
-  thumbnail: string | null;
-  description: string;
+  category: ContestCategory;
+  categoryLabel: string;
+  status: ContestStatus;
+  endDate: string;
+  dDay: number;
+  isNew: boolean;
+  isHearted: boolean;
 }
