@@ -8,6 +8,16 @@ interface MessageBubbleProps {
 }
 
 export const MessageBubble: React.FC<MessageBubbleProps> = ({ message }) => {
+  if (message.isSystem) {
+    return (
+      <View style={styles.systemContainer}>
+        <View style={styles.systemBubble}>
+          <Text style={styles.systemText}>{message.content}</Text>
+        </View>
+      </View>
+    );
+  }
+
   const isOwn = message.isSent;
 
   return (
@@ -83,6 +93,22 @@ const styles = StyleSheet.create({
   },
   bubbleOther: {
     backgroundColor: Colors.lightGray,
+  },
+  systemContainer: {
+    alignItems: 'center',
+    marginVertical: 12,
+  },
+  systemBubble: {
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 16,
+    backgroundColor: Colors.white,
+    borderWidth: 1,
+    borderColor: Colors.lightGray,
+  },
+  systemText: {
+    fontSize: 12,
+    color: Colors.grayMedium,
   },
   text: {
     fontSize: 14,

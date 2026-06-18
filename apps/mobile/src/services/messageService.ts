@@ -52,6 +52,9 @@ export const getChat = async (chatId: number): Promise<Chat | null> => {
     participants: chatRoom.participants,
     messages: messages,
     description: chatRoom.description,
+    detailType: chatRoom.detailType ?? 'normal',
+    matchStatus: chatRoom.matchStatus ?? 'none',
+    teamInfo: chatRoom.teamInfo,
   };
 };
 

@@ -12,6 +12,7 @@ export interface Message {
   content: string;
   createdAt: string;
   isSent: boolean; // 현재 사용자가 보낸 메시지인지 여부
+  isSystem?: boolean;
 }
 
 export interface ChatRoom {
@@ -25,6 +26,25 @@ export interface ChatRoom {
   unreadCount: number;
   participants: User[];
   description?: string; // 단체 채팅의 경우
+  detailType?: 'member-invite' | 'leader-request' | 'group-status' | 'normal';
+  matchStatus?: 'pending' | 'accepted' | 'requested' | 'waiting' | 'completed' | 'none';
+  teamInfo?: TeamInfo;
+}
+
+export interface TeamMemberStatus {
+  id: number;
+  name: string;
+  role: string;
+  avatar: string;
+  filled: boolean;
+}
+
+export interface TeamInfo {
+  statusLabel: string;
+  title: string;
+  currentCount: number;
+  totalCount: number;
+  members: TeamMemberStatus[];
 }
 
 export interface Chat {
@@ -35,4 +55,7 @@ export interface Chat {
   participants: User[];
   messages: Message[];
   description?: string;
+  detailType?: 'member-invite' | 'leader-request' | 'group-status' | 'normal';
+  matchStatus?: 'pending' | 'accepted' | 'requested' | 'waiting' | 'completed' | 'none';
+  teamInfo?: TeamInfo;
 }
