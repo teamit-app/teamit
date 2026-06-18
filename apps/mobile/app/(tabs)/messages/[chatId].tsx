@@ -205,7 +205,7 @@ export default function ChatDetailScreen() {
                   >
                     <Text style={styles.teamMemberAvatarText}>{member.avatar}</Text>
                   </View>
-                  <Text style={styles.teamMemberName} numberOfLines={1}>{member.name}</Text>
+                  <Text style={[styles.teamMemberName, !member.filled && styles.teamMemberNameEmpty]} numberOfLines={1}>{member.name}</Text>
                 </View>
               ))}
             </View>
@@ -494,6 +494,9 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     maxWidth: 52,
   },
+  teamMemberNameEmpty: {
+    color: Colors.grayMedium,
+  },
   dateDivider: {
     alignItems: 'center',
     marginVertical: 14,
@@ -654,9 +657,9 @@ const styles = StyleSheet.create({
   },
   dialogBtnCancel: {
     flex: 1,
-    paddingVertical: 14,
+    paddingVertical: 18,
     borderRadius: 14,
-    backgroundColor: Colors.pageBg,
+    backgroundColor: Colors.lightGray,
     alignItems: 'center',
   },
   dialogBtnCancelText: {
@@ -666,7 +669,7 @@ const styles = StyleSheet.create({
   },
   dialogBtnConfirm: {
     flex: 1,
-    paddingVertical: 14,
+    paddingVertical: 18,
     borderRadius: 14,
     backgroundColor: Colors.primary,
     alignItems: 'center',
