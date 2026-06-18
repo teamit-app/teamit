@@ -4,7 +4,9 @@ import {
   dummyDirectMessages1,
   dummyDirectMessages2,
   dummyDirectMessages3,
-  dummyGroupMessages,
+  dummyDirectMessages4,
+  dummyGroupMessages1,
+  dummyGroupMessages2,
 } from '../data/chatRooms';
 
 // TODO: 백엔드 API 연결 시 fetch 호출로 교체
@@ -20,17 +22,23 @@ export const getChat = async (chatId: number): Promise<Chat | null> => {
 
   // 각 채팅 ID별로 정확한 메시지를 할당
   switch (chatId) {
-    case 1: // 김모집
+    case 1: // 2025 창업 아이디어 팀
+      messages = dummyGroupMessages1;
+      break;
+    case 2: // AI 해커톤 우리팀
+      messages = dummyGroupMessages2;
+      break;
+    case 3: // 김모집 (팀 리더)
       messages = dummyDirectMessages1;
       break;
-    case 2: // AI 해커톤 팀
-      messages = dummyGroupMessages;
-      break;
-    case 3: // 박강민
+    case 4: // 박팀장
       messages = dummyDirectMessages2;
       break;
-    case 4: // 박준서
+    case 5: // 이팀원
       messages = dummyDirectMessages3;
+      break;
+    case 6: // 최기획자
+      messages = dummyDirectMessages4;
       break;
     default:
       messages = [];
