@@ -12,29 +12,31 @@ export const MessageInput: React.FC<MessageInputProps> = ({ onSendMessage, isLoa
 
   const handleSend = () => {
     if (text.trim()) {
-      onSendMessage(text);
+      onSendMessage(text.trim());
       setText('');
     }
   };
+
+  const canSend = text.trim().length > 0 && !isLoading;
 
   return (
     <View style={styles.container}>
       <TextInput
         style={styles.input}
         placeholder="메시지를 입력하세요..."
-        placeholderTextColor={Colors.grayLight}
+        placeholderTextColor={Colors.grayMedium}
         value={text}
         onChangeText={setText}
         multiline
         editable={!isLoading}
       />
       <TouchableOpacity
-        style={[styles.sendButton, (!text.trim() || isLoading) && styles.sendButtonDisabled]}
+        style={[styles.sendBtn, !canSend && styles.sendBtnDisabled]}
         onPress={handleSend}
-        disabled={!text.trim() || isLoading}
-        activeOpacity={0.7}
+        disabled={!canSend}
+        activeOpacity={0.8}
       >
-        <Text style={styles.sendButtonText}>전송</Text>
+        <Text style={styles.sendIcon}>▶</Text>
       </TouchableOpacity>
     </View>
   );
@@ -45,7 +47,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'flex-end',
     paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingVertical: 10,
     borderTopWidth: 1,
     borderTopColor: Colors.lightGray,
     backgroundColor: Colors.white,
@@ -53,30 +55,31 @@ const styles = StyleSheet.create({
   },
   input: {
     flex: 1,
-    borderWidth: 1,
-    borderColor: Colors.lightGray,
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
+    backgroundColor: Colors.pageBg,
+    borderRadius: 22,
+    paddingHorizontal: 16,
+    paddingTop: 11,
+    paddingBottom: 11,
     fontSize: 14,
     color: Colors.dark,
     maxHeight: 100,
+    minHeight: 44,
   },
-  sendButton: {
-    paddingHorizontal: 16,
-    paddingVertical: 10,
+  sendBtn: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     backgroundColor: Colors.primary,
-    borderRadius: 8,
     justifyContent: 'center',
     alignItems: 'center',
+    flexShrink: 0,
   },
-  sendButtonDisabled: {
-    backgroundColor: Colors.grayLight,
-    opacity: 0.5,
+  sendBtnDisabled: {
+    backgroundColor: Colors.lightGray,
   },
-  sendButtonText: {
+  sendIcon: {
     color: Colors.white,
-    fontSize: 14,
-    fontWeight: '600',
+    fontSize: 15,
+    marginLeft: 2,
   },
 });

@@ -8,36 +8,48 @@ interface ChatRoomItemProps {
   onPress: () => void;
 }
 
-export const ChatRoomItem: React.FC<ChatRoomItemProps> = ({ chatRoom, onPress }) => {
-  const timeString = formatTime(chatRoom.lastMessageAt);
+const getParticipantLabel = (chatRoom: ChatRoomItemProps['chatRoom']): string | null => {
+  if (chatRoom.type !== 'group') return null;
+  const others = chatRoom.participants.filter((p) => p.id !== 1);
+  if (others.length === 0) return null;
+  if (others.length <= 2) return others.map((p) => p.name).join(', ');
+  return `${others.slice(0, 2).map((p) => p.name).join(', ')}, 외 ${others.length - 2}명`;
+};
 
+export const ChatRoomItem: React.FC<ChatRoomItemProps> = ({ chatRoom, onPress }) => {
+  const hasUnread = chatRoom.unreadCount > 0;
+  const participantLabel = getParticipantLabel(chatRoom);
   return (
-    <TouchableOpacity style={styles.container} onPress={onPress} activeOpacity={0.7}>
-      {/* 아바타 */}
-      <View style={styles.avatarContainer}>
+    <TouchableOpacity
+      style={[styles.container, hasUnread && styles.containerUnread]}
+      onPress={onPress}
+      activeOpacity={0.7}
+    >
+      <View style={styles.avatarWrap}>
         <View style={styles.avatar}>
           <Text style={styles.avatarText}>{chatRoom.avatar}</Text>
         </View>
-        {chatRoom.unreadCount > 0 && (
-          <View style={styles.badge}>
-            <Text style={styles.badgeText}>
-              {chatRoom.unreadCount > 99 ? '99+' : chatRoom.unreadCount}
-            </Text>
-          </View>
-        )}
       </View>
 
-      {/* 메시지 내용 */}
-      <View style={styles.contentContainer}>
-        <View style={styles.header}>
-          <Text style={styles.name}>{chatRoom.name}</Text>
-          <Text style={styles.time}>{timeString}</Text>
+      <View style={styles.content}>
+        <View style={styles.topRow}>
+          <Text style={styles.name} numberOfLines={1}>{chatRoom.name}</Text>
+          <Text style={styles.time}>{formatTime(chatRoom.lastMessageAt)}</Text>
         </View>
-        <View style={styles.messageContainer}>
-          <Text style={styles.senderName}>{chatRoom.lastMessageBy}</Text>
+        {participantLabel && (
+          <Text style={styles.participants} numberOfLines={1}>{participantLabel}</Text>
+        )}
+        <View style={styles.bottomRow}>
           <Text style={styles.lastMessage} numberOfLines={1}>
             {chatRoom.lastMessage}
           </Text>
+          {hasUnread && (
+            <View style={styles.badge}>
+              <Text style={styles.badgeText}>
+                {chatRoom.unreadCount > 99 ? '99+' : chatRoom.unreadCount}
+              </Text>
+            </View>
+          )}
         </View>
       </View>
     </TouchableOpacity>
@@ -47,90 +59,98 @@ export const ChatRoomItem: React.FC<ChatRoomItemProps> = ({ chatRoom, onPress })
 const formatTime = (dateString: string): string => {
   const date = new Date(dateString);
   const now = new Date();
-  const diffTime = now.getTime() - date.getTime();
-  const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
-  const diffHours = Math.floor(diffTime / (1000 * 60 * 60));
-  const diffMinutes = Math.floor(diffTime / (1000 * 60));
+  const diffMs = now.getTime() - date.getTime();
+  const diffMin = Math.floor(diffMs / 60000);
+  const diffHr = Math.floor(diffMs / 3600000);
+  const diffDay = Math.floor(diffMs / 86400000);
 
-  if (diffMinutes < 1) return '방금';
-  if (diffMinutes < 60) return `${diffMinutes}분`;
-  if (diffHours < 24) return `${diffHours}시간`;
-  if (diffDays < 7) return `${diffDays}일`;
-
-  return date.toLocaleDateString('ko-KR', { month: 'short', day: 'numeric' });
+  if (diffMin < 1) return '방금 전';
+  if (diffMin < 60) return `${diffMin}분 전`;
+  if (diffHr < 24) return `${diffHr}시간 전`;
+  if (diffDay < 7) return `${diffDay}일 전`;
+  return date.toLocaleDateString('ko-KR', { month: 'numeric', day: 'numeric' });
 };
 
 const styles = StyleSheet.create({
   container: {
     flexDirection: 'row',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.lightGray,
     alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 14,
+    backgroundColor: Colors.white,
   },
-  avatarContainer: {
-    position: 'relative',
+  containerUnread: {
+    backgroundColor: '#FFF8F2',
+  },
+  avatarWrap: {
     marginRight: 12,
+    flexShrink: 0,
   },
   avatar: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: Colors.ogTint,
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    backgroundColor: Colors.lightGray,
     justifyContent: 'center',
     alignItems: 'center',
   },
   avatarText: {
-    fontSize: 28,
+    fontSize: 24,
+    height: 52,
+    lineHeight: 52,
+    includeFontPadding: false,
   },
   badge: {
-    position: 'absolute',
-    bottom: 0,
-    right: 0,
+    minWidth: 24,
+    height: 24,
+    borderRadius: 12,
     backgroundColor: Colors.primary,
-    borderRadius: 10,
-    minWidth: 20,
-    height: 20,
     justifyContent: 'center',
     alignItems: 'center',
+    paddingHorizontal: 6,
+    flexShrink: 0,
   },
   badgeText: {
     fontSize: 11,
-    fontWeight: '600',
+    fontWeight: '700',
     color: Colors.white,
-    paddingHorizontal: 4,
   },
-  contentContainer: {
+  content: {
     flex: 1,
+    gap: 4,
   },
-  header: {
+  topRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 4,
   },
   name: {
-    fontSize: 14,
+    fontSize: 15,
     fontWeight: '600',
     color: Colors.dark,
+    flex: 1,
+    marginRight: 8,
   },
   time: {
     fontSize: 12,
     color: Colors.grayMedium,
+    flexShrink: 0,
   },
-  messageContainer: {
+  bottomRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
   },
-  senderName: {
-    fontSize: 12,
-    color: Colors.grayMedium,
-    marginRight: 4,
+  participants: {
+    fontSize: 11,
+    color: Colors.grayLight,
+    marginBottom: 1,
   },
   lastMessage: {
     flex: 1,
-    fontSize: 12,
+    fontSize: 13,
     color: Colors.grayMedium,
+    lineHeight: 18,
+    marginRight: 8,
   },
 });

@@ -5,13 +5,14 @@ import { Message } from '../../types/message';
 
 interface MessageBubbleProps {
   message: Message;
+  showSenderName?: boolean;
 }
 
-export const MessageBubble: React.FC<MessageBubbleProps> = ({ message }) => {
+export const MessageBubble: React.FC<MessageBubbleProps> = ({ message, showSenderName = false }) => {
   if (message.isSystem) {
     return (
-      <View style={styles.systemContainer}>
-        <View style={styles.systemBubble}>
+      <View style={styles.systemRow}>
+        <View style={styles.systemPill}>
           <Text style={styles.systemText}>{message.content}</Text>
         </View>
       </View>
@@ -21,20 +22,27 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message }) => {
   const isOwn = message.isSent;
 
   return (
-    <View style={[styles.container, isOwn ? styles.containerOwn : styles.containerOther]}>
+    <View style={[styles.row, isOwn ? styles.rowOwn : styles.rowOther]}>
       {!isOwn && (
         <View style={styles.avatar}>
           <Text style={styles.avatarText}>{message.senderAvatar}</Text>
         </View>
       )}
-      <View style={[styles.bubbleContainer, isOwn && styles.bubbleContainerOwn]}>
-        {!isOwn && <Text style={styles.senderName}>{message.senderName}</Text>}
-        <View style={[styles.bubble, isOwn ? styles.bubbleOwn : styles.bubbleOther]}>
-          <Text style={[styles.text, isOwn && styles.textOwn]}>{message.content}</Text>
+      <View style={[styles.group, isOwn && styles.groupOwn]}>
+        {!isOwn && showSenderName && (
+          <Text style={styles.senderName}>{message.senderName}</Text>
+        )}
+        <View style={styles.bubbleRow}>
+          {isOwn && (
+            <Text style={styles.time}>{formatTime(message.createdAt)}</Text>
+          )}
+          <View style={[styles.bubble, isOwn ? styles.bubbleOwn : styles.bubbleOther]}>
+            <Text style={[styles.text, isOwn && styles.textOwn]}>{message.content}</Text>
+          </View>
+          {!isOwn && (
+            <Text style={styles.time}>{formatTime(message.createdAt)}</Text>
+          )}
         </View>
-        <Text style={[styles.timestamp, isOwn && styles.timestampOwn]}>
-          {formatTime(message.createdAt)}
-        </Text>
       </View>
     </View>
   );
@@ -42,20 +50,20 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message }) => {
 
 const formatTime = (dateString: string): string => {
   const date = new Date(dateString);
-  return date.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' });
+  return date.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', hour12: false });
 };
 
 const styles = StyleSheet.create({
-  container: {
+  row: {
     flexDirection: 'row',
-    marginVertical: 8,
     paddingHorizontal: 16,
+    marginVertical: 3,
     alignItems: 'flex-end',
   },
-  containerOwn: {
+  rowOwn: {
     justifyContent: 'flex-end',
   },
-  containerOther: {
+  rowOther: {
     justifyContent: 'flex-start',
   },
   avatar: {
@@ -66,49 +74,43 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 8,
+    flexShrink: 0,
+    marginBottom: 4,
   },
   avatarText: {
     fontSize: 18,
   },
-  bubbleContainer: {
-    maxWidth: '70%',
+  group: {
+    maxWidth: '72%',
   },
-  bubbleContainerOwn: {
+  groupOwn: {
     alignItems: 'flex-end',
   },
   senderName: {
-    fontSize: 11,
-    color: Colors.grayMedium,
+    fontSize: 12,
+    color: Colors.primary,
+    fontWeight: '600',
     marginBottom: 4,
-    marginLeft: 8,
+    marginLeft: 4,
+  },
+  bubbleRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    gap: 4,
   },
   bubble: {
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 12,
-    backgroundColor: Colors.lightGray,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 16,
+    flexShrink: 1,
   },
   bubbleOwn: {
     backgroundColor: Colors.primary,
+    borderBottomRightRadius: 4,
   },
   bubbleOther: {
-    backgroundColor: Colors.lightGray,
-  },
-  systemContainer: {
-    alignItems: 'center',
-    marginVertical: 12,
-  },
-  systemBubble: {
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 16,
-    backgroundColor: Colors.white,
-    borderWidth: 1,
-    borderColor: Colors.lightGray,
-  },
-  systemText: {
-    fontSize: 12,
-    color: Colors.grayMedium,
+    backgroundColor: Colors.pageBg,
+    borderBottomLeftRadius: 4,
   },
   text: {
     fontSize: 14,
@@ -118,14 +120,27 @@ const styles = StyleSheet.create({
   textOwn: {
     color: Colors.white,
   },
-  timestamp: {
-    fontSize: 11,
+  time: {
+    fontSize: 10,
     color: Colors.grayMedium,
-    marginTop: 4,
-    marginLeft: 8,
+    marginBottom: 2,
+    flexShrink: 0,
   },
-  timestampOwn: {
-    marginLeft: 0,
-    marginRight: 8,
+  systemRow: {
+    alignItems: 'center',
+    marginVertical: 8,
+    paddingHorizontal: 16,
+  },
+  systemPill: {
+    backgroundColor: Colors.white,
+    borderRadius: 20,
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+    borderWidth: 1,
+    borderColor: Colors.lightGray,
+  },
+  systemText: {
+    fontSize: 12,
+    color: Colors.grayMedium,
   },
 });

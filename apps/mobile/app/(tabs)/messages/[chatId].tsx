@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   StyleSheet,
@@ -9,6 +9,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   SafeAreaView,
+  Modal,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Colors } from '../../../src/constants/colors';
@@ -16,10 +17,11 @@ import { MessageBubble } from '../../../src/components/messages/MessageBubble';
 import { MessageInput } from '../../../src/components/messages/MessageInput';
 import { getChat, sendMessage } from '../../../src/services/messageService';
 import { Chat, Message } from '../../../src/types/message';
-
 export default function ChatDetailScreen() {
   const router = useRouter();
   const { chatId } = useLocalSearchParams();
+  const flatListRef = useRef<FlatList>(null);
+
   const [chat, setChat] = useState<Chat | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -27,6 +29,9 @@ export default function ChatDetailScreen() {
   const [matchStatus, setMatchStatus] = useState<
     'pending' | 'accepted' | 'requested' | 'waiting' | 'completed' | 'none'
   >('none');
+  const [isMoreSheetVisible, setIsMoreSheetVisible] = useState(false);
+  const [isBlockConfirmVisible, setIsBlockConfirmVisible] = useState(false);
+  const [isLeaveConfirmVisible, setIsLeaveConfirmVisible] = useState(false);
 
   useEffect(() => {
     loadChat();
@@ -35,14 +40,14 @@ export default function ChatDetailScreen() {
   const loadChat = async () => {
     setIsLoading(true);
     try {
-      const chatData = await getChat(parseInt(chatId as string));
-      if (chatData) {
-        setChat(chatData);
-        setMessages(chatData.messages);
-        setMatchStatus(chatData.matchStatus ?? 'none');
+      const data = await getChat(parseInt(chatId as string));
+      if (data) {
+        setChat(data);
+        setMessages(data.messages);
+        setMatchStatus(data.matchStatus ?? 'none');
       }
-    } catch (error) {
-      console.error('Failed to load chat:', error);
+    } catch (e) {
+      console.error('Failed to load chat:', e);
     } finally {
       setIsLoading(false);
     }
@@ -53,103 +58,142 @@ export default function ChatDetailScreen() {
     try {
       const newMessage = await sendMessage(parseInt(chatId as string), text);
       setMessages((prev) => [...prev, newMessage]);
-    } catch (error) {
-      console.error('Failed to send message:', error);
+      setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 100);
+    } catch (e) {
+      console.error('Failed to send:', e);
     } finally {
       setIsSending(false);
     }
   };
 
-  const handleMoreOptions = () => {
-    // TODO: Bottom sheet 구현
-    console.log('More options pressed');
-  };
-
   const handleMatchAction = () => {
-    if (chat?.detailType === 'member-invite') {
-      setMatchStatus('accepted');
-      return;
-    }
-    if (chat?.detailType === 'leader-request') {
-      setMatchStatus('waiting');
-      return;
-    }
+    if (chat?.detailType === 'member-invite') setMatchStatus('accepted');
+    if (chat?.detailType === 'leader-request') setMatchStatus('waiting');
   };
 
-  const renderActionArea = () => {
-    if (!chat) return null;
+  // ────────────────────────────────────────────────
+  // Modals
+  // ────────────────────────────────────────────────
 
-    if (chat.detailType === 'member-invite') {
-      const accepted = matchStatus === 'accepted';
-      return (
-        <View style={styles.actionArea}>
-          <View style={styles.actionInfoBox}>
-            <Text style={styles.actionTitle}>팀 매칭 제안이 왔어요!</Text>
-            <Text style={styles.actionDescription}>
-              이 팀과 매칭을 수락하면 채팅으로 바로 대화를 이어갈 수 있어요.
-            </Text>
-          </View>
+  const renderMoreSheet = () => (
+    <Modal visible={isMoreSheetVisible} animationType="slide" transparent>
+      <View style={styles.sheetOverlay}>
+        <TouchableOpacity style={styles.sheetBackdrop} onPress={() => setIsMoreSheetVisible(false)} />
+        <View style={styles.sheetContainer}>
+          <View style={styles.sheetHandle} />
+          {chat?.type === 'direct' && (
+            <TouchableOpacity
+              style={styles.sheetItem}
+              onPress={() => { setIsMoreSheetVisible(false); setIsBlockConfirmVisible(true); }}
+            >
+              <View style={styles.sheetItemIcon}>
+                <Text style={styles.sheetItemIconText}>🚫</Text>
+              </View>
+              <Text style={styles.sheetItemLabel}>차단하기</Text>
+            </TouchableOpacity>
+          )}
           <TouchableOpacity
-            style={[
-              styles.actionButton,
-              accepted ? styles.disabledButton : styles.primaryButton,
-            ]}
-            disabled={accepted}
-            onPress={handleMatchAction}
+            style={styles.sheetItem}
+            onPress={() => { setIsMoreSheetVisible(false); router.push(`/messages/${chatId}/report`); }}
           >
-            <Text style={[styles.actionButtonText, accepted && styles.disabledButtonText]}>
-              {accepted ? '매칭 수락 완료' : '매칭 수락하기'}
-            </Text>
+            <View style={styles.sheetItemIcon}>
+              <Text style={styles.sheetItemIconText}>⚠️</Text>
+            </View>
+            <Text style={styles.sheetItemLabel}>신고하기</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.sheetItem}
+            onPress={() => { setIsMoreSheetVisible(false); setIsLeaveConfirmVisible(true); }}
+          >
+            <View style={styles.sheetItemIcon}>
+              <Text style={styles.sheetItemIconText}>🚪</Text>
+            </View>
+            <Text style={[styles.sheetItemLabel, styles.sheetItemDanger]}>채팅방 나가기</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.sheetCloseBtn}
+            onPress={() => setIsMoreSheetVisible(false)}
+          >
+            <Text style={styles.sheetCloseBtnText}>닫기</Text>
           </TouchableOpacity>
         </View>
-      );
-    }
+      </View>
+    </Modal>
+  );
 
-    if (chat.detailType === 'leader-request') {
-      const waiting = matchStatus === 'waiting';
-      return (
-        <View style={styles.actionArea}>
-          <View style={styles.actionInfoBox}>
-            <Text style={styles.actionTitle}>팀 매칭 요청을 보냈습니다</Text>
-            <Text style={styles.actionDescription}>
-              요청을 보내면 상대방의 수락 여부를 기다리는 중이에요.
-            </Text>
+  const renderBlockConfirm = () => (
+    <Modal visible={isBlockConfirmVisible} animationType="fade" transparent>
+      <View style={styles.dialogOverlay}>
+        <View style={styles.dialogBox}>
+          <Text style={styles.dialogTitle}>상대방을 차단할까요?</Text>
+          <Text style={styles.dialogDesc}>
+            {`차단하면 ${chat?.name ?? ''}님과 채팅방에서\n대화를 주고받을 수 없어요.\n차단하시겠어요?`}
+          </Text>
+          <View style={styles.dialogBtns}>
+            <TouchableOpacity
+              style={styles.dialogBtnCancel}
+              onPress={() => setIsBlockConfirmVisible(false)}
+            >
+              <Text style={styles.dialogBtnCancelText}>취소</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.dialogBtnConfirm}
+              onPress={() => {
+                setIsBlockConfirmVisible(false);
+                setTimeout(() => router.back(), 300);
+              }}
+            >
+              <Text style={styles.dialogBtnConfirmText}>차단</Text>
+            </TouchableOpacity>
           </View>
-          <TouchableOpacity
-            style={[
-              styles.actionButton,
-              waiting ? styles.disabledButton : styles.primaryButton,
-            ]}
-            disabled={waiting}
-            onPress={handleMatchAction}
-          >
-            <Text style={[styles.actionButtonText, waiting && styles.disabledButtonText]}>
-              {waiting ? '수락 대기 중' : '매칭 요청하기'}
-            </Text>
-          </TouchableOpacity>
         </View>
-      );
-    }
+      </View>
+    </Modal>
+  );
 
-    return null;
-  };
+  const renderLeaveConfirm = () => (
+    <Modal visible={isLeaveConfirmVisible} animationType="fade" transparent>
+      <View style={styles.dialogOverlay}>
+        <View style={styles.dialogBox}>
+          <Text style={styles.dialogTitle}>채팅방을 나갈까요?</Text>
+          <Text style={styles.dialogDesc}>
+            {'채팅방을 나가면 채팅 목록 및 대화\n내용이 삭제되고 복구할 수 없어요.\n채팅방에서 나가시겠어요?'}
+          </Text>
+          <View style={styles.dialogBtns}>
+            <TouchableOpacity
+              style={styles.dialogBtnCancel}
+              onPress={() => setIsLeaveConfirmVisible(false)}
+            >
+              <Text style={styles.dialogBtnCancelText}>취소</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.dialogBtnConfirm}
+              onPress={() => { setIsLeaveConfirmVisible(false); router.back(); }}
+            >
+              <Text style={styles.dialogBtnConfirmText}>나가기</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </View>
+    </Modal>
+  );
+
+  // ────────────────────────────────────────────────
+  // List header (team status card + date divider)
+  // ────────────────────────────────────────────────
 
   const renderListHeader = () => {
     if (!chat) return null;
-
     return (
-      <View style={styles.listHeaderContainer}>
+      <View style={styles.listHeaderWrap}>
         {chat.detailType === 'group-status' && chat.teamInfo && (
-          <View style={styles.teamStatusCard}>
-            <View style={styles.teamStatusBadge}>
-              <Text style={styles.teamStatusBadgeText}>{chat.teamInfo.statusLabel}</Text>
+          <View style={styles.teamCard}>
+            <View style={styles.teamCardBadgeWrap}>
+              <View style={styles.teamCardBadge}>
+                <Text style={styles.teamCardBadgeText}>{chat.teamInfo.statusLabel}</Text>
+              </View>
             </View>
-            <View style={styles.teamStatusHeaderRow}>
-              <Text style={styles.teamStatusTitle}>{chat.teamInfo.title}</Text>
-              <Text style={styles.teamStatusParticipants}>
-                {chat.teamInfo.currentCount}/{chat.teamInfo.totalCount}명 참여 중
-              </Text>
-            </View>
+            <Text style={styles.teamCardTitle}>{chat.teamInfo.title}</Text>
             <View style={styles.teamMemberRow}>
               {chat.teamInfo.members.map((member) => (
                 <View key={member.id} style={styles.teamMemberItem}>
@@ -161,23 +205,89 @@ export default function ChatDetailScreen() {
                   >
                     <Text style={styles.teamMemberAvatarText}>{member.avatar}</Text>
                   </View>
-                  <Text style={styles.teamMemberName}>{member.name}</Text>
+                  <Text style={styles.teamMemberName} numberOfLines={1}>{member.name}</Text>
                 </View>
               ))}
             </View>
           </View>
         )}
-        <View style={styles.todayBadge}>
-          <Text style={styles.todayBadgeText}>오늘</Text>
+        <View style={styles.dateDivider}>
+          <View style={styles.dateDividerPill}>
+            <Text style={styles.dateDividerText}>오늘</Text>
+          </View>
         </View>
       </View>
     );
   };
 
+  // ────────────────────────────────────────────────
+  // Action area (below message list)
+  // ────────────────────────────────────────────────
+
+  const renderActionArea = () => {
+    if (!chat) return null;
+
+    if (chat.detailType === 'member-invite') {
+      const accepted = matchStatus === 'accepted';
+      return (
+        <View style={styles.actionArea}>
+          <View style={[styles.actionBanner, accepted && styles.actionBannerDone]}>
+            <Text style={[styles.actionBannerText, !accepted ? styles.actionBannerTextActive : styles.actionBannerTextDone]}>
+              {accepted
+                ? '🎉 팀 매칭이 완료됐어요! 팀채팅방에서 만나요.'
+                : '💌 팀 매칭 제의가 왔어요! 수락하시겠어요?'}
+            </Text>
+          </View>
+          <TouchableOpacity
+            style={[styles.actionBtn, accepted && styles.actionBtnDisabled]}
+            disabled={accepted}
+            onPress={handleMatchAction}
+            activeOpacity={0.8}
+          >
+            <Text style={[styles.actionBtnText, accepted && styles.actionBtnTextDisabled]}>
+              {accepted ? '팀 매칭 수락 완료' : '팀 매칭 수락하기'}
+            </Text>
+          </TouchableOpacity>
+        </View>
+      );
+    }
+
+    if (chat.detailType === 'leader-request') {
+      const waiting = matchStatus === 'waiting';
+      return (
+        <View style={styles.actionArea}>
+          <View style={[styles.actionBanner, waiting && styles.actionBannerDone]}>
+            <Text style={[styles.actionBannerText, !waiting ? styles.actionBannerTextActive : styles.actionBannerTextDone]}>
+              {waiting
+                ? '💌 매칭 요청을 보냈어요. 상대방의 수락을 기다리는 중...'
+                : '💌 팀 매칭 제안을 보내볼까요?'}
+            </Text>
+          </View>
+          <TouchableOpacity
+            style={[styles.actionBtn, waiting && styles.actionBtnDisabled]}
+            disabled={waiting}
+            onPress={handleMatchAction}
+            activeOpacity={0.8}
+          >
+            <Text style={[styles.actionBtnText, waiting && styles.actionBtnTextDisabled]}>
+              {waiting ? '상대방 수락 대기 중' : '팀 매칭 제안하기'}
+            </Text>
+          </TouchableOpacity>
+        </View>
+      );
+    }
+
+    return null;
+  };
+
+  // ────────────────────────────────────────────────
+  // Render
+  // ────────────────────────────────────────────────
+
   if (isLoading) {
     return (
       <SafeAreaView style={styles.container}>
-        <View style={styles.loadingContainer}>
+        <View style={styles.center}>
           <ActivityIndicator size="large" color={Colors.primary} />
         </View>
       </SafeAreaView>
@@ -187,41 +297,51 @@ export default function ChatDetailScreen() {
   if (!chat) {
     return (
       <SafeAreaView style={styles.container}>
-        <View style={styles.errorContainer}>
+        <View style={styles.center}>
           <Text style={styles.errorText}>채팅을 불러올 수 없습니다</Text>
         </View>
       </SafeAreaView>
     );
   }
 
+  const isGroup = chat.type === 'group';
+  const headerName = isGroup ? `${chat.name} ${chat.avatar}` : chat.name;
+  const headerSubtitle = isGroup && chat.teamInfo
+    ? `${chat.teamInfo.currentCount}/${chat.teamInfo.totalCount}명 참여 중`
+    : chat.description ?? null;
+
   return (
     <SafeAreaView style={styles.container}>
       {/* 헤더 */}
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-          <Text style={styles.backButtonText}>←</Text>
+        <TouchableOpacity onPress={() => router.back()} style={styles.backBtn} hitSlop={8}>
+          <Text style={styles.backBtnText}>{'<'}</Text>
         </TouchableOpacity>
-        <View style={styles.headerTitle}>
-          <Text style={styles.chatName}>{chat.name}</Text>
-          {chat.type === 'group' && (
-            <Text style={styles.chatType}>
-              {chat.participants.length}명
-            </Text>
-          )}
+        <View style={styles.headerTitleRow}>
+          <Text style={styles.headerName}>{headerName}</Text>
+          {headerSubtitle ? (
+            <Text style={styles.headerSubtitle}>{headerSubtitle}</Text>
+          ) : null}
         </View>
-        <TouchableOpacity onPress={handleMoreOptions} style={styles.moreButton}>
-          <Text style={styles.moreButtonText}>⋯</Text>
+        <TouchableOpacity onPress={() => setIsMoreSheetVisible(true)} style={styles.moreBtn} hitSlop={8}>
+          <Text style={styles.moreBtnText}>⋮</Text>
         </TouchableOpacity>
       </View>
 
+      {renderMoreSheet()}
+      {renderBlockConfirm()}
+      {renderLeaveConfirm()}
+
       {/* 메시지 목록 */}
       <FlatList
+        ref={flatListRef}
         data={messages}
-        renderItem={({ item }) => <MessageBubble message={item} />}
+        renderItem={({ item }) => <MessageBubble message={item} showSenderName={isGroup} />}
         keyExtractor={(item) => item.id.toString()}
-        scrollEnabled={true}
         contentContainerStyle={styles.messageListContent}
         ListHeaderComponent={renderListHeader}
+        onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: false })}
+        showsVerticalScrollIndicator={false}
       />
 
       {renderActionArea()}
@@ -242,95 +362,106 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: Colors.white,
   },
+  center: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  errorText: {
+    fontSize: 15,
+    color: Colors.grayMedium,
+  },
+
+  // ── 헤더 ──────────────────────────────────────
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderBottomWidth: 1,
     borderBottomColor: Colors.lightGray,
+    backgroundColor: Colors.white,
   },
-  backButton: {
-    paddingHorizontal: 8,
-    paddingVertical: 8,
+  backBtn: {
+    marginRight: 8,
+    paddingVertical: 4,
+    paddingHorizontal: 4,
   },
-  backButtonText: {
-    fontSize: 18,
-    color: Colors.primary,
-    fontWeight: '600',
-  },
-  headerTitle: {
-    flex: 1,
-    alignItems: 'center',
-    marginHorizontal: 12,
-  },
-  chatName: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: Colors.dark,
-  },
-  chatType: {
-    fontSize: 11,
-    color: Colors.grayMedium,
-    marginTop: 2,
-  },
-  moreButton: {
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-  },
-  moreButtonText: {
+  backBtnText: {
     fontSize: 20,
-    color: Colors.dark,
-  },
-  listHeaderContainer: {
-    paddingHorizontal: 16,
-    paddingBottom: 12,
-  },
-  todayBadge: {
-    alignSelf: 'center',
-    backgroundColor: Colors.backgroundLight,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 14,
-    marginTop: 8,
-  },
-  todayBadgeText: {
-    fontSize: 12,
-    color: Colors.grayMedium,
-  },
-  teamStatusCard: {
-    backgroundColor: Colors.backgroundWhite,
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 12,
-  },
-  teamStatusBadge: {
-    alignSelf: 'flex-start',
-    backgroundColor: Colors.backgroundLight,
-    borderRadius: 12,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    marginBottom: 12,
-  },
-  teamStatusBadgeText: {
     color: Colors.primary,
-    fontSize: 12,
+    fontWeight: '600',
   },
-  teamStatusHeaderRow: {
+  headerTitleRow: {
+    flex: 1,
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 14,
+    alignItems: 'flex-end',
+    gap: 6,
   },
-  teamStatusTitle: {
-    fontSize: 15,
+  headerName: {
+    fontSize: 16,
     fontWeight: '700',
     color: Colors.dark,
   },
-  teamStatusParticipants: {
-    fontSize: 12,
+  headerSubtitle: {
+    fontSize: 11,
     color: Colors.grayMedium,
+    fontWeight: '400',
+  },
+  moreBtn: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    borderWidth: 1.5,
+    borderColor: Colors.lightGray,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  moreBtnText: {
+    fontSize: 18,
+    color: Colors.dark,
+    includeFontPadding: false,
+    marginTop: 3,
+  },
+
+  // ── 메시지 목록 ────────────────────────────────
+  messageListContent: {
+    paddingVertical: 8,
+  },
+
+  // ── 리스트 헤더 (팀 카드 + 날짜 구분선) ────────
+  listHeaderWrap: {
+    paddingBottom: 4,
+  },
+  teamCard: {
+    backgroundColor: Colors.ogTint,
+    paddingHorizontal: 20,
+    paddingTop: 16,
+    paddingBottom: 20,
+  },
+  teamCardBadgeWrap: {
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  teamCardBadge: {
+    backgroundColor: Colors.white,
+    borderRadius: 20,
+    paddingHorizontal: 14,
+    paddingVertical: 5,
+    borderWidth: 1,
+    borderColor: Colors.lightGray,
+  },
+  teamCardBadgeText: {
+    fontSize: 12,
+    color: Colors.primary,
+    fontWeight: '500',
+  },
+  teamCardTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: Colors.dark,
+    textAlign: 'center',
+    marginBottom: 16,
   },
   teamMemberRow: {
     flexDirection: 'row',
@@ -338,7 +469,7 @@ const styles = StyleSheet.create({
   },
   teamMemberItem: {
     alignItems: 'center',
-    width: 56,
+    flex: 1,
   },
   teamMemberAvatar: {
     width: 48,
@@ -349,75 +480,200 @@ const styles = StyleSheet.create({
     marginBottom: 6,
   },
   teamMemberAvatarFilled: {
-    backgroundColor: Colors.primary,
+    backgroundColor: Colors.white,
   },
   teamMemberAvatarEmpty: {
-    backgroundColor: Colors.backgroundLight,
+    backgroundColor: Colors.lightGray,
   },
   teamMemberAvatarText: {
-    fontSize: 20,
+    fontSize: 22,
   },
   teamMemberName: {
     fontSize: 11,
     color: Colors.dark,
     textAlign: 'center',
+    maxWidth: 52,
   },
+  dateDivider: {
+    alignItems: 'center',
+    marginVertical: 14,
+  },
+  dateDividerPill: {
+    backgroundColor: Colors.white,
+    borderRadius: 20,
+    paddingHorizontal: 14,
+    paddingVertical: 5,
+    borderWidth: 1,
+    borderColor: Colors.lightGray,
+  },
+  dateDividerText: {
+    fontSize: 12,
+    color: Colors.grayMedium,
+  },
+
+  // ── 액션 영역 ──────────────────────────────────
   actionArea: {
     paddingHorizontal: 16,
-    paddingBottom: 12,
+    paddingTop: 12,
+    paddingBottom: 10,
     backgroundColor: Colors.white,
+    gap: 10,
   },
-  actionInfoBox: {
-    backgroundColor: Colors.backgroundLight,
-    padding: 16,
-    borderRadius: 16,
-    marginBottom: 12,
+  actionBanner: {
+    backgroundColor: Colors.ogTint,
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 13,
   },
-  actionTitle: {
+  actionBannerText: {
     fontSize: 14,
-    fontWeight: '700',
     color: Colors.dark,
-    marginBottom: 6,
+    fontWeight: '500',
   },
-  actionDescription: {
-    fontSize: 13,
+  actionBannerDone: {
+    backgroundColor: Colors.pageBg,
+  },
+  actionBannerTextDone: {
     color: Colors.grayMedium,
-    lineHeight: 19,
   },
-  actionButton: {
-    borderRadius: 16,
-    paddingVertical: 14,
+  actionBannerTextActive: {
+    color: Colors.primary,
+    fontWeight: '500',
+  },
+  actionBtn: {
+    backgroundColor: Colors.primary,
+    borderRadius: 10,
+    paddingVertical: 16,
     alignItems: 'center',
   },
-  primaryButton: {
-    backgroundColor: Colors.primary,
-  },
-  disabledButton: {
+  actionBtnDisabled: {
     backgroundColor: Colors.lightGray,
   },
-  actionButtonText: {
-    color: Colors.white,
-    fontWeight: '700',
+  actionBtnText: {
     fontSize: 15,
+    fontWeight: '700',
+    color: Colors.white,
   },
-  disabledButtonText: {
+  actionBtnTextDisabled: {
     color: Colors.grayMedium,
   },
-  messageListContent: {
-    paddingVertical: 8,
-  },
-  loadingContainer: {
+
+  // ── 바텀 시트 ──────────────────────────────────
+  sheetOverlay: {
     flex: 1,
+    justifyContent: 'flex-end',
+    backgroundColor: 'rgba(0,0,0,0.3)',
+  },
+  sheetBackdrop: {
+    flex: 1,
+  },
+  sheetContainer: {
+    backgroundColor: Colors.white,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    paddingTop: 10,
+    paddingBottom: 28,
+    paddingHorizontal: 20,
+  },
+  sheetHandle: {
+    width: 36,
+    height: 4,
+    backgroundColor: Colors.lightGray,
+    borderRadius: 2,
+    alignSelf: 'center',
+    marginBottom: 16,
+  },
+  sheetItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 16,
+    gap: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.lightGray,
+  },
+  sheetItemIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: Colors.pageBg,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  errorContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
+  sheetItemIconText: {
+    fontSize: 18,
   },
-  errorText: {
+  sheetItemLabel: {
     fontSize: 16,
+    color: Colors.dark,
+  },
+  sheetItemDanger: {
+    color: '#E53935',
+  },
+  sheetCloseBtn: {
+    marginTop: 14,
+    paddingVertical: 15,
+    backgroundColor: Colors.pageBg,
+    borderRadius: 14,
+    alignItems: 'center',
+  },
+  sheetCloseBtnText: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: Colors.dark,
+  },
+
+  // ── 다이얼로그 ─────────────────────────────────
+  dialogOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 28,
+  },
+  dialogBox: {
+    width: '100%',
+    backgroundColor: Colors.white,
+    borderRadius: 20,
+    padding: 24,
+  },
+  dialogTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: Colors.dark,
+    marginBottom: 10,
+  },
+  dialogDesc: {
+    fontSize: 14,
     color: Colors.grayMedium,
+    lineHeight: 22,
+    marginBottom: 24,
+  },
+  dialogBtns: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  dialogBtnCancel: {
+    flex: 1,
+    paddingVertical: 14,
+    borderRadius: 14,
+    backgroundColor: Colors.pageBg,
+    alignItems: 'center',
+  },
+  dialogBtnCancelText: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: Colors.dark,
+  },
+  dialogBtnConfirm: {
+    flex: 1,
+    paddingVertical: 14,
+    borderRadius: 14,
+    backgroundColor: Colors.primary,
+    alignItems: 'center',
+  },
+  dialogBtnConfirmText: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: Colors.white,
   },
 });

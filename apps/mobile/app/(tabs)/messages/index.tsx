@@ -2,15 +2,11 @@ import React, { useState, useEffect } from 'react';
 import {
   View,
   StyleSheet,
-  FlatList,
-  TextInput,
-  TouchableOpacity,
   Text,
   ActivityIndicator,
   SectionList,
   SafeAreaView,
 } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Colors } from '../../../src/constants/colors';
 import { ScreenHeader } from '../../../src/components/common/ScreenHeader';
@@ -24,11 +20,9 @@ interface SectionData {
 }
 
 export default function MessagesScreen() {
-  const insets = useSafeAreaInsets();
   const router = useRouter();
   const [chatRooms, setChatRooms] = useState<ChatRoom[]>([]);
   const [sections, setSections] = useState<SectionData[]>([]);
-  const [searchText, setSearchText] = useState('');
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
@@ -36,51 +30,28 @@ export default function MessagesScreen() {
   }, []);
 
   useEffect(() => {
-    filterAndOrganizeRooms();
-  }, [chatRooms, searchText]);
+    buildSections();
+  }, [chatRooms]);
 
   const loadChatRooms = async () => {
     setIsLoading(true);
     try {
       const rooms = await getChatRooms();
       setChatRooms(rooms);
-    } catch (error) {
-      console.error('Failed to load chat rooms:', error);
+    } catch (e) {
+      console.error('Failed to load chat rooms:', e);
     } finally {
       setIsLoading(false);
     }
   };
 
-  const filterAndOrganizeRooms = () => {
-    let filtered = chatRooms;
-
-    if (searchText.trim()) {
-      filtered = filtered.filter((room) =>
-        room.name.toLowerCase().includes(searchText.toLowerCase())
-      );
-    }
-
-    // 단체 채팅과 1:1 매칭 채팅으로 분리
-    const groupChats = filtered.filter((room) => room.type === 'group');
-    const directChats = filtered.filter((room) => room.type === 'direct');
-
-    const newSections: SectionData[] = [];
-
-    if (groupChats.length > 0) {
-      newSections.push({
-        title: '단체 채팅',
-        data: groupChats,
-      });
-    }
-
-    if (directChats.length > 0) {
-      newSections.push({
-        title: '1:1 매칭 채팅',
-        data: directChats,
-      });
-    }
-
-    setSections(newSections);
+  const buildSections = () => {
+    const group = chatRooms.filter((r) => r.type === 'group');
+    const direct = chatRooms.filter((r) => r.type === 'direct');
+    const result: SectionData[] = [];
+    if (group.length > 0) result.push({ title: '단체 채팅', data: group });
+    if (direct.length > 0) result.push({ title: '1:1 채팅', data: direct });
+    setSections(result);
   };
 
   const handleChatPress = (chatId: number) => {
@@ -90,25 +61,13 @@ export default function MessagesScreen() {
     });
   };
 
-  const renderSectionHeader = ({ section }: { section: SectionData }) => (
-    <View style={styles.sectionHeader}>
-      <Text style={styles.sectionTitle}>{section.title}</Text>
-    </View>
-  );
-
-  const renderEmptyState = () => (
-    <View style={styles.emptyContainer}>
-      <Text style={styles.emptyIcon}>💬</Text>
-      <Text style={styles.emptyTitle}>메시지가 없어요</Text>
-      <Text style={styles.emptySubtitle}>채팅을 시작해보세요</Text>
-    </View>
-  );
+  const totalUnread = chatRooms.reduce((sum, r) => sum + r.unreadCount, 0);
 
   if (isLoading) {
     return (
       <SafeAreaView style={styles.container}>
         <ScreenHeader title="메시지" />
-        <View style={styles.loadingContainer}>
+        <View style={styles.center}>
           <ActivityIndicator size="large" color={Colors.primary} />
         </View>
       </SafeAreaView>
@@ -119,24 +78,15 @@ export default function MessagesScreen() {
     <SafeAreaView style={styles.container}>
       <ScreenHeader title="메시지" />
 
-      {/* 배너 */}
-      <View style={styles.bannerContainer}>
-        <Text style={styles.bannerIcon}>💔</Text>
-        <Text style={styles.bannerText}>새로운 팀매칭 제의가 2건 있어요!</Text>
-      </View>
+      {totalUnread > 0 && (
+        <View style={styles.banner}>
+          <Text style={styles.bannerIcon}>💌</Text>
+          <Text style={styles.bannerText}>
+            새로운 팀매칭 제의가 {totalUnread}건 있어요!
+          </Text>
+        </View>
+      )}
 
-      {/* 검색창 */}
-      <View style={styles.searchContainer}>
-        <TextInput
-          style={styles.searchInput}
-          placeholder="채팅 검색"
-          placeholderTextColor={Colors.grayMedium}
-          value={searchText}
-          onChangeText={setSearchText}
-        />
-      </View>
-
-      {/* 섹션별 채팅 목록 */}
       {sections.length > 0 ? (
         <SectionList
           sections={sections}
@@ -147,11 +97,21 @@ export default function MessagesScreen() {
               onPress={() => handleChatPress(item.id)}
             />
           )}
-          renderSectionHeader={renderSectionHeader}
-          scrollEnabled={true}
+          renderSectionHeader={({ section }) => (
+            <View style={styles.sectionHeader}>
+              <Text style={styles.sectionTitle}>{section.title}</Text>
+            </View>
+          )}
+          ItemSeparatorComponent={() => <View style={styles.separator} />}
+          stickySectionHeadersEnabled={false}
+          contentContainerStyle={styles.listContent}
         />
       ) : (
-        renderEmptyState()
+        <View style={styles.center}>
+          <Text style={styles.emptyIcon}>💬</Text>
+          <Text style={styles.emptyTitle}>메시지가 없어요</Text>
+          <Text style={styles.emptySub}>채팅을 시작해보세요</Text>
+        </View>
       )}
     </SafeAreaView>
   );
@@ -160,75 +120,60 @@ export default function MessagesScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.white,
+    backgroundColor: Colors.pageBg,
   },
-  bannerContainer: {
-    backgroundColor: '#FFE8D6',
+  center: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  banner: {
     flexDirection: 'row',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
     alignItems: 'center',
     gap: 8,
+    backgroundColor: Colors.ogTint,
+    paddingHorizontal: 20,
+    paddingVertical: 12,
   },
   bannerIcon: {
     fontSize: 16,
   },
   bannerText: {
     fontSize: 13,
-    color: Colors.dark,
     fontWeight: '500',
+    color: Colors.primary,
   },
-  searchContainer: {
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.lightGray,
-  },
-  searchInput: {
-    borderWidth: 1,
-    borderColor: Colors.lightGray,
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    fontSize: 14,
-    color: Colors.dark,
-    backgroundColor: Colors.pageBg,
+  listContent: {
+    paddingBottom: 20,
   },
   sectionHeader: {
-    paddingHorizontal: 16,
-    paddingTop: 16,
+    paddingHorizontal: 20,
+    paddingTop: 20,
     paddingBottom: 8,
-    backgroundColor: Colors.white,
+    backgroundColor: Colors.pageBg,
   },
   sectionTitle: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '600',
-    color: Colors.dark,
+    color: Colors.grayMedium,
   },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  emptyContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 40,
+  separator: {
+    height: 1,
+    backgroundColor: Colors.lightGray,
+    marginLeft: 84,
   },
   emptyIcon: {
-    fontSize: 48,
-    marginBottom: 16,
+    fontSize: 40,
+    marginBottom: 12,
   },
   emptyTitle: {
     fontSize: 16,
     fontWeight: '600',
     color: Colors.dark,
-    marginBottom: 8,
   },
-  emptySubtitle: {
+  emptySub: {
     fontSize: 13,
     color: Colors.grayMedium,
-    textAlign: 'center',
+    marginTop: 4,
   },
 });
