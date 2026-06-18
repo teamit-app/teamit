@@ -120,7 +120,7 @@ export default function MessagesScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.pageBg,
+    backgroundColor: Colors.white,
   },
   center: {
     flex: 1,
@@ -132,8 +132,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 8,
     backgroundColor: Colors.ogTint,
-    paddingHorizontal: 20,
+    marginHorizontal: 16,
+    marginTop: 12,
+    paddingHorizontal: 16,
     paddingVertical: 12,
+    borderRadius: 12,
   },
   bannerIcon: {
     fontSize: 16,
@@ -150,12 +153,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingTop: 20,
     paddingBottom: 8,
-    backgroundColor: Colors.pageBg,
+    backgroundColor: Colors.white,
   },
   sectionTitle: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: Colors.grayMedium,
+    fontSize: 15,
+    fontWeight: '700',
+    color: Colors.dark,
   },
   separator: {
     height: 1,
