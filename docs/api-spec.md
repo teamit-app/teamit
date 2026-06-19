@@ -483,7 +483,7 @@ image: (파일)
 ---
 
 ### 1-18. 인재풀 목록 조회 (탐색 탭)
-**GET** `/users?skillId={skillId}&sido={sido}&role={role}&page={page}&size={size}`
+**GET** `/users?skillId={skillId}&sido={sido}&role={role}&keyword={keyword}&page={page}&size={size}`
 
 **Query Parameters**
 | 파라미터 | 타입 | 필수 | 설명 |
@@ -491,6 +491,7 @@ image: (파일)
 | skillId | Long | N | 스킬 필터 |
 | sido | String | N | 지역 필터 |
 | role | String | N | 역할 필터 |
+| keyword | String | N | 키워드 검색 (닉네임, 보유스킬명 LIKE 검색) |
 | page | int | N | 페이지 번호 (기본 0) |
 | size | int | N | 페이지 크기 (기본 20) |
 
@@ -511,7 +512,7 @@ image: (파일)
           { "skillName": "React", "level": 3 },
           { "skillName": "TypeScript", "level": 3 }
         ],
-        "certificates": ["컴퓨터활용능력1급", "정보처리기사"],
+        "certificates": [],
         "isMatchingActive": true
       }
     ],
@@ -644,13 +645,14 @@ image: (파일)
 ## 3. Contest
 
 ### 3-1. 공모전 목록 조회
-**GET** `/contests?category={category}&status={status}&page={page}&size={size}`
+**GET** `/contests?category={category}&status={status}&keyword={keyword}&page={page}&size={size}`
 
 **Query Parameters**
 | 파라미터 | 타입 | 필수 | 설명 |
 |---------|------|------|------|
 | category | String | N | `IT` / `STARTUP` / `DESIGN` / `SOCIAL` / `ENGINEERING` / `ARTS` / `ETC` |
 | status | String | N | `ONGOING` / `DEADLINE_SOON` / `CLOSED` |
+| keyword | String | N | 키워드 검색 (공모전명, 주최기관, 카테고리 LIKE 검색) |
 | page | int | N | 기본 0 |
 | size | int | N | 기본 20 |
 

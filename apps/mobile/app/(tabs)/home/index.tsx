@@ -25,8 +25,12 @@ export default function HomeScreen() {
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('ALL');
 
   useEffect(() => {
-    getPopularContests().then(setContests);
-    getMatchingStatus().then(setMatchingStatus);
+    getPopularContests()
+      .then(setContests)
+      .catch((e) => console.error('[Home] 인기 공모전 로드 실패:', e));
+    getMatchingStatus()
+      .then((data) => { if (data) setMatchingStatus(data); })
+      .catch((e) => console.error('[Home] 매칭 현황 로드 실패:', e));
   }, []);
 
   const filteredContests = contests.filter(

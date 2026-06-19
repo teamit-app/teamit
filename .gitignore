@@ -17,3 +17,4 @@ apps/mobile/.env
 .DS_Store
 *.env
 *.env.local
+.idea/
