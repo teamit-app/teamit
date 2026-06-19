@@ -11,6 +11,7 @@ import { ContestCard } from '../../../src/components/explore/ContestCard';
 import { TalentCard } from '../../../src/components/explore/TalentCard';
 import { useExploreStore } from '../../../src/store/useExploreStore';
 import { ContestStatus } from '../../../src/types/contest';
+import { getOrCreateDirectChatRoom } from '../../../src/services/messageService';
 
 type MainTab = 'POOL' | 'CONTEST';
 type StatusFilter = 'ALL' | ContestStatus;
@@ -33,6 +34,15 @@ export default function ExploreScreen() {
   const loadData = useExploreStore((s) => s.loadData);
   const toggleTalentHeart = useExploreStore((s) => s.toggleTalentHeart);
   const toggleContestHeart = useExploreStore((s) => s.toggleContestHeart);
+
+  const handlePropose = async (targetUserId: number) => {
+    try {
+      const chatRoomId = await getOrCreateDirectChatRoom(targetUserId);
+      router.push(`/messages/${chatRoomId}` as never);
+    } catch (e) {
+      console.error('[Explore] 채팅방 생성 실패:', e);
+    }
+  };
 
   useEffect(() => {
     loadData();
@@ -119,6 +129,7 @@ export default function ExploreScreen() {
                   key={talent.userId}
                   talent={talent}
                   onPressHeart={() => toggleTalentHeart(talent.userId)}
+                  onPressPropose={() => handlePropose(talent.userId)}
                 />
               ))
             : filteredContests.map((contest) => (

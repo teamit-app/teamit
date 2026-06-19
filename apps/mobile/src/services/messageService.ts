@@ -1,73 +1,201 @@
+import { apiRequest } from './api';
 import { ChatRoom, Chat, Message } from '../types/message';
-import {
-  dummyChatRooms,
-  dummyDirectMessages1,
-  dummyDirectMessages2,
-  dummyDirectMessages3,
-  dummyDirectMessages4,
-  dummyGroupMessages1,
-  dummyGroupMessages2,
-} from '../data/chatRooms';
+import { useOnboardingStore } from '../store/useOnboardingStore';
+import { dummyChatRooms } from '../data/chatRooms';
 
-// TODO: 백엔드 API 연결 시 fetch 호출로 교체
+const IS_MOCK = process.env.EXPO_PUBLIC_API_MODE === 'mock';
+
+// ── 백엔드 응답 타입 ─────────────────────────────────────────────────────────
+
+interface BackendGroupChat {
+  chatRoomId: number;
+  roomType: 'GROUP';
+  teamName: string;
+  memberCount: number;
+  lastMessage: string;
+  lastMessageAt: string;
+  unreadCount: number;
+}
+
+interface BackendDirectChat {
+  chatRoomId: number;
+  roomType: 'DIRECT';
+  opponentNickname: string;
+  lastMessage: string;
+  lastMessageAt: string;
+  unreadCount: number;
+}
+
+interface BackendChatRoomListResponse {
+  groupChats: BackendGroupChat[];
+  directChats: BackendDirectChat[];
+}
+
+interface BackendChatMessage {
+  messageId: number;
+  senderId: number;
+  senderNickname: string;
+  content: string;
+  isRead: boolean;
+  createdAt: string;
+}
+
+interface BackendMessagePageResponse {
+  content: BackendChatMessage[];
+  totalElements: number;
+  currentPage: number;
+}
+
+// ── 어댑터 ──────────────────────────────────────────────────────────────────
+
+function adaptGroupChat(c: BackendGroupChat): ChatRoom {
+  return {
+    id: c.chatRoomId,
+    type: 'group',
+    name: c.teamName,
+    avatar: '👥',
+    lastMessage: c.lastMessage ?? '',
+    lastMessageBy: '',
+    lastMessageAt: c.lastMessageAt ?? '',
+    unreadCount: c.unreadCount,
+    participants: [],
+    detailType: 'normal',
+    matchStatus: 'none',
+  };
+}
+
+function adaptDirectChat(c: BackendDirectChat): ChatRoom {
+  return {
+    id: c.chatRoomId,
+    type: 'direct',
+    name: c.opponentNickname,
+    avatar: '👤',
+    lastMessage: c.lastMessage ?? '',
+    lastMessageBy: '',
+    lastMessageAt: c.lastMessageAt ?? '',
+    unreadCount: c.unreadCount,
+    participants: [],
+    detailType: 'normal',
+    matchStatus: 'none',
+  };
+}
+
+function adaptMessage(msg: BackendChatMessage, currentUserId: number): Message {
+  return {
+    id: msg.messageId,
+    senderId: msg.senderId,
+    senderName: msg.senderNickname,
+    senderAvatar: '👤',
+    content: msg.content,
+    createdAt: msg.createdAt,
+    isSent: msg.senderId === currentUserId,
+  };
+}
+
+// ── API 함수 ─────────────────────────────────────────────────────────────────
+
 export const getChatRooms = async (): Promise<ChatRoom[]> => {
-  return dummyChatRooms;
+  const userId = useOnboardingStore.getState().userId;
+  if (!userId) return [];
+
+  const data = await apiRequest<BackendChatRoomListResponse>(`/users/${userId}/chat-rooms`);
+  return [
+    ...(data.groupChats ?? []).map(adaptGroupChat),
+    ...(data.directChats ?? []).map(adaptDirectChat),
+  ];
 };
 
 export const getChat = async (chatId: number): Promise<Chat | null> => {
-  const chatRoom = dummyChatRooms.find((room) => room.id === chatId);
-  if (!chatRoom) return null;
+  const userId = useOnboardingStore.getState().userId;
+  if (!userId) return null;
 
-  let messages: Message[] = [];
+  // 채팅방 메타데이터 (rooms 목록에서 찾기)
+  const roomsData = await apiRequest<BackendChatRoomListResponse>(`/users/${userId}/chat-rooms`);
+  const allRooms: ChatRoom[] = [
+    ...(roomsData.groupChats ?? []).map(adaptGroupChat),
+    ...(roomsData.directChats ?? []).map(adaptDirectChat),
+  ];
+  const room = allRooms.find((r) => r.id === chatId);
+  if (!room) return null;
 
-  // 각 채팅 ID별로 정확한 메시지를 할당
-  switch (chatId) {
-    case 1: // 2025 창업 아이디어 팀
-      messages = dummyGroupMessages1;
-      break;
-    case 2: // AI 해커톤 우리팀
-      messages = dummyGroupMessages2;
-      break;
-    case 3: // 김모집 (팀 리더)
-      messages = dummyDirectMessages1;
-      break;
-    case 4: // 박팀장
-      messages = dummyDirectMessages2;
-      break;
-    case 5: // 이팀원
-      messages = dummyDirectMessages3;
-      break;
-    case 6: // 최기획자
-      messages = dummyDirectMessages4;
-      break;
-    default:
-      messages = [];
-  }
+  // 메시지 조회
+  const messagesData = await apiRequest<BackendMessagePageResponse>(
+    `/chat-rooms/${chatId}/messages?userId=${userId}&page=0&size=50`,
+  );
+  const messages = (messagesData.content ?? []).map((m) => adaptMessage(m, userId));
 
   return {
-    id: chatRoom.id,
-    type: chatRoom.type,
-    name: chatRoom.name,
-    avatar: chatRoom.avatar,
-    participants: chatRoom.participants,
-    messages: messages,
-    description: chatRoom.description,
-    detailType: chatRoom.detailType ?? 'normal',
-    matchStatus: chatRoom.matchStatus ?? 'none',
-    teamInfo: chatRoom.teamInfo,
+    id: room.id,
+    type: room.type,
+    name: room.name,
+    avatar: room.avatar,
+    participants: room.participants,
+    messages,
+    description: room.description,
+    detailType: room.detailType ?? 'normal',
+    matchStatus: room.matchStatus ?? 'none',
+    teamInfo: room.teamInfo,
   };
 };
 
+export const leaveChatRoom = async (chatId: number): Promise<void> => {
+  const userId = useOnboardingStore.getState().userId;
+  if (!userId) return;
+
+  if (IS_MOCK) return;
+
+  await apiRequest<null>(`/chat-rooms/${chatId}/members/${userId}`, { method: 'DELETE' });
+};
+
+// 제안하기: 상대방과의 1:1 채팅방 ID 반환 (없으면 생성)
+export const getOrCreateDirectChatRoom = async (targetUserId: number): Promise<number> => {
+  const userId = useOnboardingStore.getState().userId;
+  if (!userId) throw new Error('로그인이 필요합니다');
+
+  if (IS_MOCK) {
+    // mock: 더미 1:1 채팅방 중 첫 번째 반환
+    const directRoom = dummyChatRooms.find((r) => r.type === 'direct');
+    return directRoom?.id ?? 3;
+  }
+
+  const response = await apiRequest<{ chatRoomId: number }>(
+    `/users/${userId}/chat-rooms/direct?targetUserId=${targetUserId}`,
+    { method: 'POST' },
+  );
+  return response.chatRoomId;
+};
+
 export const sendMessage = async (chatId: number, text: string): Promise<Message> => {
-  // 실제 구현에서는 API로 보낼 메시지 데이터를 전송
-  const newMessage: Message = {
-    id: Math.random(),
-    senderId: 1,
-    senderName: '김지수',
-    senderAvatar: '👨‍💻',
+  const userId = useOnboardingStore.getState().userId ?? 1;
+
+  // mock 모드: GET /messages와 URL이 동일해 라우터 구분 불가 → 로컬 구성
+  if (IS_MOCK) {
+    return {
+      id: Date.now(),
+      senderId: userId,
+      senderName: '나',
+      senderAvatar: '👤',
+      content: text,
+      createdAt: new Date().toISOString(),
+      isSent: true,
+    };
+  }
+
+  const response = await apiRequest<{ messageId: number; createdAt: string }>(
+    `/chat-rooms/${chatId}/messages`,
+    {
+      method: 'POST',
+      body: JSON.stringify({ senderId: userId, content: text }),
+    },
+  );
+
+  return {
+    id: response.messageId,
+    senderId: userId,
+    senderName: '나',
+    senderAvatar: '👤',
     content: text,
-    createdAt: new Date().toISOString(),
+    createdAt: response.createdAt,
     isSent: true,
   };
-  return newMessage;
 };

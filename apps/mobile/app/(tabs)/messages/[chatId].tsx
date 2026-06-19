@@ -10,12 +10,13 @@ import {
   Platform,
   SafeAreaView,
   Modal,
+  Alert,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Colors } from '../../../src/constants/colors';
 import { MessageBubble } from '../../../src/components/messages/MessageBubble';
 import { MessageInput } from '../../../src/components/messages/MessageInput';
-import { getChat, sendMessage } from '../../../src/services/messageService';
+import { getChat, sendMessage, leaveChatRoom } from '../../../src/services/messageService';
 import { Chat, Message } from '../../../src/types/message';
 export default function ChatDetailScreen() {
   const router = useRouter();
@@ -84,7 +85,10 @@ export default function ChatDetailScreen() {
           {chat?.type === 'direct' && (
             <TouchableOpacity
               style={styles.sheetItem}
-              onPress={() => { setIsMoreSheetVisible(false); setIsBlockConfirmVisible(true); }}
+              onPress={() => {
+                setIsMoreSheetVisible(false);
+                Alert.alert('개발 중', '차단 기능은 현재 개발 중입니다.');
+              }}
             >
               <View style={styles.sheetItemIcon}>
                 <Text style={styles.sheetItemIconText}>🚫</Text>
@@ -94,7 +98,10 @@ export default function ChatDetailScreen() {
           )}
           <TouchableOpacity
             style={styles.sheetItem}
-            onPress={() => { setIsMoreSheetVisible(false); router.push(`/messages/${chatId}/report`); }}
+            onPress={() => {
+                setIsMoreSheetVisible(false);
+                Alert.alert('개발 중', '신고 기능은 현재 개발 중입니다.');
+              }}
           >
             <View style={styles.sheetItemIcon}>
               <Text style={styles.sheetItemIconText}>⚠️</Text>
@@ -168,7 +175,15 @@ export default function ChatDetailScreen() {
             </TouchableOpacity>
             <TouchableOpacity
               style={styles.dialogBtnConfirm}
-              onPress={() => { setIsLeaveConfirmVisible(false); router.back(); }}
+              onPress={async () => {
+                setIsLeaveConfirmVisible(false);
+                try {
+                  await leaveChatRoom(parseInt(chatId as string));
+                } catch (e) {
+                  console.error('[Chat] 채팅방 나가기 실패:', e);
+                }
+                router.back();
+              }}
             >
               <Text style={styles.dialogBtnConfirmText}>나가기</Text>
             </TouchableOpacity>

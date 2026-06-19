@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   StyleSheet,
@@ -8,6 +8,7 @@ import {
   SafeAreaView,
 } from 'react-native';
 import { useRouter } from 'expo-router';
+import { useFocusEffect } from '@react-navigation/native';
 import { Colors } from '../../../src/constants/colors';
 import { ScreenHeader } from '../../../src/components/common/ScreenHeader';
 import { ChatRoomItem } from '../../../src/components/messages/ChatRoomItem';
@@ -25,9 +26,11 @@ export default function MessagesScreen() {
   const [sections, setSections] = useState<SectionData[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  useEffect(() => {
-    loadChatRooms();
-  }, []);
+  useFocusEffect(
+    useCallback(() => {
+      loadChatRooms();
+    }, []),
+  );
 
   useEffect(() => {
     buildSections();
@@ -55,10 +58,7 @@ export default function MessagesScreen() {
   };
 
   const handleChatPress = (chatId: number) => {
-    router.push({
-      pathname: '/(tabs)/messages/[chatId]',
-      params: { chatId: chatId.toString() },
-    });
+    router.push(`/messages/${chatId}` as never);
   };
 
   const totalUnread = chatRooms.reduce((sum, r) => sum + r.unreadCount, 0);
