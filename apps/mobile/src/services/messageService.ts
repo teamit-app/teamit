@@ -124,17 +124,21 @@ export const getChat = async (chatId: number): Promise<Chat | null> => {
   );
   const messages = (messagesData.content ?? []).map((m) => adaptMessage(m, userId));
 
+  // mock 모드: 백엔드가 제공하지 않는 UI 전용 필드(detailType/matchStatus/teamInfo)를
+  // 더미 데이터에서 보완 (실서버 모드에서는 사용 안 함)
+  const dummyRoom = IS_MOCK ? dummyChatRooms.find((r) => r.id === chatId) : null;
+
   return {
     id: room.id,
     type: room.type,
     name: room.name,
     avatar: room.avatar,
-    participants: room.participants,
+    participants: dummyRoom?.participants ?? room.participants,
     messages,
-    description: room.description,
-    detailType: room.detailType ?? 'normal',
-    matchStatus: room.matchStatus ?? 'none',
-    teamInfo: room.teamInfo,
+    description: dummyRoom?.description ?? room.description,
+    detailType: dummyRoom?.detailType ?? room.detailType ?? 'normal',
+    matchStatus: dummyRoom?.matchStatus ?? room.matchStatus ?? 'none',
+    teamInfo: dummyRoom?.teamInfo ?? room.teamInfo,
   };
 };
 
