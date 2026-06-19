@@ -9,7 +9,15 @@ export default function TabLayout() {
     >
       <Tabs.Screen name="home" options={{ title: '홈' }} />
       <Tabs.Screen name="explore" options={{ title: '탐색' }} />
-      <Tabs.Screen name="messages" options={{ title: '메시지' }} />
+      <Tabs.Screen
+        name="messages"
+        options={{ title: '메시지' }}
+        listeners={({ navigation }) => ({
+          tabPress: () => {
+            navigation.navigate('messages', { screen: 'index' });
+          },
+        })}
+      />
       <Tabs.Screen name="profile" options={{ title: '내정보' }} />
     </Tabs>
   );

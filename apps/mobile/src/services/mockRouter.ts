@@ -32,8 +32,12 @@ const staticRoutes: Record<string, () => unknown> = {
     currentPage: 0,
   }),
 
-  // 홈 — 인기 공모전 (GET /contests/popular)
-  '/contests/popular': () => dummyContests.slice(0, 3),
+  // 홈 — 인기 공모전 (GET /contests/popular) — 백엔드 응답 포맷 { contests: [...] }
+  '/contests/popular': () => ({
+    contests: dummyContests
+      .slice(0, 3)
+      .map(({ isHearted: _h, categoryLabel: _l, status: _s, ...rest }) => rest),
+  }),
 
   // 알림은 동적 라우트(/users/{userId}/notifications)로 처리됨 — 아래 dynamicRoutes 참고
   // GET /home/matching-status?userId=...  (쿼리스트링은 strip 후 매칭)

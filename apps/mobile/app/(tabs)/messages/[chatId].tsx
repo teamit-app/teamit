@@ -17,6 +17,8 @@ import { Colors } from '../../../src/constants/colors';
 import { MessageBubble } from '../../../src/components/messages/MessageBubble';
 import { MessageInput } from '../../../src/components/messages/MessageInput';
 import { getChat, sendMessage, leaveChatRoom } from '../../../src/services/messageService';
+
+const IS_MOCK = process.env.EXPO_PUBLIC_API_MODE === 'mock';
 import { Chat, Message } from '../../../src/types/message';
 export default function ChatDetailScreen() {
   const router = useRouter();
@@ -87,7 +89,11 @@ export default function ChatDetailScreen() {
               style={styles.sheetItem}
               onPress={() => {
                 setIsMoreSheetVisible(false);
-                Alert.alert('개발 중', '차단 기능은 현재 개발 중입니다.');
+                if (IS_MOCK) {
+                  setIsBlockConfirmVisible(true);
+                } else {
+                  Alert.alert('개발 중', '차단 기능은 현재 개발 중입니다.');
+                }
               }}
             >
               <View style={styles.sheetItemIcon}>
@@ -99,9 +105,13 @@ export default function ChatDetailScreen() {
           <TouchableOpacity
             style={styles.sheetItem}
             onPress={() => {
-                setIsMoreSheetVisible(false);
+              setIsMoreSheetVisible(false);
+              if (IS_MOCK) {
+                router.push(`/messages/${chatId}/report` as never);
+              } else {
                 Alert.alert('개발 중', '신고 기능은 현재 개발 중입니다.');
-              }}
+              }
+            }}
           >
             <View style={styles.sheetItemIcon}>
               <Text style={styles.sheetItemIconText}>⚠️</Text>
