@@ -21,7 +21,9 @@ export default function NotificationsScreen() {
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
 
   useEffect(() => {
-    getNotifications().then(setNotifications);
+    getNotifications()
+      .then(setNotifications)
+      .catch((e) => console.error('[Notifications] 알림 로드 실패:', e));
   }, []);
 
   const groups = Array.from(new Set(notifications.map((n) => n.group)));
@@ -31,6 +33,9 @@ export default function NotificationsScreen() {
       <ScreenHeader title="알림" onBack={() => router.back()} />
 
       <ScrollView showsVerticalScrollIndicator={false}>
+        {groups.length === 0 && (
+          <Text style={styles.emptyText}>알림이 없습니다</Text>
+        )}
         {groups.map((group) => (
           <View key={group}>
             <Text style={styles.groupLabel}>{group}</Text>
@@ -129,5 +134,11 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: Colors.grayMedium,
     marginTop: 5,
+  },
+  emptyText: {
+    textAlign: 'center',
+    color: Colors.grayMedium,
+    fontSize: 14,
+    marginTop: 80,
   },
 });
