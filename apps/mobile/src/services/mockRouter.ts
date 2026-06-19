@@ -2,6 +2,16 @@ import { dummyContests } from '../data/contests';
 import { dummyTalents } from '../data/talents';
 import { dummyNotifications } from '../data/notifications';
 import { dummyMatchingStatus } from '../data/matchingStatus';
+import {
+  dummyChatRooms,
+  dummyDirectMessages1,
+  dummyDirectMessages2,
+  dummyDirectMessages3,
+  dummyDirectMessages4,
+  dummyGroupMessages1,
+  dummyGroupMessages2,
+} from '../data/chatRooms';
+import { Message } from '../types/message';
 
 // ─── 정적 라우트: 정확한 경로 일치 ───────────────────────────────────────────
 
@@ -100,6 +110,72 @@ const dynamicRoutes: Array<[RegExp, (path: string) => unknown]> = [
       major: '컴퓨터공학',
       verified: false,
     }),
+  ],
+
+  // POST /users/{userId}/chat-rooms/direct — 1:1 채팅방 생성 또는 조회
+  [
+    /^\/users\/\d+\/chat-rooms\/direct$/,
+    () => {
+      const directRoom = dummyChatRooms.find((r) => r.type === 'direct');
+      return { chatRoomId: directRoom?.id ?? 3 };
+    },
+  ],
+
+  // GET /users/{userId}/chat-rooms
+  [
+    /^\/users\/\d+\/chat-rooms$/,
+    () => ({
+      groupChats: dummyChatRooms
+        .filter((r) => r.type === 'group')
+        .map((r) => ({
+          chatRoomId: r.id,
+          roomType: 'GROUP',
+          teamName: r.name,
+          memberCount: r.participants.length,
+          lastMessage: r.lastMessage,
+          lastMessageAt: r.lastMessageAt,
+          unreadCount: r.unreadCount,
+        })),
+      directChats: dummyChatRooms
+        .filter((r) => r.type === 'direct')
+        .map((r) => ({
+          chatRoomId: r.id,
+          roomType: 'DIRECT',
+          opponentNickname: r.name,
+          lastMessage: r.lastMessage,
+          lastMessageAt: r.lastMessageAt,
+          unreadCount: r.unreadCount,
+        })),
+    }),
+  ],
+
+  // GET /chat-rooms/{chatRoomId}/messages — dummy 메시지를 백엔드 포맷으로 변환
+  [
+    /^\/chat-rooms\/(\d+)\/messages$/,
+    (path) => {
+      const id = Number(path.split('/')[2]);
+      const msgMap: Record<number, Message[]> = {
+        1: dummyGroupMessages1,
+        2: dummyGroupMessages2,
+        3: dummyDirectMessages1,
+        4: dummyDirectMessages2,
+        5: dummyDirectMessages3,
+        6: dummyDirectMessages4,
+      };
+      const msgs = msgMap[id] ?? [];
+      return {
+        content: msgs.map((m) => ({
+          messageId: m.id,
+          senderId: m.senderId,
+          senderNickname: m.senderName,
+          content: m.content,
+          isRead: true,
+          createdAt: m.createdAt,
+        })),
+        totalElements: msgs.length,
+        currentPage: 0,
+      };
+    },
   ],
 ];
 
