@@ -13,6 +13,7 @@ import { Colors } from '../../../../src/constants/colors';
 import { ScreenHeader } from '../../../../src/components/common/ScreenHeader';
 import { SortBottomSheet } from '../../../../src/components/explore/SortBottomSheet';
 import { useExploreStore } from '../../../../src/store/useExploreStore';
+import { useRecruitPostStore } from '../../../../src/store/useRecruitPostStore';
 import { dummyContestDetails, dummyRecruitPosts } from '../../../../src/data/recruitmentPosts';
 import { SortOption, RecruitPost } from '../../../../src/types/contest';
 
@@ -20,6 +21,12 @@ const SORT_LABEL: Record<SortOption, string> = {
   LATEST: '최신순',
   POPULAR: '인기순',
   DEADLINE: '마감임박순',
+};
+
+const normalizeMeetingType = (type: string) => {
+  if (type.includes('혼합')) return '온오프라인혼합';
+  if (type.includes('오프라인')) return '오프라인';
+  return '온라인';
 };
 
 function RecruitPostCard({ post, onPress }: { post: RecruitPost; onPress: () => void }) {
@@ -31,11 +38,16 @@ function RecruitPostCard({ post, onPress }: { post: RecruitPost; onPress: () => 
       </View>
       <Text style={postStyles.title}>{post.title}</Text>
       <View style={postStyles.skillRow}>
-        {post.skills.map((skill) => (
+        {post.skills.slice(0, 3).map((skill) => (
           <View key={skill} style={postStyles.skillTag}>
             <Text style={postStyles.skillText}>{skill}</Text>
           </View>
         ))}
+        {post.skills.length > 3 && (
+          <View style={postStyles.skillTag}>
+            <Text style={postStyles.skillText}>+{post.skills.length - 3}</Text>
+          </View>
+        )}
       </View>
       <View style={postStyles.conditionRow}>
         <View style={postStyles.conditionTag}>
@@ -43,8 +55,10 @@ function RecruitPostCard({ post, onPress }: { post: RecruitPost; onPress: () => 
         </View>
         <View style={postStyles.conditionTag}>
           <Text style={postStyles.conditionText}>
-            {post.meetingType}
-            {post.location ? `·${post.location}` : ''}
+            {normalizeMeetingType(post.meetingType)}
+            {post.location && (post.meetingType.includes('혼합') || post.meetingType.includes('오프라인'))
+              ? `·${post.location}`
+              : ''}
           </Text>
         </View>
         <View style={postStyles.conditionTag}>
@@ -78,8 +92,12 @@ export default function ContestDetailScreen() {
   const detail = dummyContestDetails.find((d) => d.contestId === id) ?? dummyContestDetails[0];
   const isHearted = storeContest?.isHearted ?? detail.isHearted;
 
-  const posts = dummyRecruitPosts.filter((p) => p.contestId === id);
-  const sortedPosts = [...posts].sort((a, b) => {
+  const userPosts = useRecruitPostStore((s) => s.userPosts);
+  const allPosts: RecruitPost[] = [
+    ...userPosts.filter((p) => p.contestId === id),
+    ...dummyRecruitPosts.filter((p) => p.contestId === id),
+  ];
+  const sortedPosts = [...allPosts].sort((a, b) => {
     if (sortOption === 'POPULAR') return b.chatCount + b.likeCount - (a.chatCount + a.likeCount);
     if (sortOption === 'DEADLINE') return a.postId - b.postId;
     return b.postId - a.postId;
@@ -161,7 +179,11 @@ export default function ContestDetailScreen() {
           <Text style={styles.participateSubheading}>원하는 방식을 선택해 주세요</Text>
 
           {/* 팀 직접 꾸리기 */}
-          <TouchableOpacity style={styles.participateCard} activeOpacity={0.85}>
+          <TouchableOpacity
+            style={styles.participateCard}
+            activeOpacity={0.85}
+            onPress={() => router.push(`/explore/build-team/${id}` as never)}
+          >
             <View style={styles.participateAccentBar} />
             <View style={styles.participateCardContent}>
               <Text style={styles.participateEmoji}>🚀</Text>
@@ -220,7 +242,7 @@ export default function ContestDetailScreen() {
 
           <View style={styles.noticeBanner}>
             <Text style={styles.noticeText}>
-              '팀 매칭 제안받기'로 내 정보를 등록한 후, 모집글에 지원할 수 있어요!
+              '팀 매칭 제안받기'로 내 정보를 등록한 후 지원할 수 있어요!
             </Text>
           </View>
 
@@ -419,14 +441,13 @@ const styles = StyleSheet.create({
   participateCardContent: {
     flex: 1,
     flexDirection: 'row',
-    alignItems: 'flex-start',
+    alignItems: 'center',
     paddingHorizontal: 14,
     paddingVertical: 14,
     gap: 12,
   },
   participateEmoji: {
     fontSize: 24,
-    marginTop: 1,
   },
   participateTextWrap: {
     flex: 1,
@@ -532,6 +553,7 @@ const postStyles = StyleSheet.create({
     fontWeight: '700',
     color: Colors.dark,
     marginBottom: 10,
+    paddingLeft: 8,
   },
   skillRow: {
     flexDirection: 'row',

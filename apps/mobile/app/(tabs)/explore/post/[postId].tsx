@@ -16,6 +16,7 @@ import { Colors } from '../../../../src/constants/colors';
 import { ScreenHeader } from '../../../../src/components/common/ScreenHeader';
 import { ApplyRequiredBottomSheet } from '../../../../src/components/explore/ApplyRequiredBottomSheet';
 import { dummyRecruitPostDetails, dummyContestDetails } from '../../../../src/data/recruitmentPosts';
+import { useRecruitPostStore } from '../../../../src/store/useRecruitPostStore';
 import { TeamMember, PostComment } from '../../../../src/types/contest';
 
 // ── 팀원 아바타 ─────────────────────────────────────────────────────────────
@@ -130,10 +131,15 @@ export default function PostDetailScreen() {
     }
   }, [replyingTo]);
 
+  const userPosts = useRecruitPostStore((s) => s.userPosts);
+
   const id = Number(postId);
   const cid = Number(contestId);
 
-  const post = dummyRecruitPostDetails.find((p) => p.postId === id) ?? dummyRecruitPostDetails[0];
+  const post =
+    userPosts.find((p) => p.postId === id) ??
+    dummyRecruitPostDetails.find((p) => p.postId === id) ??
+    dummyRecruitPostDetails[0];
   const contestDetail = dummyContestDetails.find((d) => d.contestId === cid) ?? dummyContestDetails[0];
   const hasRegistered = contestDetail.hasRegisteredForMatching;
 
@@ -188,7 +194,7 @@ export default function PostDetailScreen() {
           <View style={styles.bannerIconCircle}>
             <Text style={styles.bannerIcon}>🏆</Text>
           </View>
-          <Text style={styles.bannerTitle}>{post.teamName}</Text>
+          <Text style={styles.bannerTitle}>{post.title}</Text>
           <Text style={styles.bannerMeta}>
             {post.createdAt} · 조회 {post.views} · 채팅 {post.chatCount}
           </Text>
@@ -275,7 +281,7 @@ export default function PostDetailScreen() {
           <TouchableOpacity
             style={styles.recruiterProfileCard}
             activeOpacity={0.85}
-            onPress={() => {/* 추후 프로필 상세 페이지로 이동 */}}
+            onPress={() => router.push(`/explore/post/recruiter-profile?postId=${id}` as never)}
           >
             <View style={styles.recruiterAvatarCircle}>
               <Text style={styles.recruiterAvatarEmoji}>👑</Text>

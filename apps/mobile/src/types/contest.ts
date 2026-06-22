@@ -92,6 +92,7 @@ export interface ParticipationCard {
   contestId: number;
   contestTitle: string;
   skills: string;
+  contestExperience: string;
   purpose: string;
   intensity: string;
   meetingPreference: string;

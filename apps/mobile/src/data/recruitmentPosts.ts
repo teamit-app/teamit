@@ -245,6 +245,7 @@ export const dummyParticipationCard: ParticipationCard = {
   contestId: 1,
   contestTitle: '2025 대학생 창업 아이디어 공모전',
   skills: 'Figma, Photoshop',
+  contestExperience: '4회 이상 (경험을 바탕으로 결과를 만들고 싶어요)',
   purpose: '성과',
   intensity: '적당히 (주 3~5시간)',
   meetingPreference: '혼합',

@@ -7,11 +7,12 @@ import {
   Switch,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { Colors } from '../../../src/constants/colors';
 
 export default function ParticipateCompleteScreen() {
   const insets = useSafeAreaInsets();
+  const { contestId } = useLocalSearchParams<{ contestId: string }>();
   const [notificationEnabled, setNotificationEnabled] = useState(true);
 
   return (
@@ -44,10 +45,14 @@ export default function ParticipateCompleteScreen() {
         </View>
 
         {/* CTA 카드 */}
-        <View style={styles.ctaCard}>
+        <TouchableOpacity
+          style={styles.ctaCard}
+          onPress={() => router.push(`/explore/build-team/recruit-count?contestId=${contestId}` as never)}
+          activeOpacity={0.85}
+        >
           <Text style={styles.ctaTitle}>직접 팀을 꾸려보시겠어요?</Text>
           <Text style={styles.ctaSubtitle}>원하는 팀원을 한번에 찾을 수 있어요!</Text>
-        </View>
+        </TouchableOpacity>
 
       </View>
 
