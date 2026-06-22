@@ -79,7 +79,7 @@ export default function RecruiterProfileScreen() {
         <TouchableOpacity onPress={() => router.back()} hitSlop={8} style={s.headerSide}>
           <Text style={s.backIcon}>‹</Text>
         </TouchableOpacity>
-        <Text style={s.headerTitle}>모집자 정보</Text>
+        <Text style={s.headerTitle}>상세 정보</Text>
         <View style={s.headerSide} />
       </View>
 
@@ -184,8 +184,9 @@ export default function RecruiterProfileScreen() {
         {/* ── 리뷰 ── */}
         <Text style={s.sectionTitle}>리뷰</Text>
 
-        {/* 티밋 온도 카드 */}
+        {/* 리뷰 통합 카드 */}
         <View style={s.card}>
+          {/* 티밋 온도 */}
           <Text style={s.tempCardLabel}>티밋 온도</Text>
           <View style={s.tempScoreRow}>
             <Text style={s.tempScore}>{mock.temperature}</Text>
@@ -197,39 +198,43 @@ export default function RecruiterProfileScreen() {
           <StatRow label="응답 속도" value={mock.reviewStats.responseSpeed} />
           <StatRow label="마감 완수" value={mock.reviewStats.deadlineCompletion} />
           <StatRow label="참여 강도" value={mock.reviewStats.participationIntensity} />
+
+          {/* 키워드 pills */}
+          {mock.reviewKeywords.length > 0 && (
+            <>
+              <View style={s.reviewInnerDivider} />
+              <View style={s.keywordRow}>
+                {mock.reviewKeywords.slice(0, KEYWORD_SHOW).map((kw) => (
+                  <View key={kw.text} style={s.keywordPill}>
+                    <Text style={s.keywordText}>{kw.text} {kw.count}</Text>
+                  </View>
+                ))}
+                {extraKeywords > 0 && (
+                  <View style={s.keywordPill}>
+                    <Text style={s.keywordText}>+{extraKeywords}</Text>
+                  </View>
+                )}
+              </View>
+            </>
+          )}
+
+          {/* 팀원 리뷰 */}
+          {mock.teamReviews.length > 0 && (
+            <>
+              <View style={s.reviewInnerDivider} />
+              <View style={s.reviewHeader}>
+                <Text style={s.reviewHeaderTitle}>💬 팀원 리뷰</Text>
+                <Text style={s.reviewCount}>{mock.teamReviews.length}개</Text>
+              </View>
+              {mock.teamReviews.map((r, i) => (
+                <View key={i} style={[s.reviewItem, i > 0 && s.reviewItemBorder]}>
+                  <Text style={s.reviewContent}>"{r.content}"</Text>
+                  <Text style={s.reviewReviewer}>{r.reviewer}</Text>
+                </View>
+              ))}
+            </>
+          )}
         </View>
-
-        {/* 키워드 pills */}
-        {mock.reviewKeywords.length > 0 && (
-          <View style={s.keywordRow}>
-            {mock.reviewKeywords.slice(0, KEYWORD_SHOW).map((kw) => (
-              <View key={kw.text} style={s.keywordPill}>
-                <Text style={s.keywordText}>{kw.text} {kw.count}</Text>
-              </View>
-            ))}
-            {extraKeywords > 0 && (
-              <View style={s.keywordPill}>
-                <Text style={s.keywordText}>+{extraKeywords}</Text>
-              </View>
-            )}
-          </View>
-        )}
-
-        {/* 팀원 리뷰 */}
-        {mock.teamReviews.length > 0 && (
-          <View style={[s.card, s.reviewCard]}>
-            <View style={s.reviewHeader}>
-              <Text style={s.reviewHeaderTitle}>💬 팀원 리뷰</Text>
-              <Text style={s.reviewCount}>{mock.teamReviews.length}개</Text>
-            </View>
-            {mock.teamReviews.map((r, i) => (
-              <View key={i} style={[s.reviewItem, i > 0 && s.reviewItemBorder]}>
-                <Text style={s.reviewContent}>"{r.content}"</Text>
-                <Text style={s.reviewReviewer}>{r.reviewer}</Text>
-              </View>
-            ))}
-          </View>
-        )}
 
         <View style={{ height: 24 }} />
       </ScrollView>
@@ -380,9 +385,11 @@ const s = StyleSheet.create({
   statLabel: { fontSize: 13, color: Colors.grayMedium, width: 72 },
   statValue: { fontSize: 13, color: Colors.dark, flex: 1, textAlign: 'right' },
 
+  reviewInnerDivider: { height: 1, backgroundColor: '#F0F0F0' },
+
   keywordRow: {
     flexDirection: 'row', flexWrap: 'wrap', gap: 8,
-    marginHorizontal: 16, marginTop: 10,
+    padding: 16,
   },
   keywordPill: {
     backgroundColor: Colors.ogTint, borderRadius: 999,
@@ -390,10 +397,9 @@ const s = StyleSheet.create({
   },
   keywordText: { fontSize: 12, color: Colors.primary, fontWeight: '600' },
 
-  reviewCard: { marginTop: 10 },
   reviewHeader: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    padding: 16, borderBottomWidth: 1, borderBottomColor: '#F0F0F0',
+    padding: 16,
   },
   reviewHeaderTitle: { fontSize: 14, fontWeight: '700', color: Colors.dark },
   reviewCount: { fontSize: 13, color: Colors.grayMedium },
