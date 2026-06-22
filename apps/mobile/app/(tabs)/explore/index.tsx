@@ -9,24 +9,26 @@ import { SearchBar } from '../../../src/components/explore/SearchBar';
 import { FilterPills } from '../../../src/components/explore/FilterPills';
 import { ContestCard } from '../../../src/components/explore/ContestCard';
 import { TalentCard } from '../../../src/components/explore/TalentCard';
+import { CategoryFilterModal, CategoryFilter } from '../../../src/components/explore/CategoryFilterModal';
 import { useExploreStore } from '../../../src/store/useExploreStore';
-import { ContestStatus } from '../../../src/types/contest';
 import { getOrCreateDirectChatRoom } from '../../../src/services/messageService';
 
 type MainTab = 'POOL' | 'CONTEST';
-type StatusFilter = 'ALL' | ContestStatus;
+type SortFilter = 'ALL' | 'LATEST' | 'POPULAR';
 
-const STATUS_OPTIONS: { key: StatusFilter; label: string }[] = [
+const SORT_OPTIONS: { key: SortFilter; label: string }[] = [
   { key: 'ALL', label: '전체' },
-  { key: 'ONGOING', label: '진행중' },
-  { key: 'DEADLINE_SOON', label: '마감임박' },
+  { key: 'LATEST', label: '최신순' },
+  { key: 'POPULAR', label: '인기순' },
 ];
 
 export default function ExploreScreen() {
   const insets = useSafeAreaInsets();
   const [mainTab, setMainTab] = useState<MainTab>('POOL');
   const [keyword, setKeyword] = useState('');
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>('ALL');
+  const [sortFilter, setSortFilter] = useState<SortFilter>('ALL');
+  const [categoryFilter, setCategoryFilter] = useState<CategoryFilter>('ALL');
+  const [categoryModalVisible, setCategoryModalVisible] = useState(false);
 
   const talents = useExploreStore((s) => s.talents);
   const contests = useExploreStore((s) => s.contests);
@@ -61,8 +63,13 @@ export default function ExploreScreen() {
       contest.title.includes(keyword) ||
       contest.organizer.includes(keyword) ||
       contest.categoryLabel.includes(keyword);
-    const matchesStatus = statusFilter === 'ALL' || contest.status === statusFilter;
-    return matchesKeyword && matchesStatus;
+    const matchesCategory = categoryFilter === 'ALL' || contest.category === categoryFilter;
+    return matchesKeyword && matchesCategory;
+  });
+
+  const sortedContests = [...filteredContests].sort((a, b) => {
+    if (sortFilter === 'POPULAR') return b.dDay - a.dDay;
+    return 0;
   });
 
   if (isLoading && talents.length === 0 && contests.length === 0) {
@@ -114,10 +121,11 @@ export default function ExploreScreen() {
         {mainTab === 'CONTEST' && (
           <View style={styles.filterRow}>
             <FilterPills
-              options={STATUS_OPTIONS}
-              value={statusFilter}
-              onChange={setStatusFilter}
+              options={SORT_OPTIONS}
+              value={sortFilter}
+              onChange={setSortFilter}
               trailingLabel="분야별"
+              onPressTrailing={() => setCategoryModalVisible(true)}
             />
           </View>
         )}
@@ -132,12 +140,14 @@ export default function ExploreScreen() {
                   onPressPropose={() => handlePropose(talent.userId)}
                 />
               ))
-            : filteredContests.map((contest) => (
+            : sortedContests.map((contest) => (
                 <ContestCard
                   key={contest.contestId}
                   contest={contest}
                   variant="full"
+                  onPress={() => router.push(`/explore/contest/${contest.contestId}` as never)}
                   onPressHeart={() => toggleContestHeart(contest.contestId)}
+                  onPressMatch={() => router.push(`/explore/contest/${contest.contestId}` as never)}
                 />
               ))}
         </View>
@@ -146,6 +156,16 @@ export default function ExploreScreen() {
           우측 상단 하트에서 저장한 {mainTab === 'POOL' ? '팀원을' : '공모전을'} 확인할 수 있어요
         </Text>
       </ScrollView>
+
+      <CategoryFilterModal
+        visible={categoryModalVisible}
+        selectedCategory={categoryFilter}
+        onApply={(cat) => {
+          setCategoryFilter(cat);
+          setCategoryModalVisible(false);
+        }}
+        onClose={() => setCategoryModalVisible(false)}
+      />
     </View>
   );
 }
