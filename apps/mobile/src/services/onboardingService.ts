@@ -49,17 +49,17 @@ export const submitBasicInfo = async (data: BasicInfoRequest): Promise<number> =
   return result.userId;
 };
 
-// POST /users/{userId}/regions
-export const submitRegions = async (userId: number, regions: RegionItem[]): Promise<void> => {
-  await apiRequest<RegionsResponseData>(`/users/${userId}/regions`, {
+// POST /users/regions
+export const submitRegions = async (_userId: number, regions: RegionItem[]): Promise<void> => {
+  await apiRequest<RegionsResponseData>(`/users/regions`, {
     method: 'POST',
     body: JSON.stringify({ regions }),
   });
 };
 
-// POST /users/{userId}/educations
-export const submitEducation = async (userId: number, data: EducationRequest): Promise<number> => {
-  const result = await apiRequest<EducationResponseData>(`/users/${userId}/educations`, {
+// POST /users/educations
+export const submitEducation = async (_userId: number, data: EducationRequest): Promise<number> => {
+  const result = await apiRequest<EducationResponseData>(`/users/educations`, {
     method: 'POST',
     body: JSON.stringify(data),
   });

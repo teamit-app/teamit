@@ -85,15 +85,15 @@ export const getContestById = (contestId: number): Promise<Contest> =>
 
 // ─── 관심 공모전 조회 ─────────────────────────────────────────────────────────
 
-export const getHeartedContests = async (userId: number): Promise<number[]> => {
-  const data = await apiRequest<HeartedContestsResponse>(`/users/${userId}/contest-hearts`);
+export const getHeartedContests = async (_userId: number): Promise<number[]> => {
+  const data = await apiRequest<HeartedContestsResponse>(`/users/contest-hearts`);
   return data.content.map((c) => c.contestId);
 };
 
 // ─── 하트 추가 / 취소 ─────────────────────────────────────────────────────────
 
-export const addContestHeart = (userId: number, contestId: number): Promise<null> =>
-  apiRequest<null>(`/users/${userId}/contest-hearts/${contestId}`, { method: 'POST' });
+export const addContestHeart = (_userId: number, contestId: number): Promise<null> =>
+  apiRequest<null>(`/users/contest-hearts/${contestId}`, { method: 'POST' });
 
-export const removeContestHeart = (userId: number, contestId: number): Promise<null> =>
-  apiRequest<null>(`/users/${userId}/contest-hearts/${contestId}`, { method: 'DELETE' });
+export const removeContestHeart = (_userId: number, contestId: number): Promise<null> =>
+  apiRequest<null>(`/users/contest-hearts/${contestId}`, { method: 'DELETE' });

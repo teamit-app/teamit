@@ -38,6 +38,7 @@ interface BackendChatMessage {
   content: string;
   isRead: boolean;
   createdAt: string;
+  isSystem?: boolean;
 }
 
 interface BackendMessagePageResponse {
@@ -89,16 +90,14 @@ function adaptMessage(msg: BackendChatMessage, currentUserId: number): Message {
     content: msg.content,
     createdAt: msg.createdAt,
     isSent: msg.senderId === currentUserId,
+    isSystem: msg.isSystem ?? false,
   };
 }
 
 // ── API 함수 ─────────────────────────────────────────────────────────────────
 
 export const getChatRooms = async (): Promise<ChatRoom[]> => {
-  const userId = useOnboardingStore.getState().userId;
-  if (!userId) return [];
-
-  const data = await apiRequest<BackendChatRoomListResponse>(`/users/${userId}/chat-rooms`);
+  const data = await apiRequest<BackendChatRoomListResponse>('/users/chat-rooms');
   return [
     ...(data.groupChats ?? []).map(adaptGroupChat),
     ...(data.directChats ?? []).map(adaptDirectChat),
@@ -106,11 +105,10 @@ export const getChatRooms = async (): Promise<ChatRoom[]> => {
 };
 
 export const getChat = async (chatId: number): Promise<Chat | null> => {
-  const userId = useOnboardingStore.getState().userId;
-  if (!userId) return null;
+  const userId = useOnboardingStore.getState().userId ?? 0;
 
   // 채팅방 메타데이터 (rooms 목록에서 찾기)
-  const roomsData = await apiRequest<BackendChatRoomListResponse>(`/users/${userId}/chat-rooms`);
+  const roomsData = await apiRequest<BackendChatRoomListResponse>('/users/chat-rooms');
   const allRooms: ChatRoom[] = [
     ...(roomsData.groupChats ?? []).map(adaptGroupChat),
     ...(roomsData.directChats ?? []).map(adaptDirectChat),
@@ -120,7 +118,7 @@ export const getChat = async (chatId: number): Promise<Chat | null> => {
 
   // 메시지 조회
   const messagesData = await apiRequest<BackendMessagePageResponse>(
-    `/chat-rooms/${chatId}/messages?userId=${userId}&page=0&size=50`,
+    `/chat-rooms/${chatId}/messages?page=0&size=50`,
   );
   const messages = (messagesData.content ?? []).map((m) => adaptMessage(m, userId));
 
@@ -143,19 +141,13 @@ export const getChat = async (chatId: number): Promise<Chat | null> => {
 };
 
 export const leaveChatRoom = async (chatId: number): Promise<void> => {
-  const userId = useOnboardingStore.getState().userId;
-  if (!userId) return;
-
   if (IS_MOCK) return;
 
-  await apiRequest<null>(`/chat-rooms/${chatId}/members/${userId}`, { method: 'DELETE' });
+  await apiRequest<null>(`/chat-rooms/${chatId}/leave`, { method: 'DELETE' });
 };
 
 // 제안하기: 상대방과의 1:1 채팅방 ID 반환 (없으면 생성)
 export const getOrCreateDirectChatRoom = async (targetUserId: number): Promise<number> => {
-  const userId = useOnboardingStore.getState().userId;
-  if (!userId) throw new Error('로그인이 필요합니다');
-
   if (IS_MOCK) {
     // mock: 더미 1:1 채팅방 중 첫 번째 반환
     const directRoom = dummyChatRooms.find((r) => r.type === 'direct');
@@ -163,7 +155,7 @@ export const getOrCreateDirectChatRoom = async (targetUserId: number): Promise<n
   }
 
   const response = await apiRequest<{ chatRoomId: number }>(
-    `/users/${userId}/chat-rooms/direct?targetUserId=${targetUserId}`,
+    `/users/chat-rooms/direct?targetUserId=${targetUserId}`,
     { method: 'POST' },
   );
   return response.chatRoomId;
@@ -189,7 +181,7 @@ export const sendMessage = async (chatId: number, text: string): Promise<Message
     `/chat-rooms/${chatId}/messages`,
     {
       method: 'POST',
-      body: JSON.stringify({ senderId: userId, content: text }),
+      body: JSON.stringify({ content: text }),
     },
   );
 
