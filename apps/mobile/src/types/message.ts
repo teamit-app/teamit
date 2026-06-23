@@ -37,6 +37,7 @@ export interface TeamMemberStatus {
   role: string;
   avatar: string;
   filled: boolean;
+  isHost?: boolean; // true = 이 채팅방의 모집자(팀장)
 }
 
 export interface TeamInfo {

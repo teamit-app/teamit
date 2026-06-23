@@ -307,11 +307,12 @@ export const dummyChatRooms: ChatRoom[] = [
       currentCount: 4,
       totalCount: 5,
       dDay: 14,
+      // chat id=1: 내가(id=1) 모집자 → 모집자 입장 화면 테스트용
       members: [
-        { id: 6, name: '김기획', role: '김기획', avatar: '👨‍💼', filled: true },
-        { id: 7, name: '박디자인', role: '박디자인', avatar: '👩‍🎨', filled: true },
-        { id: 8, name: '이개발', role: '이개발', avatar: '👨‍💻', filled: true },
-        { id: 1, name: '나', role: '나', avatar: '👨‍💻', filled: true },
+        { id: 1, name: '나', role: '나', avatar: '👑', filled: true, isHost: true },
+        { id: 6, name: '김기획', role: '기획', avatar: '👨‍💼', filled: true },
+        { id: 7, name: '박디자인', role: '디자인', avatar: '👩‍🎨', filled: true },
+        { id: 8, name: '이개발', role: '개발', avatar: '👨‍💻', filled: true },
       ],
     },
   },
@@ -334,9 +335,10 @@ export const dummyChatRooms: ChatRoom[] = [
       currentCount: 3,
       totalCount: 5,
       dDay: 10,
+      // chat id=2: 이팀장(id=3)이 모집자 → 팀원 입장 화면 테스트용
       members: [
-        { id: 3, name: '이팀장', role: '이팀장', avatar: '👑', filled: true },
-        { id: 7, name: '최개발', role: '최개발', avatar: '👨‍💻', filled: true },
+        { id: 3, name: '이팀장', role: '기획', avatar: '👑', filled: true, isHost: true },
+        { id: 7, name: '최개발', role: '개발', avatar: '👨‍💻', filled: true },
         { id: 1, name: '나', role: '나', avatar: '👨‍💻', filled: true },
       ],
     },
