@@ -2,7 +2,9 @@ package com.teamit.server.domain.matching.controller;
 
 import com.teamit.server.domain.matching.dto.*;
 import com.teamit.server.domain.matching.service.MatchingService;
+import com.teamit.server.global.annotation.LoginUser;
 import com.teamit.server.global.response.ApiResponse;
+import com.teamit.server.global.security.CustomUserDetails;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
@@ -22,8 +24,9 @@ public class MatchingController {
     @ResponseStatus(HttpStatus.CREATED)
     public ApiResponse<ApplyPostResponse> apply(
             @PathVariable Long postId,
+            @LoginUser CustomUserDetails userDetails,
             @RequestBody ApplyPostRequest request) {
-        ApplyPostResponse response = matchingService.apply(postId, request);
+        ApplyPostResponse response = matchingService.apply(postId, userDetails.getUserId(), request);
         return ApiResponse.success(response, "지원이 완료됐어요! 채팅방이 생성되었습니다");
     }
 
@@ -32,8 +35,9 @@ public class MatchingController {
     @ResponseStatus(HttpStatus.CREATED)
     public ApiResponse<InviteTeamResponse> invite(
             @PathVariable Long postId,
+            @LoginUser CustomUserDetails userDetails,
             @RequestBody InviteTeamRequest request) {
-        InviteTeamResponse response = matchingService.invite(postId, request);
+        InviteTeamResponse response = matchingService.invite(postId, userDetails.getUserId(), request);
         return ApiResponse.success(response, "초대를 보냈어요! 채팅방이 생성되었습니다");
     }
 
