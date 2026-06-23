@@ -106,7 +106,12 @@ export default function HomeScreen() {
 
           <View style={styles.list}>
             {filteredContests.map((contest) => (
-              <ContestCard key={contest.contestId} contest={contest} variant="compact" />
+              <ContestCard
+                key={contest.contestId}
+                contest={contest}
+                variant="compact"
+                onPress={() => router.push(`/explore/contest/${contest.contestId}` as never)}
+              />
             ))}
           </View>
         </View>

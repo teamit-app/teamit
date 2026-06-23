@@ -6,15 +6,16 @@ import { Contest } from '../../types/contest';
 interface ContestCardProps {
   contest: Contest;
   variant: 'compact' | 'full';
+  onPress?: () => void;
   onPressHeart?: () => void;
   onPressMatch?: () => void;
 }
 
-export function ContestCard({ contest, variant, onPressHeart, onPressMatch }: ContestCardProps) {
+export function ContestCard({ contest, variant, onPress, onPressHeart, onPressMatch }: ContestCardProps) {
   const formattedDeadline = contest.endDate.replace(/-/g, '.');
 
   return (
-    <View style={styles.card}>
+    <TouchableOpacity style={styles.card} onPress={onPress} activeOpacity={onPress ? 0.85 : 1}>
       {variant === 'full' && (
         <View style={styles.row}>
           <View style={styles.thumbnail}>
@@ -82,7 +83,7 @@ export function ContestCard({ contest, variant, onPressHeart, onPressMatch }: Co
           </View>
         </>
       )}
-    </View>
+    </TouchableOpacity>
   );
 }
 
