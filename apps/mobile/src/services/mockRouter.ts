@@ -2,6 +2,7 @@ import { dummyContests } from '../data/contests';
 import { dummyTalents } from '../data/talents';
 import { dummyNotifications } from '../data/notifications';
 import { dummyMatchingStatus } from '../data/matchingStatus';
+import { dummyInvitations } from '../data/invitations';
 import {
   dummyChatRooms,
   dummyDirectMessages1,
@@ -109,6 +110,11 @@ const staticRoutes: Record<string, () => unknown> = {
     const directRoom = dummyChatRooms.find((r) => r.type === 'direct');
     return { chatRoomId: directRoom?.id ?? 3 };
   },
+
+  // GET /users/invitations — 받은 초대장 목록
+  '/users/invitations': () => ({
+    content: dummyInvitations,
+  }),
 };
 
 // ─── 동적 라우트: 경로 파라미터 포함 ──────────────────────────────────────────
@@ -135,6 +141,9 @@ const dynamicRoutes: Array<[RegExp, (path: string) => unknown]> = [
     /^\/users\/\d+\/notifications$/,
     () => ({ content: dummyNotifications, unreadCount: dummyNotifications.filter((n) => !n.isRead).length }),
   ],
+
+  // POST /users/invitations/{id}/decline, POST /users/invitations/{id}/accept
+  [/^\/users\/invitations\/\d+\/(decline|accept)$/, () => null],
 
   // GET /chat-rooms/{chatRoomId}/messages — dummy 메시지를 백엔드 포맷으로 변환
   [
