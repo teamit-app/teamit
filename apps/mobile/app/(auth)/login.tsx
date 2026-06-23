@@ -37,12 +37,12 @@ export default function LoginScreen() {
     // 브라우저 열기 (await 안 함 — 폴링과 병행)
     WebBrowser.openBrowserAsync(`${SERVER_BASE}/api/v1/auth/kakao/web?sessionId=${sessionId}`);
 
-    // 브라우저에서 인증 완료할 시간 확보 후 폴링 시작
-    await new Promise((r) => setTimeout(r, 5000));
+    // 카카오 인증 최소 소요 시간 확보
+    await new Promise((r) => setTimeout(r, 2000));
 
-    // JWT 폴링 (3초 간격, 최대 120초)
-    for (let i = 0; i < 40; i++) {
-      await new Promise((r) => setTimeout(r, 3000));
+    // JWT 폴링 (1.5초 간격, 최대 90초)
+    for (let i = 0; i < 60; i++) {
+      await new Promise((r) => setTimeout(r, 1500));
       try {
         const res = await fetch(`${SERVER_BASE}/api/v1/auth/kakao/session/${sessionId}`);
         if (!res.ok) continue;
