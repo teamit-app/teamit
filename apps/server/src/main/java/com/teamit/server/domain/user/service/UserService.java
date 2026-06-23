@@ -36,7 +36,7 @@ public class UserService {
                 .userId(user.getId())
                 .nickname(user.getNickname())
                 .profileImageUrl(user.getProfileImageUrl())
-                .needsOnboarding(user.getName() == null)
+                .needsOnboarding(!educationRepository.existsByUserId(user.getId()))
                 .build();
     }
 

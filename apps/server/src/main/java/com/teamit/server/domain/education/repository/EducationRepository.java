@@ -11,4 +11,6 @@ public interface EducationRepository extends JpaRepository<Education, Long> {
     Optional<Education> findByUserId(Long userId);
 
     List<Education> findByUserIdIn(List<Long> userIds);
+
+    boolean existsByUserId(Long userId);
 }
