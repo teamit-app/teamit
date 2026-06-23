@@ -45,6 +45,7 @@ export interface TeamInfo {
   currentCount: number;
   totalCount: number;
   members: TeamMemberStatus[];
+  dDay?: number;
 }
 
 export interface Chat {

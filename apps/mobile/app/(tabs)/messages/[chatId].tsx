@@ -6,20 +6,54 @@ import {
   ActivityIndicator,
   TouchableOpacity,
   Text,
+  TextInput,
   KeyboardAvoidingView,
   Platform,
-  SafeAreaView,
   Modal,
   Alert,
+  ScrollView,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Colors } from '../../../src/constants/colors';
 import { MessageBubble } from '../../../src/components/messages/MessageBubble';
 import { MessageInput } from '../../../src/components/messages/MessageInput';
 import { getChat, sendMessage, leaveChatRoom } from '../../../src/services/messageService';
+import { Chat, Message } from '../../../src/types/message';
 
 const IS_MOCK = process.env.EXPO_PUBLIC_API_MODE === 'mock';
-import { Chat, Message } from '../../../src/types/message';
+
+// ── 초대 관련 로컬 타입 ──────────────────────────────────────────────────────
+interface InvitedUser {
+  id: number;
+  name: string;
+  role: string;
+  status: 'pending' | 'rejected';
+  directChatId?: number;
+}
+
+interface DirectContact {
+  id: number;
+  chatId: number;
+  name: string;
+  role: string;
+  isTeamMember: boolean;
+}
+
+// mock 전용 더미 데이터 (초대 시트)
+const MOCK_INVITED: InvitedUser[] = [
+  { id: 101, name: '박기획', role: '기획·마케팅', status: 'pending', directChatId: 5 },
+  { id: 102, name: '최디자인', role: '디자인·UI/UX', status: 'rejected' },
+];
+
+const MOCK_CONTACTS: DirectContact[] = [
+  { id: 3,  chatId: 3, name: '이팀장',  role: '기획',               isTeamMember: true  },
+  { id: 7,  chatId: 4, name: '최개발',  role: '개발',               isTeamMember: true  },
+  { id: 51, chatId: 5, name: '김데이터', role: '개발·데이터사이언스', isTeamMember: false },
+  { id: 52, chatId: 6, name: '이PM',    role: '기획·프로덕트 매니저', isTeamMember: false },
+];
+
+// ── 메인 화면 ─────────────────────────────────────────────────────────────────
 export default function ChatDetailScreen() {
   const router = useRouter();
   const { chatId } = useLocalSearchParams();
@@ -29,12 +63,21 @@ export default function ChatDetailScreen() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSending, setIsSending] = useState(false);
-  const [matchStatus, setMatchStatus] = useState<
-    'pending' | 'accepted' | 'requested' | 'waiting' | 'completed' | 'none'
-  >('none');
+
+  // 팀 채팅 전용 상태
+  const [isTeamConfirmed, setIsTeamConfirmed] = useState(false);
+  const [isInviteSheetVisible, setIsInviteSheetVisible] = useState(false);
+  const [isConfirmTeamModalVisible, setIsConfirmTeamModalVisible] = useState(false);
+  const [invitedUsers, setInvitedUsers] = useState<InvitedUser[]>(MOCK_INVITED);
+  const [invitedIds, setInvitedIds] = useState<Set<number>>(new Set([101, 102]));
+  const [contactSearch, setContactSearch] = useState('');
+
+  // 더보기 / 차단 / 나가기 / 이름 수정 모달
   const [isMoreSheetVisible, setIsMoreSheetVisible] = useState(false);
   const [isBlockConfirmVisible, setIsBlockConfirmVisible] = useState(false);
   const [isLeaveConfirmVisible, setIsLeaveConfirmVisible] = useState(false);
+  const [isRenameModalVisible, setIsRenameModalVisible] = useState(false);
+  const [renameText, setRenameText] = useState('');
 
   useEffect(() => {
     loadChat();
@@ -47,7 +90,6 @@ export default function ChatDetailScreen() {
       if (data) {
         setChat(data);
         setMessages(data.messages);
-        setMatchStatus(data.matchStatus ?? 'none');
       }
     } catch (e) {
       console.error('Failed to load chat:', e);
@@ -69,14 +111,44 @@ export default function ChatDetailScreen() {
     }
   };
 
-  const handleMatchAction = () => {
-    if (chat?.detailType === 'member-invite') setMatchStatus('accepted');
-    if (chat?.detailType === 'leader-request') setMatchStatus('waiting');
+  // 팀원 확정 처리
+  const handleConfirmTeam = () => {
+    setIsConfirmTeamModalVisible(false);
+    setIsTeamConfirmed(true);
+    const systemMsg: Message = {
+      id: Date.now(),
+      senderId: 0,
+      senderName: '',
+      senderAvatar: '',
+      content: '✅ 팀원을 확정했습니다',
+      createdAt: new Date().toISOString(),
+      isSent: false,
+      isSystem: true,
+    };
+    setMessages((prev) => [...prev, systemMsg]);
+    setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 100);
   };
 
-  // ────────────────────────────────────────────────
-  // Modals
-  // ────────────────────────────────────────────────
+  // 초대 전송
+  const handleInvite = (contact: DirectContact) => {
+    const newUser: InvitedUser = {
+      id: contact.id,
+      name: contact.name,
+      role: contact.role,
+      status: 'pending',
+      directChatId: contact.chatId,
+    };
+    setInvitedUsers((prev) => [...prev, newUser]);
+    setInvitedIds((prev) => new Set([...prev, contact.id]));
+  };
+
+  // 초대 취소(X 버튼)
+  const handleDismissInvite = (userId: number) => {
+    setInvitedUsers((prev) => prev.filter((u) => u.id !== userId));
+    setInvitedIds((prev) => { const s = new Set(prev); s.delete(userId); return s; });
+  };
+
+  // ── 더보기 / 차단 / 나가기 모달 ───────────────────────────────────────────
 
   const renderMoreSheet = () => (
     <Modal visible={isMoreSheetVisible} animationType="slide" transparent>
@@ -84,6 +156,19 @@ export default function ChatDetailScreen() {
         <TouchableOpacity style={styles.sheetBackdrop} onPress={() => setIsMoreSheetVisible(false)} />
         <View style={styles.sheetContainer}>
           <View style={styles.sheetHandle} />
+          {chat?.type === 'group' && (
+            <TouchableOpacity
+              style={styles.sheetItem}
+              onPress={() => {
+                setIsMoreSheetVisible(false);
+                setRenameText(chat?.name ?? '');
+                setIsRenameModalVisible(true);
+              }}
+            >
+              <View style={styles.sheetItemIcon}><Text style={styles.sheetItemIconText}>✏️</Text></View>
+              <Text style={styles.sheetItemLabel}>채팅방 이름 수정하기</Text>
+            </TouchableOpacity>
+          )}
           {chat?.type === 'direct' && (
             <TouchableOpacity
               style={styles.sheetItem}
@@ -96,9 +181,7 @@ export default function ChatDetailScreen() {
                 }
               }}
             >
-              <View style={styles.sheetItemIcon}>
-                <Text style={styles.sheetItemIconText}>🚫</Text>
-              </View>
+              <View style={styles.sheetItemIcon}><Text style={styles.sheetItemIconText}>🚫</Text></View>
               <Text style={styles.sheetItemLabel}>차단하기</Text>
             </TouchableOpacity>
           )}
@@ -113,24 +196,17 @@ export default function ChatDetailScreen() {
               }
             }}
           >
-            <View style={styles.sheetItemIcon}>
-              <Text style={styles.sheetItemIconText}>⚠️</Text>
-            </View>
+            <View style={styles.sheetItemIcon}><Text style={styles.sheetItemIconText}>⚠️</Text></View>
             <Text style={styles.sheetItemLabel}>신고하기</Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={styles.sheetItem}
             onPress={() => { setIsMoreSheetVisible(false); setIsLeaveConfirmVisible(true); }}
           >
-            <View style={styles.sheetItemIcon}>
-              <Text style={styles.sheetItemIconText}>🚪</Text>
-            </View>
+            <View style={styles.sheetItemIcon}><Text style={styles.sheetItemIconText}>🚪</Text></View>
             <Text style={[styles.sheetItemLabel, styles.sheetItemDanger]}>채팅방 나가기</Text>
           </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.sheetCloseBtn}
-            onPress={() => setIsMoreSheetVisible(false)}
-          >
+          <TouchableOpacity style={styles.sheetCloseBtn} onPress={() => setIsMoreSheetVisible(false)}>
             <Text style={styles.sheetCloseBtnText}>닫기</Text>
           </TouchableOpacity>
         </View>
@@ -147,18 +223,12 @@ export default function ChatDetailScreen() {
             {`차단하면 ${chat?.name ?? ''}님과 채팅방에서\n대화를 주고받을 수 없어요.\n차단하시겠어요?`}
           </Text>
           <View style={styles.dialogBtns}>
-            <TouchableOpacity
-              style={styles.dialogBtnCancel}
-              onPress={() => setIsBlockConfirmVisible(false)}
-            >
+            <TouchableOpacity style={styles.dialogBtnCancel} onPress={() => setIsBlockConfirmVisible(false)}>
               <Text style={styles.dialogBtnCancelText}>취소</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={styles.dialogBtnConfirm}
-              onPress={() => {
-                setIsBlockConfirmVisible(false);
-                setTimeout(() => router.back(), 300);
-              }}
+              onPress={() => { setIsBlockConfirmVisible(false); setTimeout(() => router.back(), 300); }}
             >
               <Text style={styles.dialogBtnConfirmText}>차단</Text>
             </TouchableOpacity>
@@ -177,21 +247,14 @@ export default function ChatDetailScreen() {
             {'채팅방을 나가면 채팅 목록 및 대화\n내용이 삭제되고 복구할 수 없어요.\n채팅방에서 나가시겠어요?'}
           </Text>
           <View style={styles.dialogBtns}>
-            <TouchableOpacity
-              style={styles.dialogBtnCancel}
-              onPress={() => setIsLeaveConfirmVisible(false)}
-            >
+            <TouchableOpacity style={styles.dialogBtnCancel} onPress={() => setIsLeaveConfirmVisible(false)}>
               <Text style={styles.dialogBtnCancelText}>취소</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={styles.dialogBtnConfirm}
               onPress={async () => {
                 setIsLeaveConfirmVisible(false);
-                try {
-                  await leaveChatRoom(parseInt(chatId as string));
-                } catch (e) {
-                  console.error('[Chat] 채팅방 나가기 실패:', e);
-                }
+                try { await leaveChatRoom(parseInt(chatId as string)); } catch {}
                 router.back();
               }}
             >
@@ -203,39 +266,282 @@ export default function ChatDetailScreen() {
     </Modal>
   );
 
-  // ────────────────────────────────────────────────
-  // List header (team status card + date divider)
-  // ────────────────────────────────────────────────
+  // ── 채팅방 이름 수정 팝업 ────────────────────────────────────────────────
+  const renderRenameModal = () => (
+    <Modal visible={isRenameModalVisible} animationType="fade" transparent>
+      <View style={styles.dialogOverlay}>
+        <View style={styles.dialogBox}>
+          <View style={styles.renameTitleRow}>
+            <Text style={styles.dialogTitle}>채팅방 이름 수정</Text>
+            <Text style={styles.renameCount}>{renameText.length}/30</Text>
+          </View>
+          <TextInput
+            style={styles.renameInput}
+            value={renameText}
+            onChangeText={(t) => setRenameText(t.slice(0, 30))}
+            placeholder=""
+            placeholderTextColor={Colors.grayLight}
+            autoFocus
+          />
+          <View style={styles.dialogBtns}>
+            <TouchableOpacity
+              style={styles.dialogBtnCancel}
+              onPress={() => setIsRenameModalVisible(false)}
+            >
+              <Text style={styles.dialogBtnCancelText}>취소</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.dialogBtnConfirm}
+              onPress={() => {
+                if (chat && renameText.trim()) {
+                  setChat((prev) => prev ? { ...prev, name: renameText.trim() } : prev);
+                }
+                setIsRenameModalVisible(false);
+              }}
+            >
+              <Text style={styles.dialogBtnConfirmText}>확인</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </View>
+    </Modal>
+  );
 
+  // ── 팀원 확정 확인 팝업 ──────────────────────────────────────────────────
+  const renderConfirmTeamModal = () => (
+    <Modal visible={isConfirmTeamModalVisible} animationType="fade" transparent>
+      <View style={styles.dialogOverlay}>
+        <View style={styles.dialogBox}>
+          <Text style={styles.dialogTitle}>팀원을 확정하시겠습니까?</Text>
+          <Text style={styles.dialogDesc}>
+            팀원을 확정하시면 모집글이 마감되고, 팀 매칭이 완료되어 더 이상 팀원을 추가할 수 없게 됩니다.
+          </Text>
+          <View style={styles.dialogBtns}>
+            <TouchableOpacity
+              style={styles.dialogBtnCancel}
+              onPress={() => setIsConfirmTeamModalVisible(false)}
+            >
+              <Text style={styles.dialogBtnCancelText}>취소</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.dialogBtnConfirm} onPress={handleConfirmTeam}>
+              <Text style={styles.dialogBtnConfirmText}>확정하기</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </View>
+    </Modal>
+  );
+
+  // ── 초대하기 바텀시트 ─────────────────────────────────────────────────────
+  const renderInviteSheet = () => {
+    if (!chat?.teamInfo) return null;
+    const remainingSlots = chat.teamInfo.totalCount - chat.teamInfo.currentCount;
+    const filteredContacts = MOCK_CONTACTS.filter((c) =>
+      c.name.includes(contactSearch) || c.role.includes(contactSearch),
+    );
+
+    return (
+      <Modal visible={isInviteSheetVisible} animationType="slide" transparent>
+        <View style={styles.sheetOverlay}>
+          <TouchableOpacity style={styles.sheetBackdrop} onPress={() => setIsInviteSheetVisible(false)} />
+          <View style={[styles.sheetContainer, inviteSheet.container]}>
+            <View style={styles.sheetHandle} />
+
+            {/* 시트 헤더 */}
+            <View style={inviteSheet.header}>
+              <Text style={inviteSheet.title}>팀원 초대</Text>
+              <TouchableOpacity
+                style={inviteSheet.closeBtnWrap}
+                onPress={() => setIsInviteSheetVisible(false)}
+                hitSlop={8}
+              >
+                <Text style={inviteSheet.closeBtn}>✕</Text>
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView showsVerticalScrollIndicator={false}>
+              {/* 초대 상태 */}
+              {invitedUsers.length > 0 && (
+                <View style={inviteSheet.section}>
+                  <Text style={inviteSheet.sectionTitle}>초대 상태</Text>
+                  {invitedUsers.map((u) => (
+                    <View
+                      key={u.id}
+                      style={[
+                        inviteSheet.invitedCard,
+                        u.status === 'pending' ? inviteSheet.invitedCardPending : inviteSheet.invitedCardRejected,
+                      ]}
+                    >
+                      <View style={inviteSheet.invitedAvatar}>
+                        <Text style={inviteSheet.invitedAvatarText}>👤</Text>
+                      </View>
+                      <View style={inviteSheet.invitedInfo}>
+                        <Text style={inviteSheet.invitedName}>{u.name}</Text>
+                        <Text style={inviteSheet.invitedRole}>{u.role}</Text>
+                      </View>
+                      {u.status === 'pending' ? (
+                        <View style={inviteSheet.pendingRight}>
+                          <View style={inviteSheet.pendingBadge}>
+                            <Text style={inviteSheet.pendingBadgeText}>⏳ 수락 대기 중</Text>
+                          </View>
+                          <TouchableOpacity
+                            style={inviteSheet.chatBtn}
+                            onPress={() => {
+                              setIsInviteSheetVisible(false);
+                              if (u.directChatId) router.push(`/messages/${u.directChatId}` as never);
+                            }}
+                          >
+                            <Text style={inviteSheet.chatBtnText}>채팅하기</Text>
+                          </TouchableOpacity>
+                          <TouchableOpacity onPress={() => handleDismissInvite(u.id)} hitSlop={8}>
+                            <Text style={inviteSheet.dismissBtn}>✕</Text>
+                          </TouchableOpacity>
+                        </View>
+                      ) : (
+                        <View style={inviteSheet.rejectedBadge}>
+                          <Text style={inviteSheet.rejectedBadgeText}>거절됨</Text>
+                        </View>
+                      )}
+                    </View>
+                  ))}
+                </View>
+              )}
+
+              {/* 1:1 채팅 목록 */}
+              <View style={inviteSheet.section}>
+                <View style={inviteSheet.sectionTitleRow}>
+                  <Text style={inviteSheet.sectionTitle}>1:1 채팅 목록</Text>
+                  <Text style={inviteSheet.remainingText}>잔여 {remainingSlots}자리</Text>
+                </View>
+
+                {/* 검색 */}
+                <View style={inviteSheet.searchRow}>
+                  <Text style={inviteSheet.searchIcon}>🔍</Text>
+                  <TextInput
+                    style={inviteSheet.searchInput}
+                    placeholder="닉네임으로 검색"
+                    placeholderTextColor={Colors.grayLight}
+                    value={contactSearch}
+                    onChangeText={setContactSearch}
+                  />
+                </View>
+
+                <View style={inviteSheet.contactList}>
+                  {filteredContacts.map((c) => {
+                    const alreadyInvited = invitedIds.has(c.id);
+                    const isDone = alreadyInvited || c.isTeamMember;
+                    return (
+                      <View key={c.id} style={[inviteSheet.contactRow, isDone && inviteSheet.contactRowDone]}>
+                        <View style={[inviteSheet.contactAvatar, isDone && inviteSheet.contactAvatarDone]}>
+                          <Text style={inviteSheet.contactAvatarText}>👤</Text>
+                        </View>
+                        <View style={inviteSheet.contactInfo}>
+                          <Text style={inviteSheet.contactName}>{c.name}</Text>
+                          <Text style={inviteSheet.contactRole}>{c.role}</Text>
+                        </View>
+                        {c.isTeamMember ? (
+                          <View style={inviteSheet.teamMemberPill}>
+                            <Text style={inviteSheet.teamMemberPillText}>팀원 추가 완료</Text>
+                          </View>
+                        ) : alreadyInvited ? (
+                          <Text style={inviteSheet.invitedLabel}>초대 전송됨</Text>
+                        ) : (
+                          <TouchableOpacity
+                            style={inviteSheet.inviteBtn}
+                            onPress={() => handleInvite(c)}
+                            activeOpacity={0.8}
+                          >
+                            <Text style={inviteSheet.inviteBtnText}>초대</Text>
+                          </TouchableOpacity>
+                        )}
+                      </View>
+                    );
+                  })}
+                </View>
+              </View>
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+    );
+  };
+
+  // ── 리스트 헤더 (팀 현황 + 날짜 구분선) ──────────────────────────────────
   const renderListHeader = () => {
     if (!chat) return null;
+
     return (
       <View style={styles.listHeaderWrap}>
-        {chat.detailType === 'group-status' && chat.teamInfo && (
-          <View style={styles.teamCard}>
-            <View style={styles.teamCardBadgeWrap}>
-              <View style={styles.teamCardBadge}>
-                <Text style={styles.teamCardBadgeText}>{chat.teamInfo.statusLabel}</Text>
+        {chat.type === 'group' && chat.teamInfo && (
+          <View style={teamCard.wrap}>
+            {/* 확정 전: 초대 대기 배너 / 확정 후: 완료 배너 */}
+            {isTeamConfirmed ? (
+              <View style={teamCard.completeBanner}>
+                <Text style={teamCard.completeBannerText}>🎉 팀 매칭이 완료되었습니다! 🎉</Text>
               </View>
-            </View>
-            <Text style={styles.teamCardTitle}>{chat.teamInfo.title}</Text>
-            <View style={styles.teamMemberRow}>
-              {chat.teamInfo.members.map((member) => (
-                <View key={member.id} style={styles.teamMemberItem}>
-                  <View
-                    style={[
-                      styles.teamMemberAvatar,
-                      member.filled ? styles.teamMemberAvatarFilled : styles.teamMemberAvatarEmpty,
-                    ]}
+            ) : (
+              (() => {
+                const pendingCount = invitedUsers.filter((u) => u.status === 'pending').length;
+                return pendingCount > 0 ? (
+                  <TouchableOpacity
+                    style={teamCard.pendingBanner}
+                    onPress={() => setIsInviteSheetVisible(true)}
+                    activeOpacity={0.7}
                   >
-                    <Text style={styles.teamMemberAvatarText}>{member.avatar}</Text>
+                    <Text style={teamCard.pendingBannerText}>
+                      {pendingCount}명의 초대 수락을 기다리는 중..
+                    </Text>
+                  </TouchableOpacity>
+                ) : null;
+              })()
+            )}
+
+            {/* 팀 현황 타이틀 */}
+            <Text style={teamCard.title}>팀 현황</Text>
+
+            {/* 팀원 아바타 행 */}
+            <View style={teamCard.memberRow}>
+              {chat.teamInfo.members
+                .filter((m) => m.filled)
+                .map((m) => (
+                  <View key={m.id} style={teamCard.memberItem}>
+                    <View style={[teamCard.memberAvatar, m.id === 3 && teamCard.hostAvatar]}>
+                      <Text style={teamCard.memberAvatarText}>{m.avatar}</Text>
+                    </View>
+                    <Text style={teamCard.memberName} numberOfLines={1}>{m.name}</Text>
                   </View>
-                  <Text style={[styles.teamMemberName, !member.filled && styles.teamMemberNameEmpty]} numberOfLines={1}>{member.name}</Text>
-                </View>
-              ))}
+                ))}
+
+              {/* 초대하기 버튼 – 미확정 & 슬롯 남을 때만 */}
+              {!isTeamConfirmed &&
+                chat.teamInfo.currentCount < chat.teamInfo.totalCount && (
+                  <TouchableOpacity
+                    style={teamCard.memberItem}
+                    onPress={() => setIsInviteSheetVisible(true)}
+                    activeOpacity={0.7}
+                  >
+                    <View style={teamCard.inviteCircle}>
+                      <Text style={teamCard.invitePlus}>+</Text>
+                    </View>
+                    <Text style={teamCard.inviteLabel}>초대하기</Text>
+                  </TouchableOpacity>
+                )}
             </View>
+
+            {/* 팀원 확정하기 버튼 – 미확정 때만 */}
+            {!isTeamConfirmed && (
+              <TouchableOpacity
+                style={teamCard.confirmBtn}
+                onPress={() => setIsConfirmTeamModalVisible(true)}
+                activeOpacity={0.85}
+              >
+                <Text style={teamCard.confirmBtnText}>팀원 확정하기</Text>
+              </TouchableOpacity>
+            )}
           </View>
         )}
+
+        {/* 날짜 구분선 */}
         <View style={styles.dateDivider}>
           <View style={styles.dateDividerPill}>
             <Text style={styles.dateDividerText}>오늘</Text>
@@ -245,70 +551,24 @@ export default function ChatDetailScreen() {
     );
   };
 
-  // ────────────────────────────────────────────────
-  // Action area (below message list)
-  // ────────────────────────────────────────────────
-
-  const renderActionArea = () => {
-    if (!chat) return null;
-
-    if (chat.detailType === 'member-invite') {
-      const accepted = matchStatus === 'accepted';
-      return (
-        <View style={styles.actionArea}>
-          <View style={[styles.actionBanner, accepted && styles.actionBannerDone]}>
-            <Text style={[styles.actionBannerText, !accepted ? styles.actionBannerTextActive : styles.actionBannerTextDone]}>
-              {accepted
-                ? '🎉 팀 매칭이 완료됐어요! 팀채팅방에서 만나요.'
-                : '💌 팀 매칭 제의가 왔어요! 수락하시겠어요?'}
-            </Text>
-          </View>
-          <TouchableOpacity
-            style={[styles.actionBtn, accepted && styles.actionBtnDisabled]}
-            disabled={accepted}
-            onPress={handleMatchAction}
-            activeOpacity={0.8}
-          >
-            <Text style={[styles.actionBtnText, accepted && styles.actionBtnTextDisabled]}>
-              {accepted ? '팀 매칭 수락 완료' : '팀 매칭 수락하기'}
-            </Text>
-          </TouchableOpacity>
+  // ── 리뷰 배너 (팀원 확정 후, 입력창 위) ──────────────────────────────────
+  const renderReviewBanner = () => {
+    if (!isTeamConfirmed || chat?.type !== 'group') return null;
+    return (
+      <View style={reviewBanner.wrap}>
+        <Text style={reviewBanner.icon}>💡</Text>
+        <View style={reviewBanner.textWrap}>
+          <Text style={reviewBanner.bold}>공모전 마감 후 팀원 간 상호 리뷰가 진행돼요!</Text>
+          <Text style={reviewBanner.body}>
+            공모전이 마무리되면 티밋에 돌아와 함께한 팀원을 리뷰해주세요.{' '}
+            여러분의 한 줄 리뷰가 다음 팀원의 좋은 만남을 만듭니다.
+          </Text>
         </View>
-      );
-    }
-
-    if (chat.detailType === 'leader-request') {
-      const waiting = matchStatus === 'waiting';
-      return (
-        <View style={styles.actionArea}>
-          <View style={[styles.actionBanner, waiting && styles.actionBannerDone]}>
-            <Text style={[styles.actionBannerText, !waiting ? styles.actionBannerTextActive : styles.actionBannerTextDone]}>
-              {waiting
-                ? '💌 매칭 요청을 보냈어요. 상대방의 수락을 기다리는 중...'
-                : '💌 팀 매칭 제안을 보내볼까요?'}
-            </Text>
-          </View>
-          <TouchableOpacity
-            style={[styles.actionBtn, waiting && styles.actionBtnDisabled]}
-            disabled={waiting}
-            onPress={handleMatchAction}
-            activeOpacity={0.8}
-          >
-            <Text style={[styles.actionBtnText, waiting && styles.actionBtnTextDisabled]}>
-              {waiting ? '상대방 수락 대기 중' : '팀 매칭 제안하기'}
-            </Text>
-          </TouchableOpacity>
-        </View>
-      );
-    }
-
-    return null;
+      </View>
+    );
   };
 
-  // ────────────────────────────────────────────────
-  // Render
-  // ────────────────────────────────────────────────
-
+  // ── 로딩 / 에러 ──────────────────────────────────────────────────────────
   if (isLoading) {
     return (
       <SafeAreaView style={styles.container}>
@@ -329,75 +589,89 @@ export default function ChatDetailScreen() {
     );
   }
 
+  // ── 헤더 데이터 ──────────────────────────────────────────────────────────
   const isGroup = chat.type === 'group';
+  const confirmedCount = isTeamConfirmed && chat.teamInfo
+    ? chat.teamInfo.currentCount
+    : chat.teamInfo?.currentCount;
+  const totalCount = chat.teamInfo?.totalCount;
+
   const headerName = isGroup ? `${chat.name} ${chat.avatar}` : chat.name;
   const headerSubtitle = isGroup && chat.teamInfo
-    ? `${chat.teamInfo.currentCount}/${chat.teamInfo.totalCount}명 참여 중`
+    ? isTeamConfirmed
+      ? `${confirmedCount}/${confirmedCount}명`
+      : `${confirmedCount}/${totalCount}명 참여 중`
     : chat.description ?? null;
+  const dDay = isGroup ? chat.teamInfo?.dDay : undefined;
 
   return (
-    <SafeAreaView style={styles.container}>
-      {/* 헤더 */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backBtn} hitSlop={8}>
-          <Text style={styles.backBtnText}>{'<'}</Text>
-        </TouchableOpacity>
-        <View style={styles.headerTitleRow}>
-          <Text style={styles.headerName}>{headerName}</Text>
-          {headerSubtitle ? (
-            <Text style={styles.headerSubtitle}>{headerSubtitle}</Text>
-          ) : null}
+    <KeyboardAvoidingView
+      style={styles.container}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
+    >
+      <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
+        {/* ── 헤더 ── */}
+        <View style={styles.header}>
+          <TouchableOpacity onPress={() => router.back()} style={styles.backBtn} hitSlop={8}>
+            <Text style={styles.backBtnText}>{'<'}</Text>
+          </TouchableOpacity>
+          <View style={styles.headerTitleRow}>
+            <Text style={styles.headerName}>{headerName}</Text>
+            {headerSubtitle ? (
+              <View style={styles.headerSubtitleRow}>
+                <Text style={styles.headerSubtitle}>{headerSubtitle}</Text>
+                {dDay !== undefined && (
+                  <View style={styles.dDayBadge}>
+                    <Text style={styles.dDayText}>D-{dDay}</Text>
+                  </View>
+                )}
+              </View>
+            ) : null}
+          </View>
+          <TouchableOpacity onPress={() => setIsMoreSheetVisible(true)} style={styles.moreBtn} hitSlop={8}>
+            <Text style={styles.moreBtnText}>⋮</Text>
+          </TouchableOpacity>
         </View>
-        <TouchableOpacity onPress={() => setIsMoreSheetVisible(true)} style={styles.moreBtn} hitSlop={8}>
-          <Text style={styles.moreBtnText}>⋮</Text>
-        </TouchableOpacity>
-      </View>
 
-      {renderMoreSheet()}
-      {renderBlockConfirm()}
-      {renderLeaveConfirm()}
+        {/* 모달들 */}
+        {renderMoreSheet()}
+        {renderBlockConfirm()}
+        {renderLeaveConfirm()}
+        {renderRenameModal()}
+        {renderConfirmTeamModal()}
+        {renderInviteSheet()}
 
-      {/* 메시지 목록 */}
-      <FlatList
-        ref={flatListRef}
-        data={messages}
-        renderItem={({ item }) => <MessageBubble message={item} showSenderName={isGroup} />}
-        keyExtractor={(item) => item.id.toString()}
-        contentContainerStyle={styles.messageListContent}
-        ListHeaderComponent={renderListHeader}
-        onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: false })}
-        showsVerticalScrollIndicator={false}
-      />
+        {/* ── 메시지 목록 ── */}
+        <FlatList
+          ref={flatListRef}
+          data={messages}
+          renderItem={({ item }) => <MessageBubble message={item} showSenderName={isGroup} />}
+          keyExtractor={(item) => item.id.toString()}
+          contentContainerStyle={styles.messageListContent}
+          ListHeaderComponent={renderListHeader}
+          onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: false })}
+          showsVerticalScrollIndicator={false}
+        />
 
-      {renderActionArea()}
+        {/* ── 리뷰 배너 (확정 후) ── */}
+        {renderReviewBanner()}
 
-      {/* 메시지 입력 */}
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
-      >
+        {/* ── 메시지 입력 ── */}
         <MessageInput onSendMessage={handleSendMessage} isLoading={isSending} />
-      </KeyboardAvoidingView>
-    </SafeAreaView>
+      </SafeAreaView>
+    </KeyboardAvoidingView>
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: Colors.white,
-  },
-  center: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  errorText: {
-    fontSize: 15,
-    color: Colors.grayMedium,
-  },
+// ── 스타일 ────────────────────────────────────────────────────────────────────
 
-  // ── 헤더 ──────────────────────────────────────
+const styles = StyleSheet.create({
+  container: { flex: 1, backgroundColor: Colors.white },
+  center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  errorText: { fontSize: 15, color: Colors.grayMedium },
+
+  // 헤더
   header: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -407,300 +681,281 @@ const styles = StyleSheet.create({
     borderBottomColor: Colors.lightGray,
     backgroundColor: Colors.white,
   },
-  backBtn: {
-    marginRight: 8,
-    paddingVertical: 4,
-    paddingHorizontal: 4,
-  },
-  backBtnText: {
-    fontSize: 20,
-    color: Colors.primary,
-    fontWeight: '600',
-  },
-  headerTitleRow: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'flex-end',
-    gap: 6,
-  },
-  headerName: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: Colors.dark,
-  },
-  headerSubtitle: {
-    fontSize: 11,
-    color: Colors.grayMedium,
-    fontWeight: '400',
-  },
-  moreBtn: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
-    backgroundColor: Colors.pageBg,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  moreBtnText: {
-    fontSize: 18,
-    color: Colors.dark,
-    includeFontPadding: false,
-    marginTop: 3,
-  },
-
-  // ── 메시지 목록 ────────────────────────────────
-  messageListContent: {
-    paddingVertical: 8,
-  },
-
-  // ── 리스트 헤더 (팀 카드 + 날짜 구분선) ────────
-  listHeaderWrap: {
-    paddingBottom: 4,
-  },
-  teamCard: {
-    backgroundColor: Colors.ogTint,
-    paddingHorizontal: 20,
-    paddingTop: 16,
-    paddingBottom: 20,
-  },
-  teamCardBadgeWrap: {
-    alignItems: 'center',
-    marginBottom: 10,
-  },
-  teamCardBadge: {
-    backgroundColor: Colors.white,
-    borderRadius: 20,
-    paddingHorizontal: 14,
-    paddingVertical: 5,
-    borderWidth: 1,
-    borderColor: Colors.lightGray,
-  },
-  teamCardBadgeText: {
-    fontSize: 12,
-    color: Colors.primary,
-    fontWeight: '500',
-  },
-  teamCardTitle: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: Colors.dark,
-    textAlign: 'center',
-    marginBottom: 16,
-  },
-  teamMemberRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  teamMemberItem: {
-    alignItems: 'center',
-    flex: 1,
-  },
-  teamMemberAvatar: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 6,
-  },
-  teamMemberAvatarFilled: {
-    backgroundColor: Colors.white,
-  },
-  teamMemberAvatarEmpty: {
-    backgroundColor: Colors.lightGray,
-  },
-  teamMemberAvatarText: {
-    fontSize: 22,
-  },
-  teamMemberName: {
-    fontSize: 11,
-    color: Colors.dark,
-    textAlign: 'center',
-    maxWidth: 52,
-  },
-  teamMemberNameEmpty: {
-    color: Colors.grayMedium,
-  },
-  dateDivider: {
-    alignItems: 'center',
-    marginVertical: 14,
-  },
-  dateDividerPill: {
-    backgroundColor: Colors.white,
-    borderRadius: 20,
-    paddingHorizontal: 14,
-    paddingVertical: 5,
-    borderWidth: 1,
-    borderColor: Colors.lightGray,
-  },
-  dateDividerText: {
-    fontSize: 12,
-    color: Colors.grayMedium,
-  },
-
-  // ── 액션 영역 ──────────────────────────────────
-  actionArea: {
-    paddingHorizontal: 16,
-    paddingTop: 12,
-    paddingBottom: 10,
-    backgroundColor: Colors.white,
-    gap: 10,
-  },
-  actionBanner: {
-    backgroundColor: Colors.ogTint,
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 13,
-  },
-  actionBannerText: {
-    fontSize: 14,
-    color: Colors.dark,
-    fontWeight: '500',
-  },
-  actionBannerDone: {
-    backgroundColor: Colors.pageBg,
-  },
-  actionBannerTextDone: {
-    color: Colors.grayMedium,
-  },
-  actionBannerTextActive: {
-    color: Colors.primary,
-    fontWeight: '500',
-  },
-  actionBtn: {
+  backBtn: { marginRight: 8, paddingVertical: 4, paddingHorizontal: 4 },
+  backBtnText: { fontSize: 20, color: Colors.primary, fontWeight: '600' },
+  headerTitleRow: { flex: 1 },
+  headerName: { fontSize: 16, fontWeight: '700', color: Colors.dark },
+  headerSubtitleRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 1 },
+  headerSubtitle: { fontSize: 11, color: Colors.grayMedium },
+  dDayBadge: {
     backgroundColor: Colors.primary,
-    borderRadius: 10,
-    paddingVertical: 16,
-    alignItems: 'center',
+    borderRadius: 999,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
   },
-  actionBtnDisabled: {
-    backgroundColor: Colors.lightGray,
+  dDayText: { fontSize: 11, fontWeight: '700', color: Colors.white },
+  moreBtn: {
+    width: 34, height: 34, borderRadius: 17,
+    backgroundColor: Colors.pageBg,
+    justifyContent: 'center', alignItems: 'center',
   },
-  actionBtnText: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: Colors.white,
-  },
-  actionBtnTextDisabled: {
-    color: Colors.grayMedium,
-  },
+  moreBtnText: { fontSize: 18, color: Colors.dark, includeFontPadding: false, marginTop: 3 },
 
-  // ── 바텀 시트 ──────────────────────────────────
-  sheetOverlay: {
-    flex: 1,
-    justifyContent: 'flex-end',
-    backgroundColor: 'rgba(0,0,0,0.3)',
+  // 메시지 목록
+  messageListContent: { paddingVertical: 8 },
+
+  // 리스트 헤더
+  listHeaderWrap: { paddingBottom: 4 },
+  dateDivider: { alignItems: 'center', marginVertical: 14 },
+  dateDividerPill: {
+    backgroundColor: Colors.white, borderRadius: 20,
+    paddingHorizontal: 14, paddingVertical: 5,
+    borderWidth: 1, borderColor: Colors.lightGray,
   },
-  sheetBackdrop: {
-    flex: 1,
-  },
+  dateDividerText: { fontSize: 12, color: Colors.grayMedium },
+
+  // 더보기 바텀시트
+  sheetOverlay: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.3)' },
+  sheetBackdrop: { flex: 1 },
   sheetContainer: {
     backgroundColor: Colors.white,
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    paddingTop: 10,
-    paddingBottom: 28,
-    paddingHorizontal: 20,
+    borderTopLeftRadius: 20, borderTopRightRadius: 20,
+    paddingTop: 10, paddingBottom: 28, paddingHorizontal: 20,
   },
   sheetHandle: {
-    width: 36,
-    height: 4,
-    backgroundColor: Colors.lightGray,
-    borderRadius: 2,
-    alignSelf: 'center',
-    marginBottom: 16,
+    width: 36, height: 4, backgroundColor: Colors.lightGray,
+    borderRadius: 2, alignSelf: 'center', marginBottom: 16,
   },
   sheetItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 16,
-    gap: 14,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.lightGray,
+    flexDirection: 'row', alignItems: 'center',
+    paddingVertical: 16, gap: 14,
+    borderBottomWidth: 1, borderBottomColor: Colors.lightGray,
   },
   sheetItemIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: Colors.pageBg,
-    justifyContent: 'center',
-    alignItems: 'center',
+    width: 40, height: 40, borderRadius: 20,
+    backgroundColor: Colors.pageBg, justifyContent: 'center', alignItems: 'center',
   },
-  sheetItemIconText: {
-    fontSize: 18,
-  },
-  sheetItemLabel: {
-    fontSize: 16,
-    color: Colors.dark,
-  },
-  sheetItemDanger: {
-    color: '#E53935',
-  },
+  sheetItemIconText: { fontSize: 18 },
+  sheetItemLabel: { fontSize: 16, color: Colors.dark },
+  sheetItemDanger: { color: '#E53935' },
   sheetCloseBtn: {
-    marginTop: 14,
-    paddingVertical: 15,
-    backgroundColor: Colors.pageBg,
-    borderRadius: 14,
-    alignItems: 'center',
+    marginTop: 14, paddingVertical: 15,
+    backgroundColor: Colors.pageBg, borderRadius: 14, alignItems: 'center',
   },
-  sheetCloseBtnText: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: Colors.dark,
-  },
+  sheetCloseBtnText: { fontSize: 16, fontWeight: '700', color: Colors.dark },
 
-  // ── 다이얼로그 ─────────────────────────────────
+  // 공통 다이얼로그
   dialogOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.4)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 28,
+    flex: 1, backgroundColor: 'rgba(0,0,0,0.4)',
+    justifyContent: 'center', alignItems: 'center', paddingHorizontal: 28,
   },
-  dialogBox: {
-    width: '100%',
+  dialogBox: { width: '100%', backgroundColor: Colors.white, borderRadius: 20, padding: 24 },
+  dialogTitle: { fontSize: 18, fontWeight: '700', color: Colors.dark, marginBottom: 10 },
+  dialogDesc: { fontSize: 14, color: Colors.grayMedium, lineHeight: 22, marginBottom: 24 },
+  dialogBtns: { flexDirection: 'row', gap: 10 },
+  dialogBtnCancel: {
+    flex: 1, paddingVertical: 18, borderRadius: 14,
+    backgroundColor: Colors.pageBg, alignItems: 'center',
+  },
+  dialogBtnCancelText: { fontSize: 15, fontWeight: '700', color: Colors.grayMedium },
+  dialogBtnConfirm: {
+    flex: 1, paddingVertical: 18, borderRadius: 14,
+    backgroundColor: Colors.primary, alignItems: 'center',
+  },
+  dialogBtnConfirmText: { fontSize: 15, fontWeight: '700', color: Colors.white },
+  renameTitleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 },
+  renameCount: { fontSize: 13, color: Colors.grayMedium },
+  renameInput: {
+    backgroundColor: Colors.pageBg,
+    borderRadius: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    fontSize: 14,
+    color: Colors.dark,
+    marginBottom: 20,
+  },
+});
+
+// ── 팀 현황 카드 스타일 ────────────────────────────────────────────────────────
+const teamCard = StyleSheet.create({
+  wrap: {
+    backgroundColor: Colors.ogTint,
+    paddingTop: 14,
+    paddingBottom: 18,
+    paddingHorizontal: 20,
+    alignItems: 'center',
+  },
+  // 초대 대기 배너
+  pendingBanner: {
     backgroundColor: Colors.white,
     borderRadius: 20,
-    padding: 24,
+    paddingHorizontal: 16,
+    paddingVertical: 6,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: Colors.lightGray,
   },
-  dialogTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: Colors.dark,
-    marginBottom: 10,
+  pendingBannerText: { fontSize: 13, color: Colors.grayMedium },
+  // 완료 배너
+  completeBanner: {
+    backgroundColor: Colors.white,
+    borderRadius: 20,
+    paddingHorizontal: 16,
+    paddingVertical: 6,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: Colors.white
   },
-  dialogDesc: {
-    fontSize: 14,
-    color: Colors.grayMedium,
-    lineHeight: 22,
-    marginBottom: 24,
+  completeBannerText: { fontSize: 13, fontWeight: '600', color: Colors.primary },
+
+  title: { fontSize: 15, fontWeight: '700', color: Colors.dark, marginBottom: 14 },
+
+  memberRow: { flexDirection: 'row', gap: 14, justifyContent: 'center', flexWrap: 'wrap' },
+  memberItem: { alignItems: 'center', width: 56 },
+  memberAvatar: {
+    width: 52, height: 52, borderRadius: 26,
+    backgroundColor: Colors.white,
+    alignItems: 'center', justifyContent: 'center', marginBottom: 6,
   },
-  dialogBtns: {
-    flexDirection: 'row',
-    gap: 10,
-  },
-  dialogBtnCancel: {
-    flex: 1,
-    paddingVertical: 18,
-    borderRadius: 14,
+  hostAvatar: { borderWidth: 2, borderColor: Colors.primary },
+  memberAvatarText: { fontSize: 24 },
+  memberName: { fontSize: 11, color: Colors.dark, textAlign: 'center' },
+
+  // 초대하기 슬롯
+  inviteCircle: {
+    width: 52, height: 52, borderRadius: 26,
     backgroundColor: Colors.lightGray,
-    alignItems: 'center',
+    alignItems: 'center', justifyContent: 'center', marginBottom: 6,
   },
-  dialogBtnCancelText: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: Colors.dark,
+  invitePlus: { fontSize: 22, color: Colors.white, fontWeight: '300' },
+  inviteLabel: { fontSize: 11, color: Colors.grayMedium, textAlign: 'center' },
+
+  // 팀원 확정하기 버튼
+  confirmBtn: {
+    marginTop: 16,
+    borderWidth: 1.5,
+    borderColor: Colors.primary,
+    borderRadius: 999,
+    paddingVertical: 10,
+    paddingHorizontal: 28,
+    alignSelf: 'center',
+    backgroundColor: Colors.white,
   },
-  dialogBtnConfirm: {
-    flex: 1,
-    paddingVertical: 18,
+  confirmBtnText: { fontSize: 14, fontWeight: '700', color: Colors.primary },
+});
+
+// ── 초대 바텀시트 스타일 ──────────────────────────────────────────────────────
+const inviteSheet = StyleSheet.create({
+  container: { maxHeight: '85%', paddingHorizontal: 0 },
+  header: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    paddingHorizontal: 20, paddingBottom: 14, position: 'relative',
+  },
+  title: { fontSize: 17, fontWeight: '700', color: Colors.dark },
+  closeBtnWrap: { position: 'absolute', right: 20 },
+  closeBtn: { fontSize: 18, color: Colors.grayMedium },
+
+  section: { paddingHorizontal: 20, marginBottom: 8 },
+  sectionTitleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 },
+  sectionTitle: { fontSize: 15, fontWeight: '700', color: Colors.dark, marginBottom: 12 },
+  remainingText: { fontSize: 13, color: Colors.grayMedium },
+
+  // 초대된 사용자 카드
+  invitedCard: {
+    flexDirection: 'row', alignItems: 'center',
+    borderRadius: 12, padding: 14, marginBottom: 8, gap: 10,
+  },
+  invitedCardPending: { borderWidth: 1.5, borderColor: Colors.primary, backgroundColor: Colors.white },
+  invitedCardRejected: { backgroundColor: Colors.pageBg },
+  invitedAvatar: {
+    width: 40, height: 40, borderRadius: 20,
+    backgroundColor: Colors.lightGray, alignItems: 'center', justifyContent: 'center',
+  },
+  invitedAvatarText: { fontSize: 20 },
+  invitedInfo: { flex: 1 },
+  invitedName: { fontSize: 14, fontWeight: '600', color: Colors.dark },
+  invitedRole: { fontSize: 12, color: Colors.grayMedium, marginTop: 2 },
+
+  pendingRight: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  pendingBadge: {
+    flexDirection: 'row', alignItems: 'center', gap: 4,
+    backgroundColor: Colors.ogTint, borderRadius: 999,
+    paddingHorizontal: 8, paddingVertical: 4,
+  },
+  pendingBadgeText: { fontSize: 11, color: Colors.primary, fontWeight: '600' },
+  chatBtn: {
+    backgroundColor: Colors.primary, borderRadius: 999,
+    paddingHorizontal: 10, paddingVertical: 5,
+  },
+  chatBtnText: { fontSize: 12, fontWeight: '700', color: Colors.white },
+  dismissBtn: { fontSize: 16, color: Colors.grayLight },
+
+  rejectedBadge: {
+    backgroundColor: Colors.pageBg, borderRadius: 999,
+    paddingHorizontal: 10, paddingVertical: 5,
+  },
+  rejectedBadgeText: { fontSize: 12, color: Colors.grayMedium, fontWeight: '600' },
+
+  // 검색
+  searchRow: {
+    flexDirection: 'row', alignItems: 'center',
+    backgroundColor: Colors.pageBg, borderRadius: 10,
+    paddingHorizontal: 12, paddingVertical: 10,
+    marginBottom: 10, gap: 8,
+  },
+  searchIcon: { fontSize: 14 },
+  searchInput: { flex: 1, fontSize: 14, color: Colors.dark },
+
+  // 1:1 연락처 행
+  contactList: { gap: 10 },
+  contactRow: {
+    flexDirection: 'row', alignItems: 'center',
+    padding: 14, gap: 12,
+    backgroundColor: Colors.white,
     borderRadius: 14,
-    backgroundColor: Colors.primary,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.06, shadowRadius: 4, elevation: 2,
+  },
+  contactRowDone: { backgroundColor: Colors.pageBg },
+  contactAvatar: {
+    width: 44, height: 44, borderRadius: 22,
+    backgroundColor: Colors.ogTint, alignItems: 'center', justifyContent: 'center',
+  },
+  contactAvatarDone: { backgroundColor: Colors.pageBg },
+  contactAvatarText: { fontSize: 22 },
+  contactInfo: { flex: 1 },
+  contactName: { fontSize: 14, fontWeight: '600', color: Colors.dark },
+  contactRole: { fontSize: 12, color: Colors.grayMedium, marginTop: 2 },
+  teamMemberPill: {
+    backgroundColor: Colors.lightGray, borderRadius: 999,
+    paddingHorizontal: 10, paddingVertical: 5,
+  },
+  teamMemberPillText: { fontSize: 12, color: Colors.grayMedium, fontWeight: '500' },
+  invitedLabel: { fontSize: 12, color: Colors.grayMedium },
+  inviteBtn: {
+    backgroundColor: Colors.primary, borderRadius: 999,
+    paddingHorizontal: 14, paddingVertical: 7, alignItems: 'center',
+  },
+  inviteBtnText: { fontSize: 13, fontWeight: '700', color: Colors.white },
+});
+
+// ── 리뷰 배너 스타일 ──────────────────────────────────────────────────────────
+const reviewBanner = StyleSheet.create({
+  wrap: {
+    flexDirection: 'row',
     alignItems: 'center',
+    gap: 10,
+    backgroundColor: '#FFFBF0',
+    borderWidth: 1,
+    borderColor: '#FFE0B2',
+    borderRadius: 16,
+    marginHorizontal: 16,
+    marginBottom: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
   },
-  dialogBtnConfirmText: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: Colors.white,
-  },
+  icon: { fontSize: 18 },
+  textWrap: { flex: 1, gap: 4 },
+  bold: { fontSize: 13, fontWeight: '700', color: Colors.dark },
+  body: { fontSize: 12, color: Colors.grayMedium, lineHeight: 18 },
 });
