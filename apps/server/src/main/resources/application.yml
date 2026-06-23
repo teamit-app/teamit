@@ -6,3 +6,7 @@ spring:
 
 server:
   port: 8080
+
+jwt:
+  access-token-expiry: 1800000       # 30분 (ms)
+  refresh-token-expiry: 1209600000   # 14일 (ms)

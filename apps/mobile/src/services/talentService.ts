@@ -62,15 +62,15 @@ export const getTalentPool = async (params?: TalentPoolParams): Promise<PoolUser
 
 // ─── 관심 팀원 조회 ──────────────────────────────────────────────────────────
 
-export const getHeartedTalents = async (userId: number): Promise<number[]> => {
-  const data = await apiRequest<HeartedUsersResponse>(`/users/${userId}/hearts`);
+export const getHeartedTalents = async (_userId: number): Promise<number[]> => {
+  const data = await apiRequest<HeartedUsersResponse>(`/users/hearts`);
   return data.content.map((u) => u.userId);
 };
 
 // ─── 하트 추가 / 취소 ─────────────────────────────────────────────────────────
 
-export const addTalentHeart = (userId: number, targetUserId: number): Promise<null> =>
-  apiRequest<null>(`/users/${userId}/hearts/${targetUserId}`, { method: 'POST' });
+export const addTalentHeart = (_userId: number, targetUserId: number): Promise<null> =>
+  apiRequest<null>(`/users/hearts/${targetUserId}`, { method: 'POST' });
 
-export const removeTalentHeart = (userId: number, targetUserId: number): Promise<null> =>
-  apiRequest<null>(`/users/${userId}/hearts/${targetUserId}`, { method: 'DELETE' });
+export const removeTalentHeart = (_userId: number, targetUserId: number): Promise<null> =>
+  apiRequest<null>(`/users/hearts/${targetUserId}`, { method: 'DELETE' });

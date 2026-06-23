@@ -14,6 +14,7 @@ import { SearchBottomSheet } from '../../../src/components/common/SearchBottomSh
 import { SCHOOL_LIST, MAJOR_LIST } from '../../../src/data/schools';
 import { submitEducation } from '../../../src/services/onboardingService';
 import { useOnboardingStore } from '../../../src/store/useOnboardingStore';
+import { tokenStorage } from '../../../src/services/tokenStorage';
 
 type EducationStatus = 'ATTENDING' | 'COMPLETED' | 'EXPECTED' | 'GRADUATED';
 
@@ -51,6 +52,7 @@ export default function EducationScreen() {
         major: major || '',
         subMajor: subMajor || null,
       });
+      await tokenStorage.setOnboardingComplete();
       router.replace('/(tabs)/home');
     } finally {
       setLoading(false);

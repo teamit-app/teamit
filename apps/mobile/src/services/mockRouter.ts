@@ -54,6 +54,61 @@ const staticRoutes: Record<string, () => unknown> = {
     gender: 'MALE',
     birthDate: '2000-01-01',
   }),
+
+  // 온보딩 지역/학력 저장 (@LoginUser 방식 — userId 없는 경로)
+  '/users/regions': () => ({ regions: [] }),
+  '/users/educations': () => ({
+    educationId: 1,
+    schoolName: '한국대학교',
+    status: 'ATTENDING',
+    major: '컴퓨터공학',
+    verified: false,
+  }),
+
+  // 관심 팀원 (@LoginUser 방식)
+  '/users/hearts': () => ({
+    content: dummyTalents
+      .filter((t) => t.isHearted)
+      .map((t) => ({ userId: t.userId })),
+  }),
+
+  // 관심 공모전 (@LoginUser 방식)
+  '/users/contest-hearts': () => ({
+    content: dummyContests
+      .filter((c) => c.isHearted)
+      .map((c) => ({ contestId: c.contestId })),
+  }),
+
+  // GET /users/chat-rooms — @LoginUser 방식 (userId 없는 경로)
+  '/users/chat-rooms': () => ({
+    groupChats: dummyChatRooms
+      .filter((r) => r.type === 'group')
+      .map((r) => ({
+        chatRoomId: r.id,
+        roomType: 'GROUP',
+        teamName: r.name,
+        memberCount: r.participants.length,
+        lastMessage: r.lastMessage,
+        lastMessageAt: r.lastMessageAt,
+        unreadCount: r.unreadCount,
+      })),
+    directChats: dummyChatRooms
+      .filter((r) => r.type === 'direct')
+      .map((r) => ({
+        chatRoomId: r.id,
+        roomType: 'DIRECT',
+        opponentNickname: r.name,
+        lastMessage: r.lastMessage,
+        lastMessageAt: r.lastMessageAt,
+        unreadCount: r.unreadCount,
+      })),
+  }),
+
+  // POST /users/chat-rooms/direct — @LoginUser 방식
+  '/users/chat-rooms/direct': () => {
+    const directRoom = dummyChatRooms.find((r) => r.type === 'direct');
+    return { chatRoomId: directRoom?.id ?? 3 };
+  },
 };
 
 // ─── 동적 라우트: 경로 파라미터 포함 ──────────────────────────────────────────
@@ -69,88 +124,16 @@ const dynamicRoutes: Array<[RegExp, (path: string) => unknown]> = [
     },
   ],
 
-  // GET /users/{userId}/hearts/{targetUserId}  (POST→추가, DELETE→취소 응답도 null)
-  [/^\/users\/\d+\/hearts\/\d+$/, () => null],
+  // POST /users/hearts/{targetUserId}, DELETE /users/hearts/{targetUserId}
+  [/^\/users\/hearts\/\d+$/, () => null],
 
-  // GET /users/{userId}/hearts — 관심 팀원 목록 (dummyTalents 중 isHearted:true)
-  [
-    /^\/users\/\d+\/hearts$/,
-    () => ({
-      content: dummyTalents
-        .filter((t) => t.isHearted)
-        .map((t) => ({ userId: t.userId })),
-    }),
-  ],
-
-  // GET /users/{userId}/contest-hearts/{contestId}  (POST/DELETE 응답도 null)
-  [/^\/users\/\d+\/contest-hearts\/\d+$/, () => null],
-
-  // GET /users/{userId}/contest-hearts — 관심 공모전 목록
-  [
-    /^\/users\/\d+\/contest-hearts$/,
-    () => ({
-      content: dummyContests
-        .filter((c) => c.isHearted)
-        .map((c) => ({ contestId: c.contestId })),
-    }),
-  ],
+  // POST /users/contest-hearts/{contestId}, DELETE /users/contest-hearts/{contestId}
+  [/^\/users\/contest-hearts\/\d+$/, () => null],
 
   // GET /users/{userId}/notifications
   [
     /^\/users\/\d+\/notifications$/,
     () => ({ content: dummyNotifications, unreadCount: dummyNotifications.filter((n) => !n.isRead).length }),
-  ],
-
-  // POST /users/{userId}/regions
-  [/^\/users\/\d+\/regions$/, () => ({ regions: [] })],
-
-  // POST /users/{userId}/educations
-  [
-    /^\/users\/\d+\/educations$/,
-    () => ({
-      educationId: 1,
-      schoolName: '한국대학교',
-      status: 'ATTENDING',
-      major: '컴퓨터공학',
-      verified: false,
-    }),
-  ],
-
-  // POST /users/{userId}/chat-rooms/direct — 1:1 채팅방 생성 또는 조회
-  [
-    /^\/users\/\d+\/chat-rooms\/direct$/,
-    () => {
-      const directRoom = dummyChatRooms.find((r) => r.type === 'direct');
-      return { chatRoomId: directRoom?.id ?? 3 };
-    },
-  ],
-
-  // GET /users/{userId}/chat-rooms
-  [
-    /^\/users\/\d+\/chat-rooms$/,
-    () => ({
-      groupChats: dummyChatRooms
-        .filter((r) => r.type === 'group')
-        .map((r) => ({
-          chatRoomId: r.id,
-          roomType: 'GROUP',
-          teamName: r.name,
-          memberCount: r.participants.length,
-          lastMessage: r.lastMessage,
-          lastMessageAt: r.lastMessageAt,
-          unreadCount: r.unreadCount,
-        })),
-      directChats: dummyChatRooms
-        .filter((r) => r.type === 'direct')
-        .map((r) => ({
-          chatRoomId: r.id,
-          roomType: 'DIRECT',
-          opponentNickname: r.name,
-          lastMessage: r.lastMessage,
-          lastMessageAt: r.lastMessageAt,
-          unreadCount: r.unreadCount,
-        })),
-    }),
   ],
 
   // GET /chat-rooms/{chatRoomId}/messages — dummy 메시지를 백엔드 포맷으로 변환
@@ -175,6 +158,7 @@ const dynamicRoutes: Array<[RegExp, (path: string) => unknown]> = [
           content: m.content,
           isRead: true,
           createdAt: m.createdAt,
+          isSystem: m.isSystem ?? false,
         })),
         totalElements: msgs.length,
         currentPage: 0,

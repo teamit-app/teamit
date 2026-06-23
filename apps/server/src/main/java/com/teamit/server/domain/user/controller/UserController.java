@@ -4,7 +4,9 @@ import com.teamit.server.domain.contest.dto.HeartedContestListResponse;
 import com.teamit.server.domain.contest.service.ContestService;
 import com.teamit.server.domain.user.dto.*;
 import com.teamit.server.domain.user.service.UserService;
+import com.teamit.server.global.annotation.LoginUser;
 import com.teamit.server.global.response.ApiResponse;
+import com.teamit.server.global.security.CustomUserDetails;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
@@ -20,16 +22,24 @@ public class UserController {
     private final UserService userService;
     private final ContestService contestService;
 
-    @Operation(summary = "온보딩 기본정보 저장", description = "닉네임, 이름, 성별, 생년월일을 저장합니다.")
+    @Operation(summary = "내 프로필 조회 (온보딩 완료 여부 포함)")
+    @GetMapping("/me")
+    public ApiResponse<UserMeResponse> getMe(@LoginUser CustomUserDetails userDetails) {
+        UserMeResponse response = userService.getMe(userDetails.getUserId());
+        return ApiResponse.success(response, "내 프로필 조회 성공");
+    }
+
+    @Operation(summary = "온보딩 기본정보 저장")
     @PostMapping("/onboarding/basic")
     @ResponseStatus(HttpStatus.CREATED)
     public ApiResponse<OnboardingBasicResponse> saveBasicInfo(
+            @LoginUser CustomUserDetails userDetails,
             @RequestBody OnboardingBasicRequest request) {
-        OnboardingBasicResponse response = userService.saveBasicInfo(request);
+        OnboardingBasicResponse response = userService.saveBasicInfo(userDetails.getUserId(), request);
         return ApiResponse.success(response, "기본 정보가 저장되었습니다");
     }
 
-    @Operation(summary = "인재풀 목록 조회", description = "스킬, 지역, 역할, 키워드(닉네임/스킬명) 필터로 인재풀을 조회합니다.")
+    @Operation(summary = "인재풀 목록 조회")
     @GetMapping
     public ApiResponse<UserPoolPageResponse> getUserPool(
             @RequestParam(required = false) Long skillId,
@@ -42,57 +52,57 @@ public class UserController {
         return ApiResponse.success(response, "인재풀 조회 성공");
     }
 
-    @Operation(summary = "인재풀 하트 추가", description = "관심 팀원으로 추가합니다.")
-    @PostMapping("/{userId}/hearts/{targetUserId}")
+    @Operation(summary = "인재풀 하트 추가")
+    @PostMapping("/hearts/{targetUserId}")
     @ResponseStatus(HttpStatus.CREATED)
     public ApiResponse<Void> addHeart(
-            @PathVariable Long userId,
+            @LoginUser CustomUserDetails userDetails,
             @PathVariable Long targetUserId) {
-        userService.addHeart(userId, targetUserId);
+        userService.addHeart(userDetails.getUserId(), targetUserId);
         return ApiResponse.success(null, "관심 팀원으로 저장되었습니다");
     }
 
-    @Operation(summary = "인재풀 하트 취소", description = "관심 팀원을 취소합니다.")
-    @DeleteMapping("/{userId}/hearts/{targetUserId}")
+    @Operation(summary = "인재풀 하트 취소")
+    @DeleteMapping("/hearts/{targetUserId}")
     public ApiResponse<Void> removeHeart(
-            @PathVariable Long userId,
+            @LoginUser CustomUserDetails userDetails,
             @PathVariable Long targetUserId) {
-        userService.removeHeart(userId, targetUserId);
+        userService.removeHeart(userDetails.getUserId(), targetUserId);
         return ApiResponse.success(null, "관심 팀원이 취소되었습니다");
     }
 
-    @Operation(summary = "관심 팀원 목록 조회", description = "하트한 팀원 목록을 조회합니다.")
-    @GetMapping("/{userId}/hearts")
+    @Operation(summary = "관심 팀원 목록 조회")
+    @GetMapping("/hearts")
     public ApiResponse<HeartedUserListResponse> getHeartedUsers(
-            @PathVariable Long userId) {
-        HeartedUserListResponse response = userService.getHeartedUsers(userId);
+            @LoginUser CustomUserDetails userDetails) {
+        HeartedUserListResponse response = userService.getHeartedUsers(userDetails.getUserId());
         return ApiResponse.success(response, "관심 팀원 목록 조회 성공");
     }
 
-    @Operation(summary = "공모전 하트 추가", description = "관심 공모전으로 추가합니다.")
-    @PostMapping("/{userId}/contest-hearts/{contestId}")
+    @Operation(summary = "공모전 하트 추가")
+    @PostMapping("/contest-hearts/{contestId}")
     @ResponseStatus(HttpStatus.CREATED)
     public ApiResponse<Void> addContestHeart(
-            @PathVariable Long userId,
+            @LoginUser CustomUserDetails userDetails,
             @PathVariable Long contestId) {
-        contestService.addContestHeart(userId, contestId);
+        contestService.addContestHeart(userDetails.getUserId(), contestId);
         return ApiResponse.success(null, "관심 공모전으로 저장되었습니다");
     }
 
-    @Operation(summary = "공모전 하트 취소", description = "관심 공모전을 취소합니다.")
-    @DeleteMapping("/{userId}/contest-hearts/{contestId}")
+    @Operation(summary = "공모전 하트 취소")
+    @DeleteMapping("/contest-hearts/{contestId}")
     public ApiResponse<Void> removeContestHeart(
-            @PathVariable Long userId,
+            @LoginUser CustomUserDetails userDetails,
             @PathVariable Long contestId) {
-        contestService.removeContestHeart(userId, contestId);
+        contestService.removeContestHeart(userDetails.getUserId(), contestId);
         return ApiResponse.success(null, "관심 공모전이 취소되었습니다");
     }
 
-    @Operation(summary = "관심 공모전 목록 조회", description = "하트한 공모전 목록을 조회합니다.")
-    @GetMapping("/{userId}/contest-hearts")
+    @Operation(summary = "관심 공모전 목록 조회")
+    @GetMapping("/contest-hearts")
     public ApiResponse<HeartedContestListResponse> getHeartedContests(
-            @PathVariable Long userId) {
-        HeartedContestListResponse response = contestService.getHeartedContests(userId);
+            @LoginUser CustomUserDetails userDetails) {
+        HeartedContestListResponse response = contestService.getHeartedContests(userDetails.getUserId());
         return ApiResponse.success(response, "관심 공모전 목록 조회 성공");
     }
 }

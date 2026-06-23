@@ -29,24 +29,30 @@ public class UserService {
     private final UserSkillRepository userSkillRepository;
     private final UserHeartRepository userHeartRepository;
 
-    @Transactional
-    public OnboardingBasicResponse saveBasicInfo(OnboardingBasicRequest request) {
-        User user = User.builder()
-                .nickname(request.getNickname())
-                .name(request.getName())
-                .gender(request.getGender())
-                .birthDate(request.getBirthDate())
-                .isMatchingActive(false)
+    public UserMeResponse getMe(Long userId) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new IllegalArgumentException("사용자를 찾을 수 없습니다"));
+        return UserMeResponse.builder()
+                .userId(user.getId())
+                .nickname(user.getNickname())
+                .profileImageUrl(user.getProfileImageUrl())
+                .needsOnboarding(!educationRepository.existsByUserId(user.getId()))
                 .build();
+    }
 
-        User saved = userRepository.save(user);
-
+    /** 온보딩 기본정보 저장: 카카오 로그인으로 생성된 유저에게 name/gender/birthDate 등록 */
+    @Transactional
+    public OnboardingBasicResponse saveBasicInfo(Long userId, OnboardingBasicRequest request) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new IllegalArgumentException("사용자를 찾을 수 없습니다"));
+        user.updateBasicInfo(request.getNickname(), request.getName(),
+                request.getGender(), request.getBirthDate());
         return OnboardingBasicResponse.builder()
-                .userId(saved.getId())
-                .nickname(saved.getNickname())
-                .name(saved.getName())
-                .gender(saved.getGender())
-                .birthDate(saved.getBirthDate())
+                .userId(user.getId())
+                .nickname(user.getNickname())
+                .name(user.getName())
+                .gender(user.getGender())
+                .birthDate(user.getBirthDate())
                 .build();
     }
 

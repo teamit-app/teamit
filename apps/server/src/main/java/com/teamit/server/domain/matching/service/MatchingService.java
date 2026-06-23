@@ -29,10 +29,10 @@ public class MatchingService {
     // 지원하기 → DIRECT 채팅방 자동 생성
     // ──────────────────────────────────────────────────────────────
     @Transactional
-    public ApplyPostResponse apply(Long postId, ApplyPostRequest request) {
+    public ApplyPostResponse apply(Long postId, Long applicantId, ApplyPostRequest request) {
         Post post = postRepository.findById(postId)
                 .orElseThrow(() -> new IllegalArgumentException("모집글을 찾을 수 없습니다"));
-        User applicant = userRepository.findById(request.getUserId())
+        User applicant = userRepository.findById(applicantId)
                 .orElseThrow(() -> new IllegalArgumentException("사용자를 찾을 수 없습니다"));
 
         // 지원자 ↔ 모집글 작성자 간 DIRECT 채팅방 생성
@@ -58,10 +58,10 @@ public class MatchingService {
     // 팀 초대 → DIRECT 채팅방 자동 생성
     // ──────────────────────────────────────────────────────────────
     @Transactional
-    public InviteTeamResponse invite(Long postId, InviteTeamRequest request) {
+    public InviteTeamResponse invite(Long postId, Long senderId, InviteTeamRequest request) {
         Post post = postRepository.findById(postId)
                 .orElseThrow(() -> new IllegalArgumentException("모집글을 찾을 수 없습니다"));
-        User sender = userRepository.findById(request.getSenderId())
+        User sender = userRepository.findById(senderId)
                 .orElseThrow(() -> new IllegalArgumentException("초대자를 찾을 수 없습니다"));
         User receiver = userRepository.findById(request.getReceiverId())
                 .orElseThrow(() -> new IllegalArgumentException("수신자를 찾을 수 없습니다"));
