@@ -287,6 +287,41 @@ export const dummyGroupMessages2: Message[] = [
   },
 ];
 
+// chat id=10: 공모전 기한이 지나 팀원 상호 리뷰 가능한 상태 (isExpired=true)
+// 팀원 확정까지 완료된 팀이며, 나(id=1)는 이 팀의 모집자
+export const dummyGroupMessages10: Message[] = [
+  {
+    id: 1, senderId: 0, senderName: '', senderAvatar: '',
+    content: 'K-스타트업 공모전 채팅방 생성 됨',
+    createdAt: '2024-11-01T09:00:00', isSent: false, isSystem: true,
+  },
+  {
+    id: 2, senderId: 1, senderName: '김지수', senderAvatar: '👑',
+    content: '팀원 여러분 반갑습니다! 열심히 해봐요 🔥',
+    createdAt: '2024-11-01T09:05:00', isSent: true,
+  },
+  {
+    id: 3, senderId: 9, senderName: '이유진', senderAvatar: '👩‍💻',
+    content: '잘 부탁드립니다! 같이 좋은 결과 만들어봐요',
+    createdAt: '2024-11-01T09:10:00', isSent: false,
+  },
+  {
+    id: 4, senderId: 10, senderName: '박준혁', senderAvatar: '🎯',
+    content: '열심히 하겠습니다!',
+    createdAt: '2024-11-01T09:12:00', isSent: false,
+  },
+  {
+    id: 5, senderId: 0, senderName: '', senderAvatar: '',
+    content: '✅ 팀원을 확정했습니다',
+    createdAt: '2024-11-05T14:00:00', isSent: false, isSystem: true,
+  },
+  {
+    id: 6, senderId: 1, senderName: '김지수', senderAvatar: '👑',
+    content: '공모전 수고 많으셨어요! 좋은 결과 있으면 좋겠네요 😊',
+    createdAt: '2024-12-20T18:00:00', isSent: true,
+  },
+];
+
 export const dummyChatRooms: ChatRoom[] = [
   // 단체 채팅
   {
@@ -340,6 +375,34 @@ export const dummyChatRooms: ChatRoom[] = [
         { id: 3, name: '이팀장', role: '기획', avatar: '👑', filled: true, isHost: true },
         { id: 7, name: '최개발', role: '개발', avatar: '👨‍💻', filled: true },
         { id: 1, name: '나', role: '나', avatar: '👨‍💻', filled: true },
+      ],
+    },
+  },
+
+  // chat id=10: 공모전 기한 지남 + 팀원 확정 완료 → 리뷰 작성 가능 상태
+  {
+    id: 10,
+    type: 'group',
+    name: 'K-스타트업 공모전 팀',
+    avatar: '🏅',
+    lastMessage: '공모전 수고 많으셨어요! 좋은 결과 있으면 좋겠네요 😊',
+    lastMessageBy: '김지수',
+    lastMessageAt: daysAgo(4),
+    unreadCount: 0,
+    participants: [dummyUser1],
+    detailType: 'group-status',
+    matchStatus: 'none',
+    teamInfo: {
+      statusLabel: '팀원 확정 완료',
+      title: '팀 현황',
+      currentCount: 3,
+      totalCount: 3,
+      dDay: 0,
+      isExpired: true,
+      members: [
+        { id: 1,  name: '나',     role: '기획',   avatar: '👑',  filled: true, isHost: true },
+        { id: 9,  name: '이유진', role: '디자인', avatar: '👩‍💻', filled: true },
+        { id: 10, name: '박준혁', role: '개발',   avatar: '🎯',  filled: true },
       ],
     },
   },

@@ -11,6 +11,7 @@ import {
   dummyDirectMessages4,
   dummyGroupMessages1,
   dummyGroupMessages2,
+  dummyGroupMessages10,
 } from '../data/chatRooms';
 import { Message } from '../types/message';
 
@@ -151,12 +152,13 @@ const dynamicRoutes: Array<[RegExp, (path: string) => unknown]> = [
     (path) => {
       const id = Number(path.split('/')[2]);
       const msgMap: Record<number, Message[]> = {
-        1: dummyGroupMessages1,
-        2: dummyGroupMessages2,
-        3: dummyDirectMessages1,
-        4: dummyDirectMessages2,
-        5: dummyDirectMessages3,
-        6: dummyDirectMessages4,
+        1:  dummyGroupMessages1,
+        2:  dummyGroupMessages2,
+        3:  dummyDirectMessages1,
+        4:  dummyDirectMessages2,
+        5:  dummyDirectMessages3,
+        6:  dummyDirectMessages4,
+        10: dummyGroupMessages10,
       };
       const msgs = msgMap[id] ?? [];
       return {

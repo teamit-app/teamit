@@ -20,6 +20,7 @@ import { MessageBubble } from '../../../src/components/messages/MessageBubble';
 import { MessageInput } from '../../../src/components/messages/MessageInput';
 import { getChat, sendMessage, leaveChatRoom } from '../../../src/services/messageService';
 import { Chat, Message } from '../../../src/types/message';
+import { useReviewStore } from '../../../src/store/useReviewStore';
 
 const IS_MOCK = process.env.EXPO_PUBLIC_API_MODE === 'mock';
 
@@ -72,6 +73,11 @@ export default function ChatDetailScreen() {
   const [isLoading, setIsLoading] = useState(true);
   const [isSending, setIsSending] = useState(false);
 
+  // 리뷰 완료 여부: 만료 채팅방에서 모든 팀원 리뷰를 제출했는지 확인
+  const { getSubmittedReviews } = useReviewStore();
+  const reviewableCount = (chat?.teamInfo?.members ?? []).filter((m) => m.id !== MY_USER_ID).length;
+  const allReviewsDone  = getSubmittedReviews(parseInt(chatId as string)).length >= reviewableCount;
+
   // 내가 이 채팅방의 모집자인지 여부 (팀 현황 UI 분기에 사용)
   const amIRecruiter =
     chat?.teamInfo?.members.find((m) => m.id === MY_USER_ID)?.isHost === true;
@@ -102,6 +108,8 @@ export default function ChatDetailScreen() {
       if (data) {
         setChat(data);
         setMessages(data.messages);
+        // 공모전 만료 상태이면 팀원이 이미 확정된 것으로 초기화
+        if (data.teamInfo?.isExpired) setIsTeamConfirmed(true);
       }
     } catch (e) {
       console.error('Failed to load chat:', e);
@@ -571,9 +579,41 @@ export default function ChatDetailScreen() {
     );
   };
 
-  // ── 리뷰 배너 (팀원 확정 후, 입력창 위) ──────────────────────────────────
+  // ── 리뷰 배너 (공모전 기한 전: 안내 / 기한 후: 리뷰 작성 유도) ─────────────
+  const isExpired = chat?.teamInfo?.isExpired === true;
   const renderReviewBanner = () => {
-    if (!isTeamConfirmed || chat?.type !== 'group') return null;
+    if (chat?.type !== 'group') return null;
+
+    // 공모전 기한 만료 → 리뷰 작성 유도 배너 (클릭 가능)
+    if (isExpired) {
+      return (
+        <TouchableOpacity
+          style={[reviewBanner.wrap, reviewBanner.expiredWrap]}
+          activeOpacity={0.85}
+          onPress={() =>
+            router.push(
+              allReviewsDone
+                ? { pathname: '/(tabs)/messages/review-complete' as never, params: { chatId: chat.id.toString() } }
+                : { pathname: '/(tabs)/messages/review-write'   as never, params: { chatId: chat.id.toString() } }
+            )
+          }
+        >
+          <Text style={reviewBanner.icon}>✍️</Text>
+          <View style={reviewBanner.textWrap}>
+            <Text style={[reviewBanner.bold, reviewBanner.expiredBold]}>
+              팀원 리뷰를 작성해 주세요!
+            </Text>
+            <Text style={reviewBanner.body}>
+              공모전이 마감되었어요. 함께한 팀원을 리뷰하고 내가 받은 리뷰도 확인해 보세요.
+            </Text>
+          </View>
+          <Text style={reviewBanner.chevron}>›</Text>
+        </TouchableOpacity>
+      );
+    }
+
+    // 팀원 확정 후, 아직 기한 전 → 사전 안내 배너
+    if (!isTeamConfirmed) return null;
     return (
       <View style={reviewBanner.wrap}>
         <Text style={reviewBanner.icon}>💡</Text>
@@ -976,8 +1016,14 @@ const reviewBanner = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 12,
   },
+  expiredWrap: {
+    backgroundColor: '#FFF2EB',
+    borderColor: Colors.primary,
+  },
   icon: { fontSize: 18 },
   textWrap: { flex: 1, gap: 4 },
   bold: { fontSize: 13, fontWeight: '700', color: Colors.dark },
+  expiredBold: { color: Colors.primary },
   body: { fontSize: 12, color: Colors.grayMedium, lineHeight: 18 },
+  chevron: { fontSize: 20, color: Colors.primary, fontWeight: '300' },
 });

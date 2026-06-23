@@ -68,7 +68,7 @@ export default function RecruiterProfileScreen() {
   // 프로토타입: 온도·학교·성별·리뷰 등 부재 필드는 dummyCandidates[0] 로 보완
   const mock = dummyCandidates[0];
 
-  const KEYWORD_SHOW = 3;
+  const KEYWORD_SHOW = 4;
   const extraKeywords = mock.reviewKeywords.length - KEYWORD_SHOW;
 
   return (
@@ -206,7 +206,10 @@ export default function RecruiterProfileScreen() {
               <View style={s.keywordRow}>
                 {mock.reviewKeywords.slice(0, KEYWORD_SHOW).map((kw) => (
                   <View key={kw.text} style={s.keywordPill}>
-                    <Text style={s.keywordText}>{kw.text} {kw.count}</Text>
+                    <Text style={s.keywordText}>{kw.text}</Text>
+                    <View style={s.kwCountBadge}>
+                      <Text style={s.kwCountText}>{kw.count}</Text>
+                    </View>
                   </View>
                 ))}
                 {extraKeywords > 0 && (
@@ -392,10 +395,23 @@ const s = StyleSheet.create({
     padding: 16,
   },
   keywordPill: {
-    backgroundColor: Colors.ogTint, borderRadius: 999,
-    paddingHorizontal: 12, paddingVertical: 7,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    borderWidth: 1.5,
+    borderColor: Colors.primary,
+    borderRadius: 999,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    backgroundColor: Colors.white,
   },
   keywordText: { fontSize: 12, color: Colors.primary, fontWeight: '600' },
+  kwCountBadge: {
+    width: 18, height: 18, borderRadius: 9,
+    backgroundColor: Colors.primary,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  kwCountText: { fontSize: 10, color: Colors.white, fontWeight: '700' },
 
   reviewHeader: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
