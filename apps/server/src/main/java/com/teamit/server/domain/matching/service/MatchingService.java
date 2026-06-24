@@ -14,6 +14,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -122,6 +123,58 @@ public class MatchingService {
         return AcceptMatchingResponse.builder()
                 .groupChatRoomId(groupChat.getId())
                 .build();
+    }
+
+    // ──────────────────────────────────────────────────────────────
+    // 받은 초대 목록 조회 (수신자 기준, PENDING 상태만)
+    // ──────────────────────────────────────────────────────────────
+    @Transactional(readOnly = true)
+    public ReceivedInvitationListResponse getReceivedInvitations(Long userId) {
+        List<ReceivedInvitationResponse> content = invitationRepository.findAllByReceiverId(userId).stream()
+                .filter(i -> i.getStatus() == InvitationStatus.PENDING)
+                .map(i -> ReceivedInvitationResponse.builder()
+                        .invitationId(i.getId())
+                        .postId(i.getPost().getId())
+                        .title(i.getPost().getTitle())
+                        .currentMembers(1)   // TODO: 팀 멤버 수 연동 후 교체
+                        .totalMembers(2)     // TODO: Post.recruitCount 컬럼 추가 후 교체
+                        .contestName("")     // TODO: Post-Contest 연관관계 추가 후 교체
+                        .senderName(i.getSender().getNickname())
+                        .receivedAt(i.getCreatedAt().toString())
+                        .build())
+                .collect(Collectors.toList());
+        return ReceivedInvitationListResponse.builder().content(content).build();
+    }
+
+    // ──────────────────────────────────────────────────────────────
+    // 초대 수락 (수신자가 직접 수락, GROUP 채팅방 자동 생성)
+    // ──────────────────────────────────────────────────────────────
+    @Transactional
+    public void acceptByReceiver(Long invitationId, Long userId) {
+        TeamInvitation invitation = invitationRepository.findById(invitationId)
+                .orElseThrow(() -> new IllegalArgumentException("초대 정보를 찾을 수 없습니다"));
+        if (!invitation.getReceiver().getId().equals(userId)) {
+            throw new IllegalArgumentException("수락 권한이 없습니다");
+        }
+        invitation.accept();
+        String teamName = invitation.getPost().getTitle() + " 팀";
+        chatService.createGroupChatRoom(teamName, List.of(
+                invitation.getSender().getId(),
+                invitation.getReceiver().getId()
+        ));
+    }
+
+    // ──────────────────────────────────────────────────────────────
+    // 초대 거절 (수신자가 직접 거절)
+    // ──────────────────────────────────────────────────────────────
+    @Transactional
+    public void declineByReceiver(Long invitationId, Long userId) {
+        TeamInvitation invitation = invitationRepository.findById(invitationId)
+                .orElseThrow(() -> new IllegalArgumentException("초대 정보를 찾을 수 없습니다"));
+        if (!invitation.getReceiver().getId().equals(userId)) {
+            throw new IllegalArgumentException("거절 권한이 없습니다");
+        }
+        invitation.reject();
     }
 
     // ──────────────────────────────────────────────────────────────
