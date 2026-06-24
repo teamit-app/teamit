@@ -64,20 +64,33 @@ export default function HomeScreen() {
           </View>
 
           <View style={styles.matchingColumns}>
-            <View style={styles.matchingColLeft}>
+            <TouchableOpacity
+              style={styles.matchingColLeft}
+              activeOpacity={0.75}
+              onPress={() =>
+                router.push({
+                  pathname: '/(tabs)/messages',
+                  params: { initialTab: 'invitations' },
+                })
+              }
+            >
               <Text style={styles.matchingLabel}>나에게 온 제안</Text>
               <View style={styles.matchingValueRow}>
                 <Text style={styles.matchingValue}>{matchingStatus?.receivedProposalCount ?? '-'}</Text>
                 <Text style={styles.matchingLinkPrimary}>보기 ›</Text>
               </View>
-            </View>
-            <View style={styles.matchingColRight}>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.matchingColRight}
+              activeOpacity={0.75}
+              onPress={() => router.push('/(tabs)/profile/my-applications')}
+            >
               <Text style={styles.matchingLabel}>내가 지원한 팀</Text>
               <View style={styles.matchingValueRow}>
                 <Text style={styles.matchingValue}>{matchingStatus?.appliedTeamCount ?? '-'}</Text>
                 <Text style={styles.matchingLinkGray}>기록 ›</Text>
               </View>
-            </View>
+            </TouchableOpacity>
           </View>
 
           {matchingStatus?.recentActivity && (

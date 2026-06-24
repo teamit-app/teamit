@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import {
   View,
   StyleSheet,
@@ -9,7 +9,7 @@ import {
   TouchableOpacity,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useFocusEffect } from '@react-navigation/native';
 import { Colors } from '../../../src/constants/colors';
 import { ScreenHeader } from '../../../src/components/common/ScreenHeader';
@@ -29,7 +29,14 @@ interface SectionData {
 
 export default function MessagesScreen() {
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState<Tab>('chats');
+  const { initialTab } = useLocalSearchParams<{ initialTab?: string }>();
+  const [activeTab, setActiveTab] = useState<Tab>((initialTab as Tab) || 'chats');
+
+  useEffect(() => {
+    if (initialTab === 'invitations' || initialTab === 'chats') {
+      setActiveTab(initialTab);
+    }
+  }, [initialTab]);
   const [invitations, setInvitations] = useState<Invitation[]>([]);
   const [sections, setSections] = useState<SectionData[]>([]);
   const [isLoading, setIsLoading] = useState(true);
