@@ -30,7 +30,13 @@
     },
     "plugins": [
       "expo-router",
-      "expo-web-browser"
+      "expo-web-browser",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "학력 인증을 위해 사진 앨범 접근이 필요합니다."
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true
