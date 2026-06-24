@@ -41,8 +41,13 @@ const staticRoutes: Record<string, () => unknown> = {
       .map(({ isHearted: _h, categoryLabel: _l, status: _s, ...rest }) => rest),
   }),
 
-  // 알림은 동적 라우트(/users/{userId}/notifications)로 처리됨 — 아래 dynamicRoutes 참고
-  // GET /home/matching-status?userId=...  (쿼리스트링은 strip 후 매칭)
+  // GET /users/notifications — @LoginUser 방식 (userId 없는 경로)
+  '/users/notifications': () => ({
+    content: dummyNotifications,
+    unreadCount: dummyNotifications.filter((n) => !n.isRead).length,
+  }),
+
+  // GET /home/matching-status — @LoginUser 방식 (쿼리스트링 없음)
   '/home/matching-status': () => ({
     receivedInvitationCount: dummyMatchingStatus.receivedProposalCount,
     appliedTeamCount: dummyMatchingStatus.appliedTeamCount,
@@ -136,12 +141,6 @@ const dynamicRoutes: Array<[RegExp, (path: string) => unknown]> = [
 
   // POST /users/contest-hearts/{contestId}, DELETE /users/contest-hearts/{contestId}
   [/^\/users\/contest-hearts\/\d+$/, () => null],
-
-  // GET /users/{userId}/notifications
-  [
-    /^\/users\/\d+\/notifications$/,
-    () => ({ content: dummyNotifications, unreadCount: dummyNotifications.filter((n) => !n.isRead).length }),
-  ],
 
   // POST /users/invitations/{id}/decline, POST /users/invitations/{id}/accept
   [/^\/users\/invitations\/\d+\/(decline|accept)$/, () => null],

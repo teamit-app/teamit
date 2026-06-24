@@ -1,6 +1,5 @@
 import { apiRequest } from './api';
 import { MatchingStatus } from '../types/matching';
-import { useOnboardingStore } from '../store/useOnboardingStore';
 
 interface BackendMatchingStatus {
   receivedInvitationCount: number;
@@ -8,12 +7,7 @@ interface BackendMatchingStatus {
 }
 
 export const getMatchingStatus = async (): Promise<MatchingStatus | null> => {
-  const userId = useOnboardingStore.getState().userId;
-  if (!userId) return null;
-
-  const data = await apiRequest<BackendMatchingStatus>(
-    `/home/matching-status?userId=${userId}`,
-  );
+  const data = await apiRequest<BackendMatchingStatus>('/home/matching-status');
 
   return {
     receivedProposalCount: data.receivedInvitationCount,
