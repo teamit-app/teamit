@@ -37,6 +37,7 @@ export interface TeamMemberStatus {
   role: string;
   avatar: string;
   filled: boolean;
+  isHost?: boolean; // true = 이 채팅방의 모집자(팀장)
 }
 
 export interface TeamInfo {
@@ -46,6 +47,7 @@ export interface TeamInfo {
   totalCount: number;
   members: TeamMemberStatus[];
   dDay?: number;
+  isExpired?: boolean; // 공모전 기한이 지나 리뷰 작성 가능한 상태
 }
 
 export interface Chat {

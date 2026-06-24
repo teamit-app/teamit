@@ -20,6 +20,7 @@ import { MessageBubble } from '../../../src/components/messages/MessageBubble';
 import { MessageInput } from '../../../src/components/messages/MessageInput';
 import { getChat, sendMessage, leaveChatRoom } from '../../../src/services/messageService';
 import { Chat, Message } from '../../../src/types/message';
+import { useReviewStore } from '../../../src/store/useReviewStore';
 
 const IS_MOCK = process.env.EXPO_PUBLIC_API_MODE === 'mock';
 
@@ -54,6 +55,14 @@ const MOCK_CONTACTS: DirectContact[] = [
 ];
 
 // ── 메인 화면 ─────────────────────────────────────────────────────────────────
+// [모집자 vs 팀원 분기 로직]
+// MY_USER_ID: mock 모드에서 "나"를 식별하는 ID. 실제 API 연동 시 auth 토큰에서 추출.
+// amIRecruiter: teamInfo.members 중 내 ID(MY_USER_ID)가 isHost=true인지 여부.
+//   - true  → 모집자 화면: 팀원 확정하기 버튼, 초대하기, 초대 대기 배너 표시
+//   - false → 팀원 화면: 위 요소 모두 숨김
+// 모집자 아바타 주황 테두리: isHost=true인 멤버에게 항상 적용 (모집자·팀원 화면 공통)
+const MY_USER_ID = 1; // mock: 현재 로그인한 사용자 ID
+
 export default function ChatDetailScreen() {
   const router = useRouter();
   const { chatId } = useLocalSearchParams();
@@ -63,6 +72,15 @@ export default function ChatDetailScreen() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSending, setIsSending] = useState(false);
+
+  // 리뷰 완료 여부: 만료 채팅방에서 모든 팀원 리뷰를 제출했는지 확인
+  const { getSubmittedReviews } = useReviewStore();
+  const reviewableCount = (chat?.teamInfo?.members ?? []).filter((m) => m.id !== MY_USER_ID).length;
+  const allReviewsDone  = getSubmittedReviews(parseInt(chatId as string)).length >= reviewableCount;
+
+  // 내가 이 채팅방의 모집자인지 여부 (팀 현황 UI 분기에 사용)
+  const amIRecruiter =
+    chat?.teamInfo?.members.find((m) => m.id === MY_USER_ID)?.isHost === true;
 
   // 팀 채팅 전용 상태
   const [isTeamConfirmed, setIsTeamConfirmed] = useState(false);
@@ -90,6 +108,8 @@ export default function ChatDetailScreen() {
       if (data) {
         setChat(data);
         setMessages(data.messages);
+        // 공모전 만료 상태이면 팀원이 이미 확정된 것으로 초기화
+        if (data.teamInfo?.isExpired) setIsTeamConfirmed(true);
       }
     } catch (e) {
       console.error('Failed to load chat:', e);
@@ -474,12 +494,16 @@ export default function ChatDetailScreen() {
       <View style={styles.listHeaderWrap}>
         {chat.type === 'group' && chat.teamInfo && (
           <View style={teamCard.wrap}>
-            {/* 확정 전: 초대 대기 배너 / 확정 후: 완료 배너 */}
+            {/* ── 상단 배너 ──────────────────────────────────────────────────
+                팀 확정 후: 완료 배너 (모집자·팀원 공통)
+                팀 확정 전 + 모집자: 초대 대기 배너 (클릭 시 초대 바텀시트)
+                팀 확정 전 + 팀원:   배너 없음
+            ─────────────────────────────────────────────────────────────── */}
             {isTeamConfirmed ? (
               <View style={teamCard.completeBanner}>
                 <Text style={teamCard.completeBannerText}>🎉 팀 매칭이 완료되었습니다! 🎉</Text>
               </View>
-            ) : (
+            ) : amIRecruiter ? (
               (() => {
                 const pendingCount = invitedUsers.filter((u) => u.status === 'pending').length;
                 return pendingCount > 0 ? (
@@ -494,26 +518,27 @@ export default function ChatDetailScreen() {
                   </TouchableOpacity>
                 ) : null;
               })()
-            )}
+            ) : null}
 
             {/* 팀 현황 타이틀 */}
             <Text style={teamCard.title}>팀 현황</Text>
 
-            {/* 팀원 아바타 행 */}
+            {/* 팀원 아바타 행
+                isHost=true 멤버: 주황 테두리 (모집자·팀원 화면 공통 적용) */}
             <View style={teamCard.memberRow}>
               {chat.teamInfo.members
                 .filter((m) => m.filled)
                 .map((m) => (
                   <View key={m.id} style={teamCard.memberItem}>
-                    <View style={[teamCard.memberAvatar, m.id === 3 && teamCard.hostAvatar]}>
+                    <View style={[teamCard.memberAvatar, m.isHost && teamCard.hostAvatar]}>
                       <Text style={teamCard.memberAvatarText}>{m.avatar}</Text>
                     </View>
                     <Text style={teamCard.memberName} numberOfLines={1}>{m.name}</Text>
                   </View>
                 ))}
 
-              {/* 초대하기 버튼 – 미확정 & 슬롯 남을 때만 */}
-              {!isTeamConfirmed &&
+              {/* 초대하기 버튼 – 모집자만, 미확정 & 슬롯 남을 때 */}
+              {amIRecruiter && !isTeamConfirmed &&
                 chat.teamInfo.currentCount < chat.teamInfo.totalCount && (
                   <TouchableOpacity
                     style={teamCard.memberItem}
@@ -528,15 +553,18 @@ export default function ChatDetailScreen() {
                 )}
             </View>
 
-            {/* 팀원 확정하기 버튼 – 미확정 때만 */}
-            {!isTeamConfirmed && (
-              <TouchableOpacity
-                style={teamCard.confirmBtn}
-                onPress={() => setIsConfirmTeamModalVisible(true)}
-                activeOpacity={0.85}
-              >
-                <Text style={teamCard.confirmBtnText}>팀원 확정하기</Text>
-              </TouchableOpacity>
+            {/* 팀원 확정하기 버튼 + 안내 문구 – 모집자만, 미확정 때 */}
+            {amIRecruiter && !isTeamConfirmed && (
+              <>
+                <TouchableOpacity
+                  style={teamCard.confirmBtn}
+                  onPress={() => setIsConfirmTeamModalVisible(true)}
+                  activeOpacity={0.85}
+                >
+                  <Text style={teamCard.confirmBtnText}>팀원 확정하기</Text>
+                </TouchableOpacity>
+                <Text style={teamCard.confirmHint}>팀원을 확정해야 공모전 마감 후 팀원 리뷰를 작성할 수 있어요!</Text>
+              </>
             )}
           </View>
         )}
@@ -551,9 +579,41 @@ export default function ChatDetailScreen() {
     );
   };
 
-  // ── 리뷰 배너 (팀원 확정 후, 입력창 위) ──────────────────────────────────
+  // ── 리뷰 배너 (공모전 기한 전: 안내 / 기한 후: 리뷰 작성 유도) ─────────────
+  const isExpired = chat?.teamInfo?.isExpired === true;
   const renderReviewBanner = () => {
-    if (!isTeamConfirmed || chat?.type !== 'group') return null;
+    if (chat?.type !== 'group') return null;
+
+    // 공모전 기한 만료 → 리뷰 작성 유도 배너 (클릭 가능)
+    if (isExpired) {
+      return (
+        <TouchableOpacity
+          style={[reviewBanner.wrap, reviewBanner.expiredWrap]}
+          activeOpacity={0.85}
+          onPress={() =>
+            router.push(
+              allReviewsDone
+                ? { pathname: '/(tabs)/messages/review-complete' as never, params: { chatId: chat.id.toString() } }
+                : { pathname: '/(tabs)/messages/review-write'   as never, params: { chatId: chat.id.toString() } }
+            )
+          }
+        >
+          <Text style={reviewBanner.icon}>✍️</Text>
+          <View style={reviewBanner.textWrap}>
+            <Text style={[reviewBanner.bold, reviewBanner.expiredBold]}>
+              팀원 리뷰를 작성해 주세요!
+            </Text>
+            <Text style={reviewBanner.body}>
+              공모전이 마감되었어요. 함께한 팀원을 리뷰하고 내가 받은 리뷰도 확인해 보세요.
+            </Text>
+          </View>
+          <Text style={reviewBanner.chevron}>›</Text>
+        </TouchableOpacity>
+      );
+    }
+
+    // 팀원 확정 후, 아직 기한 전 → 사전 안내 배너
+    if (!isTeamConfirmed) return null;
     return (
       <View style={reviewBanner.wrap}>
         <Text style={reviewBanner.icon}>💡</Text>
@@ -639,8 +699,9 @@ export default function ChatDetailScreen() {
         {renderBlockConfirm()}
         {renderLeaveConfirm()}
         {renderRenameModal()}
-        {renderConfirmTeamModal()}
-        {renderInviteSheet()}
+        {/* 팀원 초대 바텀시트·확정 모달은 모집자만 사용 가능 */}
+        {amIRecruiter && renderConfirmTeamModal()}
+        {amIRecruiter && renderInviteSheet()}
 
         {/* ── 메시지 목록 ── */}
         <FlatList
@@ -842,6 +903,7 @@ const teamCard = StyleSheet.create({
     backgroundColor: Colors.white,
   },
   confirmBtnText: { fontSize: 14, fontWeight: '700', color: Colors.primary },
+  confirmHint: { fontSize: 11, color: Colors.grayMedium, textAlign: 'center', marginTop: 8 },
 });
 
 // ── 초대 바텀시트 스타일 ──────────────────────────────────────────────────────
@@ -954,8 +1016,14 @@ const reviewBanner = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 12,
   },
+  expiredWrap: {
+    backgroundColor: '#FFF2EB',
+    borderColor: Colors.primary,
+  },
   icon: { fontSize: 18 },
   textWrap: { flex: 1, gap: 4 },
   bold: { fontSize: 13, fontWeight: '700', color: Colors.dark },
+  expiredBold: { color: Colors.primary },
   body: { fontSize: 12, color: Colors.grayMedium, lineHeight: 18 },
+  chevron: { fontSize: 20, color: Colors.primary, fontWeight: '300' },
 });
