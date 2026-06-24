@@ -56,14 +56,18 @@ export default function MessagesScreen() {
   const buildSections = (rooms: ChatRoom[]) => {
     const group = rooms.filter((r) => r.type === 'group');
     const direct = rooms.filter((r) => r.type === 'direct');
-    const result: SectionData[] = [];
-    result.push({
-      title: '팀 채팅',
-      data: group,
-      hint: "공모전 탭에서 '팀원 직접 꾸리기'를 완료하거나 팀 초대를 수락하면 팀 채팅방이 만들어져요!",
-    });
-    if (direct.length > 0) result.push({ title: '1:1 채팅', data: direct });
-    setSections(result);
+    setSections([
+      {
+        title: '팀 채팅',
+        data: group,
+        hint: "공모전 탭에서 '팀원 직접 꾸리기'를 완료하거나 팀 초대를 수락하면 팀 채팅방이 만들어져요!",
+      },
+      {
+        title: '1:1 채팅',
+        data: direct,
+        hint: direct.length === 0 ? '지원하기 또는 팀 초대를 통해 상대방과 1:1 채팅을 시작할 수 있어요!' : undefined,
+      },
+    ]);
   };
 
   const handleChatPress = (chatId: number) => {
@@ -151,8 +155,15 @@ export default function MessagesScreen() {
                     <Text style={styles.hintText}>{section.hint}</Text>
                   </View>
                 )}
-                {section.data.length === 0 && section.title === '팀 채팅' && (
-                  <View style={styles.emptySectionPlaceholder} />
+                {section.data.length === 0 && (
+                  <View style={styles.emptySectionBox}>
+                    <Text style={styles.emptySectionIcon}>
+                      {section.title === '팀 채팅' ? '👥' : '💬'}
+                    </Text>
+                    <Text style={styles.emptySectionText}>
+                      {section.title === '팀 채팅' ? '팀 채팅이 없어요' : '1:1 채팅이 없어요'}
+                    </Text>
+                  </View>
                 )}
               </View>
             )}
@@ -343,8 +354,18 @@ const styles = StyleSheet.create({
     color: Colors.primary,
     lineHeight: 18,
   },
-  emptySectionPlaceholder: {
-    height: 4,
+  emptySectionBox: {
+    alignItems: 'center',
+    paddingVertical: 24,
+    marginBottom: 16,
+  },
+  emptySectionIcon: {
+    fontSize: 32,
+    marginBottom: 8,
+  },
+  emptySectionText: {
+    fontSize: 14,
+    color: Colors.grayMedium,
   },
   separator: {
     height: 1,

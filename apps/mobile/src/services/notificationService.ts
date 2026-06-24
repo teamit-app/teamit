@@ -1,6 +1,5 @@
 import { apiRequest } from './api';
 import { AppNotification } from '../types/notification';
-import { useOnboardingStore } from '../store/useOnboardingStore';
 
 interface BackendNotification {
   notificationId: number;
@@ -50,12 +49,9 @@ function adaptNotification(n: BackendNotification): AppNotification {
 }
 
 export const getNotifications = async (): Promise<AppNotification[]> => {
-  const userId = useOnboardingStore.getState().userId;
-  if (!userId) return [];
-
   try {
     const data = await apiRequest<NotificationsPageResponse>(
-      `/users/${userId}/notifications?page=0&size=50`,
+      '/users/notifications?page=0&size=50',
     );
     return data.content.map(adaptNotification);
   } catch {

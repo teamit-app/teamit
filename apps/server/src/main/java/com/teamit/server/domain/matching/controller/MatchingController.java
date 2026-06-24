@@ -58,4 +58,30 @@ public class MatchingController {
         matchingService.reject(type, id);
         return ApiResponse.success(null, "거절 처리되었습니다");
     }
+
+    @Operation(summary = "받은 초대 목록 조회", description = "로그인한 사용자가 받은 PENDING 상태의 팀 초대 목록을 조회합니다.")
+    @GetMapping("/users/invitations")
+    public ApiResponse<ReceivedInvitationListResponse> getReceivedInvitations(
+            @LoginUser CustomUserDetails userDetails) {
+        ReceivedInvitationListResponse response = matchingService.getReceivedInvitations(userDetails.getUserId());
+        return ApiResponse.success(response, "받은 초대 목록 조회 성공");
+    }
+
+    @Operation(summary = "초대 수락", description = "받은 팀 초대를 수락합니다. 수락 시 GROUP 채팅방이 자동 생성됩니다.")
+    @PostMapping("/users/invitations/{invitationId}/accept")
+    public ApiResponse<Void> acceptInvitation(
+            @PathVariable Long invitationId,
+            @LoginUser CustomUserDetails userDetails) {
+        matchingService.acceptByReceiver(invitationId, userDetails.getUserId());
+        return ApiResponse.success(null, "초대를 수락했어요! 팀 채팅방에서 만나요");
+    }
+
+    @Operation(summary = "초대 거절", description = "받은 팀 초대를 거절합니다.")
+    @PostMapping("/users/invitations/{invitationId}/decline")
+    public ApiResponse<Void> declineInvitation(
+            @PathVariable Long invitationId,
+            @LoginUser CustomUserDetails userDetails) {
+        matchingService.declineByReceiver(invitationId, userDetails.getUserId());
+        return ApiResponse.success(null, "초대를 거절했습니다");
+    }
 }
