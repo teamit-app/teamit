@@ -13,12 +13,17 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { Colors } from '../../../../src/constants/colors';
 import { useBuildTeamStore } from '../../../../src/store/useBuildTeamStore';
 
-const PRESET_SKILLS = [
-  'Figma', 'Sketch', '기획', '마케팅', '영상편집', 'Photoshop',
-  'Zeplin', 'Protopie', 'React', 'TypeScript', 'JavaScript',
-  'Flutter', 'SwiftUI', 'Python', 'FastAPI', 'Spring Boot',
-  'Node.js', 'AWS', 'Firebase', '디자인',
-];
+const SKILL_CATEGORIES: Record<string, string[]> = {
+  전체: [],
+  디자인: ['Figma', 'Sketch', 'Photoshop', 'Zeplin', 'Protopie', '영상편집', '디자인'],
+  개발: ['React', 'TypeScript', 'JavaScript', 'Flutter', 'SwiftUI', 'Python', 'FastAPI', 'Spring Boot', 'Node.js', 'AWS', 'Firebase'],
+  기획: ['기획', 'PM', 'UX Research', '데이터분석', 'SQL'],
+  마케팅: ['마케팅', '콘텐츠기획', 'SNS운영', '카피라이팅'],
+};
+
+const ALL_SKILLS = Object.values(SKILL_CATEGORIES)
+  .flat()
+  .filter((v, i, a) => a.indexOf(v) === i);
 
 const TOTAL_STEPS = 5;
 const CURRENT_STEP = 2;
@@ -28,11 +33,13 @@ export default function RecruitSkillsScreen() {
   const { contestId, returnToConfirm } = useLocalSearchParams<{ contestId: string; returnToConfirm: string }>();
   const selectedSkills = useBuildTeamStore((s) => s.requiredSkills);
   const toggleSkill = useBuildTeamStore((s) => s.toggleSkill);
-  const [query, setQuery] = useState('');
 
-  const filtered = query.trim()
-    ? PRESET_SKILLS.filter((s) => s.toLowerCase().includes(query.toLowerCase()))
-    : PRESET_SKILLS;
+  const [query, setQuery] = useState('');
+  const [skillCategory, setSkillCategory] = useState('전체');
+
+  const displayedSkills = query.trim()
+    ? ALL_SKILLS.filter((s) => s.toLowerCase().includes(query.toLowerCase()))
+    : skillCategory === '전체' ? ALL_SKILLS : (SKILL_CATEGORIES[skillCategory] ?? []);
 
   const handleDirectAdd = () => {
     if (!query.trim()) {
@@ -67,7 +74,7 @@ export default function RecruitSkillsScreen() {
         <View style={[styles.progressFill, { width: `${(CURRENT_STEP / TOTAL_STEPS) * 100}%` }]} />
       </View>
 
-      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
 
         {/* 타이틀 */}
         <View style={styles.titleRow}>
@@ -84,15 +91,49 @@ export default function RecruitSkillsScreen() {
           <TextInput
             style={styles.searchInput}
             placeholder="기술 및 역할 검색... (예: SQL, React, Figma)"
-            placeholderTextColor={Colors.grayLight}
+            placeholderTextColor={Colors.grayMedium}
             value={query}
             onChangeText={setQuery}
           />
+          {query.length > 0 && (
+            <TouchableOpacity onPress={() => setQuery('')}>
+              <Text style={styles.searchClear}>✕</Text>
+            </TouchableOpacity>
+          )}
         </View>
+
+        {/* 카테고리 탭 — 검색 중에는 숨김 */}
+        {!query.trim() && (
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            style={styles.catScroll}
+            contentContainerStyle={{ gap: 8 }}
+          >
+            {Object.keys(SKILL_CATEGORIES).map((cat) => (
+              <TouchableOpacity
+                key={cat}
+                style={[styles.catChip, skillCategory === cat && styles.catChipActive]}
+                onPress={() => setSkillCategory(cat)}
+              >
+                <Text style={[styles.catChipText, skillCategory === cat && styles.catChipTextActive]}>
+                  {cat}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        )}
+
+        {/* 섹션 라벨 */}
+        {!query.trim() && (
+          <Text style={styles.sectionLabel}>
+            {skillCategory === '전체' ? '전체 스킬' : `${skillCategory} 스킬`}
+          </Text>
+        )}
 
         {/* 스킬 그리드 */}
         <View style={styles.chipGrid}>
-          {filtered.map((skill) => {
+          {displayedSkills.map((skill) => {
             const selected = selectedSkills.includes(skill);
             return (
               <TouchableOpacity
@@ -102,7 +143,7 @@ export default function RecruitSkillsScreen() {
                 activeOpacity={0.75}
               >
                 <Text style={[styles.chipText, selected && styles.chipTextSelected]}>
-                  {selected ? `${skill} ✓` : skill}
+                  {skill}
                 </Text>
               </TouchableOpacity>
             );
@@ -121,7 +162,7 @@ export default function RecruitSkillsScreen() {
         {/* 선택된 스킬 및 역할 */}
         {selectedSkills.length > 0 && (
           <View style={styles.selectedSection}>
-            <Text style={styles.selectedSectionLabel}>선택된 스킬 및 역할</Text>
+            <Text style={styles.selectedSectionLabel}>선택된 스킬 및 역할 ({selectedSkills.length})</Text>
             <View style={styles.selectedChipRow}>
               {selectedSkills.map((skill) => (
                 <TouchableOpacity
@@ -180,13 +221,13 @@ const styles = StyleSheet.create({
   progressFill: { height: 3, backgroundColor: Colors.primary },
 
   // 본문
-  content: { paddingHorizontal: 20, paddingTop: 28, paddingBottom: 32 },
+  content: { paddingHorizontal: 20, paddingTop: 24, paddingBottom: 32 },
 
   titleRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    marginBottom: 8,
+    marginBottom: 6,
     flexWrap: 'wrap',
   },
   title: { fontSize: 18, fontWeight: '700', color: Colors.dark },
@@ -197,7 +238,7 @@ const styles = StyleSheet.create({
     paddingVertical: 3,
   },
   optionalBadgeText: { fontSize: 12, color: Colors.grayMedium },
-  subtitle: { fontSize: 14, color: Colors.gray, lineHeight: 21, marginBottom: 20 },
+  subtitle: { fontSize: 14, color: Colors.gray, lineHeight: 21, marginBottom: 16 },
 
   // 검색창
   searchWrap: {
@@ -206,45 +247,69 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     borderColor: Colors.primary,
     borderRadius: 12,
-    paddingHorizontal: 14,
-    paddingVertical: 11,
-    marginBottom: 20,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    marginBottom: 14,
     gap: 8,
+    backgroundColor: Colors.white,
   },
   searchIcon: { fontSize: 15 },
   searchInput: { flex: 1, fontSize: 14, color: Colors.dark },
+  searchClear: { fontSize: 14, color: Colors.grayMedium, paddingHorizontal: 4 },
+
+  // 카테고리 탭
+  catScroll: { marginBottom: 12 },
+  catChip: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    backgroundColor: '#EEEEEE',
+  },
+  catChipActive: { backgroundColor: Colors.primary },
+  catChipText: { fontSize: 13, color: Colors.gray, fontWeight: '500' },
+  catChipTextActive: { color: Colors.white, fontWeight: '700' },
+
+  // 섹션 라벨
+  sectionLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: Colors.grayMedium,
+    letterSpacing: 0.5,
+    marginBottom: 10,
+  },
 
   // 스킬 그리드
   chipGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 8 },
 
   chip: {
-    borderWidth: 1,
-    borderColor: Colors.lightGray,
+    borderWidth: 1.5,
+    borderColor: '#D0D0D0',
     borderRadius: 20,
-    paddingHorizontal: 16,
-    paddingVertical: 9,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    backgroundColor: Colors.white,
   },
   chipSelected: {
     borderColor: Colors.primary,
-    backgroundColor: Colors.white,
+    backgroundColor: Colors.ogTint,
   },
-  chipText: { fontSize: 14, color: Colors.dark },
+  chipText: { fontSize: 13, color: Colors.dark },
   chipTextSelected: { color: Colors.primary, fontWeight: '600' },
 
   chipAdd: {
-    borderWidth: 1,
+    borderWidth: 1.5,
     borderColor: Colors.lightGray,
     borderRadius: 20,
-    paddingHorizontal: 16,
-    paddingVertical: 9,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
     borderStyle: 'dashed',
   },
-  chipAddText: { fontSize: 14, color: Colors.grayMedium },
+  chipAddText: { fontSize: 13, color: Colors.grayMedium },
 
   // 선택된 스킬 섹션
   selectedSection: {
-    marginTop: 24,
-    paddingTop: 20,
+    marginTop: 20,
+    paddingTop: 16,
     borderTopWidth: 1,
     borderTopColor: Colors.lightGray,
   },
@@ -261,11 +326,12 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     borderColor: Colors.primary,
     borderRadius: 20,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    backgroundColor: Colors.ogTint,
   },
-  selectedChipText: { fontSize: 14, color: Colors.primary, fontWeight: '600' },
-  selectedChipX: { fontSize: 14, color: Colors.primary, fontWeight: '400' },
+  selectedChipText: { fontSize: 13, color: Colors.primary, fontWeight: '600' },
+  selectedChipX: { fontSize: 13, color: Colors.primary },
 
   // 하단
   bottomBar: {

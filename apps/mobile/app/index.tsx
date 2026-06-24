@@ -5,7 +5,7 @@ import { tokenStorage } from '../src/services/tokenStorage';
 import { useOnboardingStore } from '../src/store/useOnboardingStore';
 
 export default function Index() {
-  const [target, setTarget] = useState<'/(tabs)/home' | '/(auth)/login' | null>(null);
+  const [target, setTarget] = useState<'/(tabs)/home' | '/(auth)/login' | '/(auth)/onboarding/basic-info' | null>(null);
 
   useEffect(() => {
     (async () => {

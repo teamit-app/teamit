@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import {
   View,
   Text,
@@ -13,6 +13,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
 import { Colors } from '../../../../src/constants/colors';
 import { useBuildTeamStore } from '../../../../src/store/useBuildTeamStore';
+import { dummyRecruitPostDetails } from '../../../../src/data/recruitmentPosts';
 
 const TOTAL_STEPS = 5;
 const CURRENT_STEP = 4;
@@ -37,11 +38,22 @@ const GUIDE_ITEMS = [
 
 export default function RecruitPostScreen() {
   const insets = useSafeAreaInsets();
-  const { contestId } = useLocalSearchParams<{ contestId: string }>();
+  const { contestId, editPostId } = useLocalSearchParams<{ contestId: string; editPostId?: string }>();
+  const isEditMode = !!editPostId;
   const postTitle = useBuildTeamStore((s) => s.postTitle);
   const postContent = useBuildTeamStore((s) => s.postContent);
   const setPostTitle = useBuildTeamStore((s) => s.setPostTitle);
   const setPostContent = useBuildTeamStore((s) => s.setPostContent);
+
+  useEffect(() => {
+    if (editPostId) {
+      const existing = dummyRecruitPostDetails.find((p) => p.postId === Number(editPostId));
+      if (existing) {
+        setPostTitle(existing.title);
+        setPostContent(existing.content);
+      }
+    }
+  }, [editPostId]);
 
   const canSubmit = postTitle.trim().length > 0;
 
@@ -55,7 +67,7 @@ export default function RecruitPostScreen() {
         <TouchableOpacity onPress={() => router.back()} hitSlop={8} style={styles.backBtn}>
           <Text style={styles.backIcon}>‹</Text>
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>모집글</Text>
+        <Text style={styles.headerTitle}>{isEditMode ? '모집글 수정' : '모집글'}</Text>
         <Text style={styles.stepText}>{CURRENT_STEP}/{TOTAL_STEPS}</Text>
       </View>
       <View style={styles.progressBar}>
@@ -121,13 +133,19 @@ export default function RecruitPostScreen() {
       <View style={[styles.bottomBar, { paddingBottom: Math.max(insets.bottom, 16) }]}>
         <TouchableOpacity
           style={[styles.doneBtn, !canSubmit && styles.doneBtnDisabled]}
-          onPress={() =>
-            canSubmit &&
-            router.push(`/explore/build-team/recruit-confirm?contestId=${contestId}` as never)
-          }
+          onPress={() => {
+            if (!canSubmit) return;
+            if (isEditMode) {
+              router.back();
+            } else {
+              router.push(`/explore/build-team/recruit-confirm?contestId=${contestId}` as never);
+            }
+          }}
           activeOpacity={canSubmit ? 0.85 : 1}
         >
-          <Text style={[styles.doneBtnText, !canSubmit && styles.doneBtnTextDisabled]}>완료</Text>
+          <Text style={[styles.doneBtnText, !canSubmit && styles.doneBtnTextDisabled]}>
+            {isEditMode ? '수정 완료' : '완료'}
+          </Text>
         </TouchableOpacity>
       </View>
     </KeyboardAvoidingView>

@@ -9,6 +9,8 @@ import {
   KeyboardAvoidingView,
   Platform,
   Keyboard,
+  Modal,
+  TouchableWithoutFeedback,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
@@ -118,8 +120,14 @@ function InfoBlock({
 // ── 메인 화면 ─────────────────────────────────────────────────────────────────
 export default function PostDetailScreen() {
   const insets = useSafeAreaInsets();
-  const { postId, contestId } = useLocalSearchParams<{ postId: string; contestId: string }>();
+  const { postId, contestId, appliedStatus, fromMyPosts } = useLocalSearchParams<{
+    postId: string;
+    contestId: string;
+    appliedStatus?: string;
+    fromMyPosts?: string;
+  }>();
   const [applySheetVisible, setApplySheetVisible] = useState(false);
+  const [menuVisible, setMenuVisible] = useState(false);
   const [commentText, setCommentText] = useState('');
   const [isHearted, setIsHearted] = useState(false);
   const [replyingTo, setReplyingTo] = useState<{ commentId: number; authorName: string } | null>(null);
@@ -185,7 +193,22 @@ export default function PostDetailScreen() {
       style={[styles.container, { paddingTop: insets.top }]}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
-      <ScreenHeader title="모집글 상세" onBack={() => router.back()} />
+      <ScreenHeader
+        title="모집글 상세"
+        onBack={() => router.back()}
+        rightElement={
+          fromMyPosts === 'true' ? (
+            <TouchableOpacity
+              onPress={() => setMenuVisible(true)}
+              hitSlop={8}
+              activeOpacity={0.7}
+              style={{ padding: 4 }}
+            >
+              <Text style={{ fontSize: 22, color: Colors.dark, letterSpacing: 2 }}>•••</Text>
+            </TouchableOpacity>
+          ) : undefined
+        }
+      />
 
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
 
@@ -373,21 +396,69 @@ export default function PostDetailScreen() {
       </ScrollView>
 
       {/* ── 하단 바 ── */}
-      <View style={[styles.bottomBar, { paddingBottom: Math.max(insets.bottom, 16) }]}>
-        <TouchableOpacity
-          style={styles.heartWrap}
-          onPress={() => setIsHearted((p) => !p)}
-          activeOpacity={0.8}
-        >
-          <Text style={[styles.heartIcon, isHearted && styles.heartIconFilled]}>
-            {isHearted ? '♥' : '♡'}
-          </Text>
-          <Text style={styles.heartCount}>{heartCount}</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.applyBtn} onPress={handleApply} activeOpacity={0.85}>
-          <Text style={styles.applyBtnText}>지원하기</Text>
-        </TouchableOpacity>
-      </View>
+      {fromMyPosts !== 'true' && (
+        <View style={[styles.bottomBar, { paddingBottom: Math.max(insets.bottom, 16) }]}>
+          <TouchableOpacity
+            style={styles.heartWrap}
+            onPress={() => setIsHearted((p) => !p)}
+            activeOpacity={0.8}
+          >
+            <Text style={[styles.heartIcon, isHearted && styles.heartIconFilled]}>
+              {isHearted ? '♥' : '♡'}
+            </Text>
+            <Text style={styles.heartCount}>{heartCount}</Text>
+          </TouchableOpacity>
+
+          {appliedStatus === 'applied' ? (
+            <View style={styles.applyBtnDone}>
+              <Text style={styles.applyBtnDoneText}>지원 완료</Text>
+            </View>
+          ) : (
+            <TouchableOpacity style={styles.applyBtn} onPress={handleApply} activeOpacity={0.85}>
+              <Text style={styles.applyBtnText}>지원하기</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+      )}
+
+      {/* ── 수정/삭제 바텀 시트 ── */}
+      <Modal
+        visible={menuVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setMenuVisible(false)}
+      >
+        <TouchableWithoutFeedback onPress={() => setMenuVisible(false)}>
+          <View style={menuStyles.overlay} />
+        </TouchableWithoutFeedback>
+        <View style={[menuStyles.sheet, { paddingBottom: Math.max(insets.bottom, 20) }]}>
+          <View style={menuStyles.handle} />
+          <TouchableOpacity
+            style={menuStyles.menuItem}
+            activeOpacity={0.7}
+            onPress={() => {
+              setMenuVisible(false);
+              router.push({
+                pathname: '/(tabs)/explore/build-team/recruit-post',
+                params: { contestId: cid, editPostId: id },
+              });
+            }}
+          >
+            <Text style={menuStyles.menuItemText}>수정하기</Text>
+          </TouchableOpacity>
+          <View style={menuStyles.separator} />
+          <TouchableOpacity
+            style={menuStyles.menuItem}
+            activeOpacity={0.7}
+            onPress={() => {
+              setMenuVisible(false);
+              router.back();
+            }}
+          >
+            <Text style={[menuStyles.menuItemText, menuStyles.deleteText]}>삭제하기</Text>
+          </TouchableOpacity>
+        </View>
+      </Modal>
 
       <ApplyRequiredBottomSheet
         visible={applySheetVisible}
@@ -684,6 +755,18 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: Colors.white,
   },
+  applyBtnDone: {
+    flex: 1,
+    backgroundColor: Colors.lightGray,
+    borderRadius: 14,
+    paddingVertical: 15,
+    alignItems: 'center',
+  },
+  applyBtnDoneText: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: Colors.grayMedium,
+  },
 });
 
 const avatarStyles = StyleSheet.create({
@@ -751,6 +834,45 @@ const sectionStyles = StyleSheet.create({
     fontSize: 14,
     color: Colors.dark,
     lineHeight: 21,
+  },
+});
+
+const menuStyles = StyleSheet.create({
+  overlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.35)',
+  },
+  sheet: {
+    backgroundColor: Colors.white,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+  },
+  handle: {
+    width: 40,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: Colors.lightGray,
+    alignSelf: 'center',
+    marginTop: 12,
+    marginBottom: 4,
+  },
+  menuItem: {
+    paddingHorizontal: 24,
+    paddingVertical: 18,
+    alignItems: 'center',
+  },
+  menuItemText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: Colors.dark,
+  },
+  deleteText: {
+    color: '#E53935',
+  },
+  separator: {
+    height: 1,
+    backgroundColor: Colors.lightGray,
+    marginHorizontal: 20,
   },
 });
 
