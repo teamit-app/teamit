@@ -11,15 +11,15 @@ import {
   Keyboard,
   Modal,
   TouchableWithoutFeedback,
+  ActivityIndicator,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
 import { Colors } from '../../../../src/constants/colors';
 import { ScreenHeader } from '../../../../src/components/common/ScreenHeader';
 import { ApplyRequiredBottomSheet } from '../../../../src/components/explore/ApplyRequiredBottomSheet';
-import { dummyRecruitPostDetails, dummyContestDetails } from '../../../../src/data/recruitmentPosts';
-import { useRecruitPostStore } from '../../../../src/store/useRecruitPostStore';
-import { TeamMember, PostComment } from '../../../../src/types/contest';
+import { getPostDetail } from '../../../../src/services/postService';
+import { TeamMember, PostComment, RecruitPostDetail } from '../../../../src/types/contest';
 
 // ── 팀원 아바타 ─────────────────────────────────────────────────────────────
 function MemberAvatar({ member }: { member: TeamMember }) {
@@ -131,7 +131,23 @@ export default function PostDetailScreen() {
   const [commentText, setCommentText] = useState('');
   const [isHearted, setIsHearted] = useState(false);
   const [replyingTo, setReplyingTo] = useState<{ commentId: number; authorName: string } | null>(null);
+  const [post, setPost] = useState<RecruitPostDetail | null>(null);
+  const [comments, setComments] = useState<PostComment[]>([]);
+  const [loading, setLoading] = useState(true);
   const inputRef = useRef<import('react-native').TextInput>(null);
+
+  const id = Number(postId);
+  const cid = Number(contestId);
+
+  useEffect(() => {
+    getPostDetail(id)
+      .then((data) => {
+        setPost(data);
+        setComments((data.comments ?? []) as PostComment[]);
+      })
+      .catch(console.error)
+      .finally(() => setLoading(false));
+  }, [id]);
 
   useEffect(() => {
     if (replyingTo) {
@@ -139,19 +155,8 @@ export default function PostDetailScreen() {
     }
   }, [replyingTo]);
 
-  const userPosts = useRecruitPostStore((s) => s.userPosts);
+  const hasRegistered = false;
 
-  const id = Number(postId);
-  const cid = Number(contestId);
-
-  const post =
-    userPosts.find((p) => p.postId === id) ??
-    dummyRecruitPostDetails.find((p) => p.postId === id) ??
-    dummyRecruitPostDetails[0];
-  const contestDetail = dummyContestDetails.find((d) => d.contestId === cid) ?? dummyContestDetails[0];
-  const hasRegistered = contestDetail.hasRegisteredForMatching;
-
-  const [comments, setComments] = useState(post.comments);
   const visibleComments = comments.filter((c) => !!c.content);
 
   const handleSend = () => {
@@ -180,13 +185,25 @@ export default function PostDetailScreen() {
     setReplyingTo(null);
     Keyboard.dismiss();
   };
-  const heartCount = post.likeCount + (isHearted ? 1 : 0);
+  const heartCount = (post?.likeCount ?? 0) + (isHearted ? 1 : 0);
 
   const handleApply = () => {
     if (!hasRegistered) {
       setApplySheetVisible(true);
     }
   };
+
+  if (loading || !post) {
+    return (
+      <KeyboardAvoidingView
+        style={[styles.container, { paddingTop: insets.top }]}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      >
+        <ScreenHeader title="모집글 상세" onBack={() => router.back()} />
+        <ActivityIndicator style={{ flex: 1 }} color={Colors.primary} />
+      </KeyboardAvoidingView>
+    );
+  }
 
   return (
     <KeyboardAvoidingView
@@ -245,7 +262,7 @@ export default function PostDetailScreen() {
             현재 팀원 {post.currentMembers}/{post.totalMembers}명
           </Text>
           <View style={styles.memberRow}>
-            {post.members.map((m) => (
+            {((post.members ?? []) as TeamMember[]).map((m) => (
               <MemberAvatar key={m.memberId} member={m} />
             ))}
           </View>
@@ -316,7 +333,7 @@ export default function PostDetailScreen() {
           </TouchableOpacity>
 
           <View style={styles.tagRow}>
-            {post.recruiter.skills.map((skill) => (
+            {(post.recruiter?.skills ?? []).map((skill) => (
               <View key={skill} style={styles.skillTag}>
                 <Text style={styles.skillTagText}>{skill}</Text>
               </View>

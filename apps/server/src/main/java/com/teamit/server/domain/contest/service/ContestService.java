@@ -78,6 +78,13 @@ public class ContestService {
                 .build();
     }
 
+    @Transactional(readOnly = true)
+    public ContestDetailResponse getContestById(Long contestId) {
+        Contest contest = contestRepository.findById(contestId)
+                .orElseThrow(() -> new IllegalArgumentException("공모전을 찾을 수 없습니다"));
+        return ContestDetailResponse.from(contest);
+    }
+
     @Transactional
     public void addContestHeart(Long userId, Long contestId) {
         if (contestHeartRepository.existsByUserIdAndContestId(userId, contestId)) {

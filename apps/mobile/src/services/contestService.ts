@@ -1,5 +1,5 @@
 import { apiRequest } from './api';
-import { Contest, ContestCategory, ContestStatus } from '../types/contest';
+import { Contest, ContestCategory, ContestDetail, ContestStatus } from '../types/contest';
 
 // ─── 백엔드 응답 타입 ─────────────────────────────────────────────────────────
 
@@ -51,6 +51,38 @@ function adaptContest(c: BackendContest): Contest {
   };
 }
 
+// ─── 공모전 상세 조회 (단건) ──────────────────────────────────────────────────
+
+interface BackendContestDetail {
+  contestId: number;
+  title: string;
+  organizer: string;
+  category: ContestCategory;
+  endDate: string;
+  dDay: number;
+  isNew: boolean;
+  targetAudience: string;
+  fields: string;
+  prizeScale: string;
+  registrationPeriod: string;
+  registrationUrl: string;
+}
+
+function adaptContestDetail(c: BackendContestDetail): ContestDetail {
+  return {
+    ...c,
+    categoryLabel: CATEGORY_LABELS[c.category] ?? c.category,
+    status: getContestStatus(c.dDay),
+    isHearted: false,
+    hasRegisteredForMatching: false,
+  };
+}
+
+export const getContestById = async (contestId: number): Promise<ContestDetail> => {
+  const data = await apiRequest<BackendContestDetail>(`/contests/${contestId}`);
+  return adaptContestDetail(data);
+};
+
 // ─── 공모전 목록 조회 ─────────────────────────────────────────────────────────
 
 export interface ContestListParams {
@@ -80,8 +112,6 @@ export const getPopularContests = async (): Promise<Contest[]> => {
   return data.contests.map((c) => adaptContest({ ...c, isNew: false }));
 };
 
-export const getContestById = (contestId: number): Promise<Contest> =>
-  apiRequest<Contest>(`/contests/${contestId}`);
 
 // ─── 관심 공모전 조회 ─────────────────────────────────────────────────────────
 
