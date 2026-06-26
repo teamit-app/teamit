@@ -14,7 +14,7 @@ export interface RegionItem {
 
 export interface EducationRequest {
   schoolName: string;
-  status: 'ATTENDING' | 'COMPLETED' | 'EXPECTED' | 'GRADUATED';
+  status: 'ATTENDING' | 'LEAVE' | 'COMPLETED' | 'GRADUATED';
   majorType: 'SINGLE' | 'DOUBLE';
   major: string;
   subMajor: string | null;

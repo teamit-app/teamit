@@ -14,6 +14,14 @@ import {
   dummyGroupMessages10,
 } from '../data/chatRooms';
 import { Message } from '../types/message';
+import {
+  dummyMyProfile,
+  dummyMatchingProfile,
+  dummyNotificationSettings,
+  dummyContestRegistrations,
+  dummyPostApplications,
+  dummyReceivedApplicationPosts,
+} from '../data/mypage';
 
 // ─── 정적 라우트: 정확한 경로 일치 ───────────────────────────────────────────
 
@@ -121,6 +129,31 @@ const staticRoutes: Record<string, () => unknown> = {
   '/users/invitations': () => ({
     content: dummyInvitations,
   }),
+
+  // ─── 마이페이지 ─────────────────────────────────────────────────────────────
+  '/users/me': () => dummyMyProfile,
+  '/users/matching-profile': () => dummyMatchingProfile,
+  '/users/matching-status': () => null,
+  '/users/notification-settings': () => dummyNotificationSettings,
+  '/users/contest-registrations': () => dummyContestRegistrations,
+  '/users/my-applications': () => dummyPostApplications,
+  '/users/received-applications': () => dummyReceivedApplicationPosts,
+  '/users/careers/contests': () => ({
+    careerItemId: Date.now(),
+    careerType: 'CONTEST',
+    contestName: '신규 공모전',
+    roles: [],
+    startDate: '',
+    endDate: '',
+    awardStatus: 'PARTICIPATED',
+  }),
+  '/users/careers/certificates': () => ({
+    careerItemId: Date.now(),
+    careerType: 'CERTIFICATE',
+    certName: '신규 자격증',
+    issuingOrg: '',
+    acquiredDate: '',
+  }),
 };
 
 // ─── 동적 라우트: 경로 파라미터 포함 ──────────────────────────────────────────
@@ -144,6 +177,28 @@ const dynamicRoutes: Array<[RegExp, (path: string) => unknown]> = [
 
   // POST /users/invitations/{id}/decline, POST /users/invitations/{id}/accept
   [/^\/users\/invitations\/\d+\/(decline|accept)$/, () => null],
+
+  // DELETE /users/careers/{careerItemId}
+  [/^\/users\/careers\/\d+$/, () => null],
+
+  // POST|GET /users/educations/{educationId}/verification
+  [
+    /^\/users\/educations\/\d+\/verification$/,
+    () => ({
+      status: 'PENDING',
+      docType: 'ENROLLMENT_CERT',
+      fileName: '재학증명서_2025.jpg',
+      submittedAt: new Date().toISOString(),
+      reviewedAt: null,
+      rejectReason: null,
+    }),
+  ],
+
+  // GET /users/{userId}/notifications
+  [
+    /^\/users\/\d+\/notifications$/,
+    () => ({ content: dummyNotifications, unreadCount: dummyNotifications.filter((n) => !n.isRead).length }),
+  ],
 
   // GET /chat-rooms/{chatRoomId}/messages — dummy 메시지를 백엔드 포맷으로 변환
   [

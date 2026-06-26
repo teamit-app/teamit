@@ -16,12 +16,12 @@ import { submitEducation } from '../../../src/services/onboardingService';
 import { useOnboardingStore } from '../../../src/store/useOnboardingStore';
 import { tokenStorage } from '../../../src/services/tokenStorage';
 
-type EducationStatus = 'ATTENDING' | 'COMPLETED' | 'EXPECTED' | 'GRADUATED';
+type EducationStatus = 'ATTENDING' | 'LEAVE' | 'COMPLETED' | 'GRADUATED';
 
 const STATUS_LABELS: { key: EducationStatus; label: string }[] = [
   { key: 'ATTENDING', label: '재학' },
-  { key: 'COMPLETED', label: '수료' },
-  { key: 'EXPECTED', label: '졸업예정' },
+  { key: 'LEAVE', label: '휴학' },
+  { key: 'COMPLETED', label: '수료/졸업유예' },
   { key: 'GRADUATED', label: '졸업' },
 ];
 
@@ -110,7 +110,11 @@ export default function EducationScreen() {
                 style={[styles.statusBtn, status === key && styles.statusBtnActive]}
                 onPress={() => setStatus(key)}
               >
-                <Text style={[styles.statusText, status === key && styles.statusTextActive]}>
+                <Text
+                  style={[styles.statusText, status === key && styles.statusTextActive]}
+                  numberOfLines={1}
+                  adjustsFontSizeToFit
+                >
                   {label}
                 </Text>
               </TouchableOpacity>
@@ -326,7 +330,8 @@ const styles = StyleSheet.create({
   },
   statusBtn: {
     flex: 1,
-    height: 40,
+    paddingVertical: 9,
+    paddingHorizontal: 4,
     borderRadius: 8,
     borderWidth: 1,
     borderColor: '#E0E0E0',

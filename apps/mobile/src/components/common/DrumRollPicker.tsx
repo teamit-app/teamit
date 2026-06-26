@@ -68,8 +68,64 @@ function DrumColumn({ items, initialIndex, onChange }: DrumColumnProps) {
   );
 }
 
+// ─── Single-column picker (e.g. gender) ───────────────────────────────────────
+
+interface SingleDrumPickerProps {
+  visible: boolean;
+  title?: string;
+  items: string[];
+  initialIndex?: number;
+  onConfirm: (index: number, value: string) => void;
+  onCancel: () => void;
+}
+
+export function SingleDrumPicker({
+  visible,
+  title,
+  items,
+  initialIndex = 0,
+  onConfirm,
+  onCancel,
+}: SingleDrumPickerProps) {
+  const idx = useRef(initialIndex);
+
+  return (
+    <Modal visible={visible} transparent animationType="fade">
+      <View style={styles.backdrop}>
+        <View style={styles.sheet}>
+          {title && <Text style={styles.title}>{title}</Text>}
+          <View style={[styles.pickerRow, { justifyContent: 'center' }]}>
+            <View style={{ width: 160, height: VISIBLE_HEIGHT }}>
+              <DrumColumn
+                items={items}
+                initialIndex={initialIndex}
+                onChange={(i) => { idx.current = i; }}
+              />
+            </View>
+          </View>
+          <View style={styles.buttonRow}>
+            <TouchableOpacity style={styles.cancelBtn} onPress={onCancel}>
+              <Text style={styles.cancelText}>취소</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.confirmBtn}
+              onPress={() => onConfirm(idx.current, items[idx.current])}
+            >
+              <Text style={styles.confirmText}>확인</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
+// ─── Date picker ───────────────────────────────────────────────────────────────
+
 interface DrumRollPickerProps {
   visible: boolean;
+  title?: string;
+  subtitle?: string;
   initialYear?: number;
   initialMonth?: number;
   initialDay?: number;
@@ -83,6 +139,8 @@ const DAYS = Array.from({ length: 31 }, (_, i) => `${i + 1}일`);
 
 export function DrumRollPicker({
   visible,
+  title = '생년월일을 선택해 주세요',
+  subtitle = '스크롤하여 날짜를 선택하세요',
   initialYear = 2000,
   initialMonth = 1,
   initialDay = 1,
@@ -105,8 +163,8 @@ export function DrumRollPicker({
     <Modal visible={visible} transparent animationType="fade">
       <View style={styles.backdrop}>
         <View style={styles.sheet}>
-          <Text style={styles.title}>생년월일을 선택해 주세요</Text>
-          <Text style={styles.subtitle}>스크롤하여 날짜를 선택하세요</Text>
+          <Text style={styles.title}>{title}</Text>
+          <Text style={styles.subtitle}>{subtitle}</Text>
 
           <View style={styles.pickerRow}>
             <DrumColumn
