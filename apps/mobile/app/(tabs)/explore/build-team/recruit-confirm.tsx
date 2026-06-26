@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -12,6 +12,7 @@ import { Colors } from '../../../../src/constants/colors';
 import { useBuildTeamStore } from '../../../../src/store/useBuildTeamStore';
 import { useRecruitPostStore } from '../../../../src/store/useRecruitPostStore';
 import { dummyContestDetails, dummyParticipationCard } from '../../../../src/data/recruitmentPosts';
+import { createPost } from '../../../../src/services/contestService';
 
 const TOTAL_STEPS = 5;
 const CURRENT_STEP = 5;
@@ -61,58 +62,84 @@ export default function RecruitConfirmScreen() {
     ? `제목 : ${postTitle}\n\n본문 : ${postContent}`
     : `제목 : ${postTitle}`;
 
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
   const goBack = () => router.back();
 
-  const handleStart = () => {
-    const today = new Date();
-    const createdAt = `${today.getFullYear()}.${String(today.getMonth() + 1).padStart(2, '0')}.${String(today.getDate()).padStart(2, '0')}`;
+  const handleStart = async () => {
+    if (isSubmitting) return;
+    setIsSubmitting(true);
+    try {
+      const today = new Date();
+      const createdAt = `${today.getFullYear()}.${String(today.getMonth() + 1).padStart(2, '0')}.${String(today.getDate()).padStart(2, '0')}`;
+      const deadline = new Date(today.getTime() + 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
 
-    const recruitingMembers = Array.from({ length: recruitCount }, (_, i) => ({
-      memberId: i + 2,
-      name: '모집중',
-      isHost: false,
-      isRecruiting: true,
-    }));
+      await createPost({
+        contestId: id,
+        postType: 'CONTEST',
+        recruitMode: 'BUILD',
+        title: postTitle || '팀원을 모집합니다',
+        description: postContent || '',
+        recruitCount,
+        genderCondition: genderCondition === '성별 상관없음' ? 'ANY' : genderCondition === '동성만' ? 'SAME' : 'ANY',
+        schoolCondition: schoolCondition === '학교 상관없음' ? 'ANY' : 'SAME_SCHOOL',
+        onlineOffline: 'MIXED',
+        deadline,
+        requiredSkills: requiredSkills.map((name) => ({ skillId: null, skillNameCustom: name })),
+      });
 
-    addPost({
-      contestId: id,
-      title: postTitle || '팀원 모집합니다',
-      teamName: `${postTitle || '팀원 모집'} 팀`,
-      createdAt,
-      views: 0,
-      chatCount: 0,
-      likeCount: 0,
-      skills: requiredSkills,
-      experienceCondition,
-      genderCondition,
-      schoolCondition,
-      meetingType: '혼합',
-      location: '',
-      intensity: '적당하게 (주 4~7h)',
-      currentMembers: 1,
-      totalMembers: recruitCount + 1,
-      isHearted: false,
-      contestName: detail.title,
-      contestPeriod: detail.registrationPeriod,
-      content: postContent,
-      members: [
-        { memberId: 1, name: '나', isHost: true, isRecruiting: false },
-        ...recruitingMembers,
-      ],
-      recruiter: {
-        name: '나',
-        skills: requiredSkills.length > 0 ? requiredSkills : dummyParticipationCard.skills.split(', '),
-        experienceCount: dummyParticipationCard.contestExperience,
-        intensity: dummyParticipationCard.intensity,
-        meetingType: dummyParticipationCard.meetingPreference,
-        location: dummyParticipationCard.location,
-        teamVibe: dummyParticipationCard.teamVibe,
-        leadershipStyle: dummyParticipationCard.leadership,
-      },
-      comments: [],
-    });
+      const recruitingMembers = Array.from({ length: recruitCount }, (_, i) => ({
+        memberId: i + 2,
+        name: '모집중',
+        isHost: false,
+        isRecruiting: true,
+      }));
 
-    router.push(`/explore/build-team/matching-loading?contestId=${contestId}&returnToConfirm=true` as never);
+      addPost({
+        contestId: id,
+        title: postTitle || '팀원 모집합니다',
+        teamName: `${postTitle || '팀원 모집'} 팀`,
+        createdAt,
+        views: 0,
+        chatCount: 0,
+        likeCount: 0,
+        skills: requiredSkills,
+        experienceCondition,
+        genderCondition,
+        schoolCondition,
+        meetingType: '혼합',
+        location: '',
+        intensity: '적당하게 (주 4~7h)',
+        currentMembers: 1,
+        totalMembers: recruitCount + 1,
+        isHearted: false,
+        contestName: detail.title,
+        contestPeriod: detail.registrationPeriod,
+        content: postContent,
+        members: [
+          { memberId: 1, name: '나', isHost: true, isRecruiting: false },
+          ...recruitingMembers,
+        ],
+        recruiter: {
+          name: '나',
+          skills: requiredSkills.length > 0 ? requiredSkills : dummyParticipationCard.skills.split(', '),
+          experienceCount: dummyParticipationCard.contestExperience,
+          intensity: dummyParticipationCard.intensity,
+          meetingType: dummyParticipationCard.meetingPreference,
+          location: dummyParticipationCard.location,
+          teamVibe: dummyParticipationCard.teamVibe,
+          feedbackStyle: dummyParticipationCard.feedbackStyle,
+          leadershipStyle: dummyParticipationCard.leadership,
+        },
+        comments: [],
+      });
+
+      router.push(`/explore/build-team/matching-loading?contestId=${contestId}&returnToConfirm=true` as never);
+    } catch (e) {
+      console.error('[RecruitConfirm] 모집글 생성 실패:', e);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (

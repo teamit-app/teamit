@@ -41,7 +41,7 @@ export default function MessagesScreen() {
   const [invitations, setInvitations] = useState<Invitation[]>([]);
   const [sections, setSections] = useState<SectionData[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const { readChats, readInvitations, markInvitationAsRead } = useReadStore();
+  const { readChats, markInvitationAsRead } = useReadStore();
 
   useFocusEffect(
     useCallback(() => {
@@ -207,7 +207,6 @@ export default function MessagesScreen() {
               renderItem={({ item }) => (
                 <InvitationCard
                   invitation={item}
-                  isRead={!!readInvitations[item.invitationId]}
                   onPress={() => handleInvitationPress(item)}
                 />
               )}
@@ -229,16 +228,14 @@ export default function MessagesScreen() {
 // ── 초대장 카드 컴포넌트 ────────────────────────────────────────────────────────
 function InvitationCard({
   invitation,
-  isRead = false,
   onPress,
 }: {
   invitation: Invitation;
-  isRead?: boolean;
   onPress: () => void;
 }) {
   return (
     <TouchableOpacity
-      style={[inviteStyles.card, isRead && inviteStyles.cardRead]}
+      style={inviteStyles.card}
       onPress={onPress}
       activeOpacity={0.85}
     >
@@ -259,7 +256,7 @@ function InvitationCard({
         </View>
         <View style={inviteStyles.right}>
           <Text style={inviteStyles.time}>{invitation.receivedAt}</Text>
-          <View style={[inviteStyles.moreBtn, isRead && inviteStyles.moreBtnRead]}>
+          <View style={inviteStyles.moreBtn}>
             <Text style={inviteStyles.moreBtnText}>더보기</Text>
           </View>
         </View>
@@ -443,9 +440,6 @@ const inviteStyles = StyleSheet.create({
     padding: 16,
     backgroundColor: Colors.white,
   },
-  cardRead: {
-    borderColor: Colors.grayLight,
-  },
   topRow: {
     flexDirection: 'row',
     alignItems: 'flex-start',
@@ -492,9 +486,6 @@ const inviteStyles = StyleSheet.create({
     borderRadius: 999,
     paddingHorizontal: 12,
     paddingVertical: 5,
-  },
-  moreBtnRead: {
-    backgroundColor: Colors.grayMedium,
   },
   moreBtnText: {
     fontSize: 12,

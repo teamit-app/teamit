@@ -749,7 +749,15 @@ export default function ChatDetailScreen() {
         <FlatList
           ref={flatListRef}
           data={messages}
-          renderItem={({ item }) => <MessageBubble message={item} showSenderName={isGroup} />}
+          renderItem={({ item }) => (
+            <MessageBubble
+              message={item}
+              showSenderName={isGroup}
+              onPressAvatar={(senderId) =>
+                router.push(`/explore/talent/${senderId}` as never)
+              }
+            />
+          )}
           keyExtractor={(item) => item.id.toString()}
           contentContainerStyle={styles.messageListContent}
           ListHeaderComponent={renderListHeader}

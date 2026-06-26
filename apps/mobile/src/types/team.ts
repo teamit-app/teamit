@@ -33,6 +33,7 @@ export interface Candidate {
   intensity: string;
   meetingType: string;
   teamVibe: string;
+  feedbackStyle: string;
   leadershipStyle: string;
   contestCount: number;
   contestExperience: string;

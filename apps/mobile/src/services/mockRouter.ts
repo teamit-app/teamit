@@ -176,6 +176,12 @@ const dynamicRoutes: Array<[RegExp, (path: string) => unknown]> = [
   // POST /users/contest-hearts/{contestId}, DELETE /users/contest-hearts/{contestId}
   [/^\/users\/contest-hearts\/\d+$/, () => null],
 
+  // POST /posts — 모집글 생성
+  [/^\/posts$/, () => ({ postId: Date.now(), title: '팀원을 모집합니다', status: 'OPEN' })],
+
+  // POST /posts/{postId}/invitations — 초대장 보내기
+  [/^\/posts\/\d+\/invitations$/, () => ({ invitationId: Date.now(), status: 'PENDING', chatRoomId: 5 })],
+
   // POST /users/invitations/{id}/decline, POST /users/invitations/{id}/accept
   [/^\/users\/invitations\/\d+\/(decline|accept)$/, () => null],
 

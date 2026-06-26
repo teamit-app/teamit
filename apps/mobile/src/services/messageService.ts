@@ -96,14 +96,28 @@ function adaptMessage(msg: BackendChatMessage, currentUserId: number): Message {
   };
 }
 
+// ── 동적 생성 1:1 채팅방 (초대 전송 시 mock 모드에서 로컬 저장) ─────────────────
+const createdDirectRooms: ChatRoom[] = [];
+
+export const registerCreatedRoom = (room: ChatRoom): void => {
+  if (!createdDirectRooms.find((r) => r.id === room.id)) {
+    createdDirectRooms.push(room);
+  }
+};
+
 // ── API 함수 ─────────────────────────────────────────────────────────────────
 
 export const getChatRooms = async (): Promise<ChatRoom[]> => {
   const data = await apiRequest<BackendChatRoomListResponse>('/users/chat-rooms');
-  return [
+  const apiRooms = [
     ...(data.groupChats ?? []).map(adaptGroupChat),
     ...(data.directChats ?? []).map(adaptDirectChat),
   ];
+  if (IS_MOCK && createdDirectRooms.length > 0) {
+    const existingIds = new Set(apiRooms.map((r) => r.id));
+    return [...apiRooms, ...createdDirectRooms.filter((r) => !existingIds.has(r.id))];
+  }
+  return apiRooms;
 };
 
 export const getChat = async (chatId: number): Promise<Chat | null> => {
@@ -114,6 +128,7 @@ export const getChat = async (chatId: number): Promise<Chat | null> => {
   const allRooms: ChatRoom[] = [
     ...(roomsData.groupChats ?? []).map(adaptGroupChat),
     ...(roomsData.directChats ?? []).map(adaptDirectChat),
+    ...(IS_MOCK ? createdDirectRooms : []),
   ];
   const room = allRooms.find((r) => r.id === chatId);
   if (!room) return null;
@@ -148,12 +163,15 @@ export const leaveChatRoom = async (chatId: number): Promise<void> => {
   await apiRequest<null>(`/chat-rooms/${chatId}/leave`, { method: 'DELETE' });
 };
 
+// mock: userId → 직접 채팅방 id 매핑 (후보 id 기준)
+const MOCK_DIRECT_CHAT_MAP: Record<number, number> = { 1: 5, 2: 6, 3: 3, 4: 4 };
+
 // 제안하기: 상대방과의 1:1 채팅방 ID 반환 (없으면 생성)
 export const getOrCreateDirectChatRoom = async (targetUserId: number): Promise<number> => {
   if (IS_MOCK) {
-    // mock: 더미 1:1 채팅방 중 첫 번째 반환
-    const directRoom = dummyChatRooms.find((r) => r.type === 'direct');
-    return directRoom?.id ?? 3;
+    return MOCK_DIRECT_CHAT_MAP[targetUserId]
+      ?? dummyChatRooms.find((r) => r.type === 'direct')?.id
+      ?? 3;
   }
 
   const response = await apiRequest<{ chatRoomId: number }>(

@@ -136,6 +136,7 @@ export default function ExploreScreen() {
                 <TalentCard
                   key={talent.userId}
                   talent={talent}
+                  onPress={() => router.push(`/explore/talent/${talent.userId}` as never)}
                   onPressHeart={() => toggleTalentHeart(talent.userId)}
                   onPressPropose={() => handlePropose(talent.userId)}
                 />

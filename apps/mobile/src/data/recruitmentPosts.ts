@@ -203,7 +203,8 @@ export const dummyRecruitPostDetails: RecruitPostDetail[] = [
       intensity: '적당하게 (주 4~7시간)',
       meetingType: '혼합',
       location: '서울 강남구',
-      teamVibe: '성과 중심/부드러운 피드백',
+      teamVibe: '성과 중심',
+      feedbackStyle: '부드러운 피드백',
       leadershipStyle: '필요하면 리더 가능',
     },
     comments: [
@@ -250,7 +251,8 @@ export const dummyParticipationCard: ParticipationCard = {
   intensity: '적당히 (주 3~5시간)',
   meetingPreference: '혼합',
   location: '서울 강남구',
-  teamVibe: '성과 중심/부드러운 피드백',
+  teamVibe: '성과 중심',
+  feedbackStyle: '부드러운 피드백',
   leadership: '필요하면 가능',
   appealTitle: '금융권 데이터 분석가를 목표로 합니다.',
   appealContent:

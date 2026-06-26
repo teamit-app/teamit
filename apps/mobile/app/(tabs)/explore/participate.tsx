@@ -14,6 +14,7 @@ import { ScreenHeader } from '../../../src/components/common/ScreenHeader';
 import { dummyContestDetails } from '../../../src/data/recruitmentPosts';
 import { useMypageStore } from '../../../src/store/useMypageStore';
 import { MatchingProfileData } from '../../../src/types/mypage';
+import { toggleMatchingStatus } from '../../../src/services/mypageService';
 
 // ── 표시용 변환 헬퍼 ──────────────────────────────────────────────────────────
 
@@ -116,7 +117,12 @@ export default function ParticipateScreen() {
     );
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
+    try {
+      await toggleMatchingStatus(true);
+    } catch (e) {
+      console.error('[Participate] 매칭 활성화 실패:', e);
+    }
     router.push(`/explore/participate-complete?contestId=${id}` as never);
   };
 

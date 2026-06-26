@@ -97,3 +97,29 @@ export const addContestHeart = (_userId: number, contestId: number): Promise<nul
 
 export const removeContestHeart = (_userId: number, contestId: number): Promise<null> =>
   apiRequest<null>(`/users/contest-hearts/${contestId}`, { method: 'DELETE' });
+
+export interface CreatePostRequest {
+  contestId: number;
+  postType: 'CONTEST' | 'STARTUP' | 'PROJECT';
+  recruitMode: 'BUILD' | 'JOIN';
+  title: string;
+  description: string;
+  recruitCount: number;
+  genderCondition: 'ANY' | 'SAME' | 'OPPOSITE';
+  schoolCondition: 'ANY' | 'SAME_SCHOOL';
+  onlineOffline: 'ONLINE' | 'OFFLINE' | 'MIXED';
+  deadline: string;
+  requiredSkills: Array<{ skillId: number | null; skillNameCustom?: string }>;
+}
+
+export interface CreatePostResponse {
+  postId: number;
+  title: string;
+  status: string;
+}
+
+export const createPost = (data: CreatePostRequest): Promise<CreatePostResponse> =>
+  apiRequest<CreatePostResponse>('/posts', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });

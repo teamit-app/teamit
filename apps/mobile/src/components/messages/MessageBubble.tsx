@@ -10,9 +10,10 @@ const CARD_WIDTH = Dimensions.get('window').width - 120;
 interface MessageBubbleProps {
   message: Message;
   showSenderName?: boolean;
+  onPressAvatar?: (senderId: number) => void;
 }
 
-export const MessageBubble: React.FC<MessageBubbleProps> = ({ message, showSenderName = false }) => {
+export const MessageBubble: React.FC<MessageBubbleProps> = ({ message, showSenderName = false, onPressAvatar }) => {
   const router = useRouter();
 
   if (message.isSystem) {
@@ -33,9 +34,13 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message, showSende
     return (
       <View style={[styles.row, isOwn ? styles.rowOwn : styles.rowOther]}>
         {!isOwn && (
-          <View style={styles.avatar}>
+          <TouchableOpacity
+            style={styles.avatar}
+            onPress={() => onPressAvatar?.(message.senderId)}
+            activeOpacity={onPressAvatar ? 0.7 : 1}
+          >
             <Text style={styles.avatarText}>{message.senderAvatar}</Text>
-          </View>
+          </TouchableOpacity>
         )}
         <View style={[styles.group, isOwn && styles.groupOwn]}>
           {!isOwn && showSenderName && (
@@ -89,9 +94,13 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message, showSende
   return (
     <View style={[styles.row, isOwn ? styles.rowOwn : styles.rowOther]}>
       {!isOwn && (
-        <View style={styles.avatar}>
+        <TouchableOpacity
+          style={styles.avatar}
+          onPress={() => onPressAvatar?.(message.senderId)}
+          activeOpacity={onPressAvatar ? 0.7 : 1}
+        >
           <Text style={styles.avatarText}>{message.senderAvatar}</Text>
-        </View>
+        </TouchableOpacity>
       )}
       <View style={[styles.group, isOwn && styles.groupOwn]}>
         {!isOwn && showSenderName && (
