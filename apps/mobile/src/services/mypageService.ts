@@ -7,6 +7,8 @@ import {
   PostApplication,
   ReceivedApplicationPost,
   CareerItem,
+  PostApplicant,
+  LikedPost,
 } from '../types/mypage';
 
 export const getMyProfile = (): Promise<MyProfile> =>
@@ -83,6 +85,15 @@ export const addCertificateCareer = (data: {
 
 export const deleteCareer = (careerItemId: number): Promise<void> =>
   apiRequest<void>(`/users/careers/${careerItemId}`, { method: 'DELETE' });
+
+export const getPostApplicants = (postId: number): Promise<PostApplicant[]> =>
+  apiRequest<PostApplicant[]>(`/users/posts/${postId}/applicants`);
+
+export const getContestCandidates = (postId: number): Promise<PostApplicant[]> =>
+  apiRequest<PostApplicant[]>(`/users/posts/${postId}/candidates`);
+
+export const getLikedPosts = (): Promise<LikedPost[]> =>
+  apiRequest<LikedPost[]>('/users/liked-posts');
 
 export const submitEducationCert = (
   educationId: number,

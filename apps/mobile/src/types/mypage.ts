@@ -146,3 +146,33 @@ export interface TalentPoolCandidate {
   workStyle: string;
   intensity: string;
 }
+
+export interface PostApplicant {
+  userId: number;
+  nickname: string;
+  temperature: number;
+  gender: Gender;
+  school: string;
+  isSchoolVerified: boolean;
+  introText: string;
+  skills: string[];
+  meetingTypeLabel: string;
+  regionLabel: string;
+  experienceLabel: string;
+  intensityLabel: string;
+  leadershipLabel: string;
+  appealTitle: string;
+  appealContent: string;
+}
+
+export interface LikedPost {
+  postId: number;
+  contestId: number;
+  contestTitle: string;
+  postTitle: string;
+  roles: string[];
+  teamSize: number;
+  deadline: string;
+  dDay: number;
+  isOpen: boolean;
+}

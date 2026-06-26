@@ -92,7 +92,7 @@ export default function ExploreScreen() {
         title="탐색"
         rightElement={
           <TouchableOpacity
-            onPress={() => router.push(`/explore/likes?tab=${mainTab}`)}
+            onPress={() => router.push('/(tabs)/profile/likes')}
             hitSlop={8}
           >
             <Text style={styles.heartIcon}>♡</Text>
@@ -147,13 +147,12 @@ export default function ExploreScreen() {
                   variant="full"
                   onPress={() => router.push(`/explore/contest/${contest.contestId}` as never)}
                   onPressHeart={() => toggleContestHeart(contest.contestId)}
-                  onPressMatch={() => router.push(`/explore/contest/${contest.contestId}` as never)}
                 />
               ))}
         </View>
 
         <Text style={styles.footerHint}>
-          우측 상단 하트에서 저장한 {mainTab === 'POOL' ? '팀원을' : '공모전을'} 확인할 수 있어요
+          우측 상단 하트에서 좋아요 목록을 확인할 수 있어요
         </Text>
       </ScrollView>
 

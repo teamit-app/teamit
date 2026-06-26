@@ -8,10 +8,9 @@ interface ContestCardProps {
   variant: 'compact' | 'full';
   onPress?: () => void;
   onPressHeart?: () => void;
-  onPressMatch?: () => void;
 }
 
-export function ContestCard({ contest, variant, onPress, onPressHeart, onPressMatch }: ContestCardProps) {
+export function ContestCard({ contest, variant, onPress, onPressHeart }: ContestCardProps) {
   const formattedDeadline = contest.endDate.replace(/-/g, '.');
 
   return (
@@ -49,9 +48,6 @@ export function ContestCard({ contest, variant, onPress, onPressHeart, onPressMa
 
             <View style={styles.bottomRow}>
               <Text style={styles.deadline}>마감: {formattedDeadline}</Text>
-              <TouchableOpacity style={styles.matchBtn} onPress={onPressMatch} activeOpacity={0.85}>
-                <Text style={styles.matchBtnText}>매칭</Text>
-              </TouchableOpacity>
             </View>
           </View>
         </View>
@@ -77,9 +73,6 @@ export function ContestCard({ contest, variant, onPress, onPressHeart, onPressMa
 
           <View style={styles.bottomRow}>
             <Text style={styles.deadline}>마감: {formattedDeadline}</Text>
-            <TouchableOpacity style={styles.matchBtn} onPress={onPressMatch} activeOpacity={0.85}>
-              <Text style={styles.matchBtnText}>매칭</Text>
-            </TouchableOpacity>
           </View>
         </>
       )}
@@ -188,16 +181,5 @@ const styles = StyleSheet.create({
   deadline: {
     fontSize: 12,
     color: Colors.grayMedium,
-  },
-  matchBtn: {
-    backgroundColor: Colors.primary,
-    borderRadius: 999,
-    paddingHorizontal: 18,
-    paddingVertical: 8,
-  },
-  matchBtnText: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: Colors.white,
   },
 });

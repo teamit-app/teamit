@@ -218,6 +218,22 @@ export default function ProfileScreen() {
           </View>
         </View>
 
+        {/* 좋아요 목록 */}
+        <View style={styles.notifSection}>
+          <TouchableOpacity
+            style={styles.notifRow}
+            onPress={() => router.push('/(tabs)/profile/likes')}
+            activeOpacity={0.7}
+          >
+            <Text style={styles.notifIcon}>🤍</Text>
+            <View style={styles.notifTexts}>
+              <Text style={styles.notifTitle}>좋아요 목록</Text>
+              <Text style={styles.notifSubtitle}>좋아요한 인재풀, 공모전, 모집글</Text>
+            </View>
+            <Text style={styles.notifArrow}>›</Text>
+          </TouchableOpacity>
+        </View>
+
         {/* 제안 받기 */}
         <View style={styles.toggleSection}>
           <View style={styles.toggleRow}>
