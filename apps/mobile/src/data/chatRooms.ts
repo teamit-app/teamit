@@ -322,6 +322,55 @@ export const dummyGroupMessages10: Message[] = [
   },
 ];
 
+// 더미 메시지 (1:1 - 김팀장: 팀 초대장 자동 메시지 예시 — PNG TALK-01-01-04 기준)
+export const dummyDirectMessages7: Message[] = [
+  {
+    id: 1,
+    senderId: 200,
+    senderName: '김팀장',
+    senderAvatar: '🏆',
+    content: '김팀장님이 티밋님을 팀에 초대하셨어요! 🎉',
+    createdAt: '2024-07-09T10:21:00',
+    isSent: false,
+  },
+  {
+    id: 2,
+    senderId: 200,
+    senderName: '김팀장',
+    senderAvatar: '🏆',
+    content: '',
+    createdAt: '2024-07-09T10:21:00',
+    isSent: false,
+    invitationCard: {
+      title: '끝까지 화이팅할 팀원 찾습니다!',
+      currentMembers: 3,
+      totalMembers: 5,
+      contestName: '2026 스타트업 해커톤',
+      senderName: '김팀장',
+      postId: 1,
+      invitationId: 1,
+    },
+  },
+  {
+    id: 3,
+    senderId: 200,
+    senderName: '김팀장',
+    senderAvatar: '🏆',
+    content: '초대 수락하실 건가요? 😁',
+    createdAt: '2024-07-09T10:25:00',
+    isSent: false,
+  },
+  {
+    id: 4,
+    senderId: 1,
+    senderName: '나',
+    senderAvatar: '👨‍💻',
+    content: '네! 바로 수락할게요 💫',
+    createdAt: '2024-07-09T10:25:00',
+    isSent: true,
+  },
+];
+
 export const dummyChatRooms: ChatRoom[] = [
   // 단체 채팅
   {
@@ -461,5 +510,18 @@ export const dummyChatRooms: ChatRoom[] = [
     participants: [dummyUser1, dummyUser5],
     detailType: 'leader-request',
     matchStatus: 'pending',
+  },
+  {
+    id: 7,
+    type: 'direct',
+    name: '김팀장',
+    avatar: '🏆',
+    lastMessage: '네! 바로 수락할게요 💫',
+    lastMessageBy: '나',
+    lastMessageAt: minsAgo(5),
+    unreadCount: 0,
+    participants: [dummyUser1],
+    detailType: 'leader-request',
+    matchStatus: 'requested',
   },
 ];

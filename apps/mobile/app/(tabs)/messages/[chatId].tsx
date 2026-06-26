@@ -21,6 +21,8 @@ import { MessageInput } from '../../../src/components/messages/MessageInput';
 import { getChat, sendMessage, leaveChatRoom } from '../../../src/services/messageService';
 import { Chat, Message } from '../../../src/types/message';
 import { useReviewStore } from '../../../src/store/useReviewStore';
+import { useInvitationStore } from '../../../src/store/useInvitationStore';
+import { useReadStore } from '../../../src/store/useReadStore';
 
 const IS_MOCK = process.env.EXPO_PUBLIC_API_MODE === 'mock';
 
@@ -37,21 +39,22 @@ interface DirectContact {
   id: number;
   chatId: number;
   name: string;
+  avatar: string;
   role: string;
   isTeamMember: boolean;
 }
 
-// mock 전용 더미 데이터 (초대 시트)
+// mock 전용 더미 데이터 (초대 시트) — 실제 더미 1:1 채팅방과 동일한 목록
 const MOCK_INVITED: InvitedUser[] = [
-  { id: 101, name: '박기획', role: '기획·마케팅', status: 'pending', directChatId: 5 },
-  { id: 102, name: '최디자인', role: '디자인·UI/UX', status: 'rejected' },
+  { id: 202, name: '박팀장', role: '팀 리더·기획', status: 'rejected' },
 ];
 
 const MOCK_CONTACTS: DirectContact[] = [
-  { id: 3,  chatId: 3, name: '이팀장',  role: '기획',               isTeamMember: true  },
-  { id: 7,  chatId: 4, name: '최개발',  role: '개발',               isTeamMember: true  },
-  { id: 51, chatId: 5, name: '김데이터', role: '개발·데이터사이언스', isTeamMember: false },
-  { id: 52, chatId: 6, name: '이PM',    role: '기획·프로덕트 매니저', isTeamMember: false },
+  { id: 201, chatId: 3, name: '김모집',   avatar: '👑', role: '개발·AI',        isTeamMember: false },
+  { id: 202, chatId: 4, name: '박팀장',   avatar: '🚀', role: '팀 리더·기획',   isTeamMember: false },
+  { id: 203, chatId: 5, name: '이팀원',   avatar: '⭐', role: '개발·프론트엔드', isTeamMember: false },
+  { id: 204, chatId: 6, name: '최기획자', avatar: '📋', role: '기획·프로덕트',  isTeamMember: false },
+  { id: 205, chatId: 7, name: '김팀장',   avatar: '🏆', role: '팀 리더',        isTeamMember: false },
 ];
 
 // ── 메인 화면 ─────────────────────────────────────────────────────────────────
@@ -75,6 +78,8 @@ export default function ChatDetailScreen() {
 
   // 리뷰 완료 여부: 만료 채팅방에서 모든 팀원 리뷰를 제출했는지 확인
   const { getSubmittedReviews } = useReviewStore();
+  const { addInvitationMessages, getExtraMessages } = useInvitationStore();
+  const { markChatAsRead } = useReadStore();
   const reviewableCount = (chat?.teamInfo?.members ?? []).filter((m) => m.id !== MY_USER_ID).length;
   const allReviewsDone  = getSubmittedReviews(parseInt(chatId as string)).length >= reviewableCount;
 
@@ -104,10 +109,14 @@ export default function ChatDetailScreen() {
   const loadChat = async () => {
     setIsLoading(true);
     try {
-      const data = await getChat(parseInt(chatId as string));
+      const cid = parseInt(chatId as string);
+      const data = await getChat(cid);
       if (data) {
         setChat(data);
-        setMessages(data.messages);
+        markChatAsRead(cid);
+        // store에 동적으로 추가된 초대 메시지를 병합
+        const extra = getExtraMessages(cid);
+        setMessages([...data.messages, ...extra]);
         // 공모전 만료 상태이면 팀원이 이미 확정된 것으로 초기화
         if (data.teamInfo?.isExpired) setIsTeamConfirmed(true);
       }
@@ -160,6 +169,39 @@ export default function ChatDetailScreen() {
     };
     setInvitedUsers((prev) => [...prev, newUser]);
     setInvitedIds((prev) => new Set([...prev, contact.id]));
+
+    // 1:1 채팅방에 초대 자동 메시지 추가
+    const now = new Date().toISOString();
+    const baseId = Date.now();
+    addInvitationMessages(contact.chatId, [
+      {
+        id: baseId,
+        senderId: MY_USER_ID,
+        senderName: '나',
+        senderAvatar: '👨‍💻',
+        content: `티밋님이 ${contact.name}님을 팀에 초대하셨어요! 🎉`,
+        createdAt: now,
+        isSent: true,
+      },
+      {
+        id: baseId + 1,
+        senderId: MY_USER_ID,
+        senderName: '나',
+        senderAvatar: '👨‍💻',
+        content: '',
+        createdAt: now,
+        isSent: true,
+        invitationCard: {
+          title: chat?.name ? `${chat.name} 팀원 모집` : '팀원을 모집합니다',
+          currentMembers: chat?.teamInfo?.currentCount ?? 0,
+          totalMembers: chat?.teamInfo?.totalCount ?? 0,
+          contestName: chat?.description ?? '공모전',
+          senderName: '나',
+          postId: 1,
+          invitationId: 1,
+        },
+      },
+    ]);
   };
 
   // 초대 취소(X 버튼)
@@ -453,7 +495,7 @@ export default function ChatDetailScreen() {
                     return (
                       <View key={c.id} style={[inviteSheet.contactRow, isDone && inviteSheet.contactRowDone]}>
                         <View style={[inviteSheet.contactAvatar, isDone && inviteSheet.contactAvatarDone]}>
-                          <Text style={inviteSheet.contactAvatarText}>👤</Text>
+                          <Text style={inviteSheet.contactAvatarText}>{c.avatar}</Text>
                         </View>
                         <View style={inviteSheet.contactInfo}>
                           <Text style={inviteSheet.contactName}>{c.name}</Text>

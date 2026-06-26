@@ -18,6 +18,7 @@ import { getChatRooms } from '../../../src/services/messageService';
 import { getInvitations } from '../../../src/services/invitationService';
 import { ChatRoom } from '../../../src/types/message';
 import { Invitation } from '../../../src/types/invitation';
+import { useReadStore } from '../../../src/store/useReadStore';
 
 type Tab = 'chats' | 'invitations';
 
@@ -40,6 +41,7 @@ export default function MessagesScreen() {
   const [invitations, setInvitations] = useState<Invitation[]>([]);
   const [sections, setSections] = useState<SectionData[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const { readChats, readInvitations, markInvitationAsRead } = useReadStore();
 
   useFocusEffect(
     useCallback(() => {
@@ -82,6 +84,7 @@ export default function MessagesScreen() {
   };
 
   const handleInvitationPress = (invitation: Invitation) => {
+    markInvitationAsRead(invitation.invitationId);
     router.push(
       `/messages/invitation-detail/${invitation.invitationId}?postId=${invitation.postId}` as never,
     );
@@ -149,7 +152,10 @@ export default function MessagesScreen() {
             keyExtractor={(item) => item.id.toString()}
             renderItem={({ item, section }) =>
               section.data.length === 0 ? null : (
-                <ChatRoomItem chatRoom={item} onPress={() => handleChatPress(item.id)} />
+                <ChatRoomItem
+                  chatRoom={readChats[item.id] ? { ...item, unreadCount: 0 } : item}
+                  onPress={() => handleChatPress(item.id)}
+                />
               )
             }
             renderSectionHeader={({ section }) => (
@@ -199,7 +205,11 @@ export default function MessagesScreen() {
               data={invitations}
               keyExtractor={(item) => item.invitationId.toString()}
               renderItem={({ item }) => (
-                <InvitationCard invitation={item} onPress={() => handleInvitationPress(item)} />
+                <InvitationCard
+                  invitation={item}
+                  isRead={!!readInvitations[item.invitationId]}
+                  onPress={() => handleInvitationPress(item)}
+                />
               )}
               contentContainerStyle={styles.invitationListContent}
             />
@@ -219,13 +229,19 @@ export default function MessagesScreen() {
 // ── 초대장 카드 컴포넌트 ────────────────────────────────────────────────────────
 function InvitationCard({
   invitation,
+  isRead = false,
   onPress,
 }: {
   invitation: Invitation;
+  isRead?: boolean;
   onPress: () => void;
 }) {
   return (
-    <TouchableOpacity style={inviteStyles.card} onPress={onPress} activeOpacity={0.85}>
+    <TouchableOpacity
+      style={[inviteStyles.card, isRead && inviteStyles.cardRead]}
+      onPress={onPress}
+      activeOpacity={0.85}
+    >
       <View style={inviteStyles.topRow}>
         <View style={inviteStyles.avatarCircle}>
           <Text style={inviteStyles.avatarEmoji}>🏆</Text>
@@ -243,7 +259,7 @@ function InvitationCard({
         </View>
         <View style={inviteStyles.right}>
           <Text style={inviteStyles.time}>{invitation.receivedAt}</Text>
-          <View style={inviteStyles.moreBtn}>
+          <View style={[inviteStyles.moreBtn, isRead && inviteStyles.moreBtnRead]}>
             <Text style={inviteStyles.moreBtnText}>더보기</Text>
           </View>
         </View>
@@ -427,6 +443,9 @@ const inviteStyles = StyleSheet.create({
     padding: 16,
     backgroundColor: Colors.white,
   },
+  cardRead: {
+    borderColor: Colors.grayLight,
+  },
   topRow: {
     flexDirection: 'row',
     alignItems: 'flex-start',
@@ -473,6 +492,9 @@ const inviteStyles = StyleSheet.create({
     borderRadius: 999,
     paddingHorizontal: 12,
     paddingVertical: 5,
+  },
+  moreBtnRead: {
+    backgroundColor: Colors.grayMedium,
   },
   moreBtnText: {
     fontSize: 12,

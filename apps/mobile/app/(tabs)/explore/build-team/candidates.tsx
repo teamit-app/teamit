@@ -11,6 +11,15 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { Colors } from '../../../../src/constants/colors';
 import { dummyCandidates } from '../../../../src/data/candidates';
 import { Candidate } from '../../../../src/types/team';
+import { useInvitationStore } from '../../../../src/store/useInvitationStore';
+
+// mock: 후보자 id → 1:1 직접 채팅방 id 매핑
+const CANDIDATE_CHAT_MAP: Record<number, number> = {
+  1: 5,
+  2: 6,
+  3: 3,
+  4: 4,
+};
 
 const leadershipSymbol = (style: string) => {
   if (style.includes('가능') || style.includes('리더')) return '○';
@@ -134,6 +143,7 @@ export default function CandidatesScreen() {
   const insets = useSafeAreaInsets();
   const { contestId } = useLocalSearchParams<{ contestId: string }>();
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
+  const { addInvitationMessages } = useInvitationStore();
 
   const toggleSelect = (id: number) =>
     setSelectedIds((prev) =>
@@ -180,7 +190,45 @@ export default function CandidatesScreen() {
       <View style={[styles.bottomBar, { paddingBottom: Math.max(insets.bottom, 16) }]}>
         <TouchableOpacity
           style={[styles.inviteBtn, selectedIds.length === 0 && styles.inviteBtnDisabled]}
-          onPress={selectedIds.length > 0 ? () => router.replace('/(tabs)/messages' as never) : undefined}
+          onPress={selectedIds.length > 0 ? () => {
+            const now = new Date().toISOString();
+            selectedIds.forEach((cid, i) => {
+              const candidate = dummyCandidates.find((c) => c.id === cid);
+              const chatId = CANDIDATE_CHAT_MAP[cid];
+              if (!candidate || !chatId) return;
+              const baseId = Date.now() + i * 100;
+              addInvitationMessages(chatId, [
+                {
+                  id: baseId,
+                  senderId: 1,
+                  senderName: '나',
+                  senderAvatar: '👨‍💻',
+                  content: `티밋님이 ${candidate.name}님을 팀에 초대하셨어요! 🎉`,
+                  createdAt: now,
+                  isSent: true,
+                },
+                {
+                  id: baseId + 1,
+                  senderId: 1,
+                  senderName: '나',
+                  senderAvatar: '👨‍💻',
+                  content: '',
+                  createdAt: now,
+                  isSent: true,
+                  invitationCard: {
+                    title: '팀원을 모집합니다',
+                    currentMembers: 3,
+                    totalMembers: 5,
+                    contestName: contestId ? `공모전 #${contestId}` : '공모전',
+                    senderName: '나',
+                    postId: 1,
+                    invitationId: 1,
+                  },
+                },
+              ]);
+            });
+            router.replace('/(tabs)/messages' as never);
+          } : undefined}
           activeOpacity={selectedIds.length > 0 ? 0.85 : 1}
         >
           <Text style={[styles.inviteBtnText, selectedIds.length === 0 && styles.inviteBtnTextDisabled]}>

@@ -9,6 +9,7 @@ import {
   dummyDirectMessages2,
   dummyDirectMessages3,
   dummyDirectMessages4,
+  dummyDirectMessages7,
   dummyGroupMessages1,
   dummyGroupMessages2,
   dummyGroupMessages10,
@@ -212,6 +213,7 @@ const dynamicRoutes: Array<[RegExp, (path: string) => unknown]> = [
         4:  dummyDirectMessages2,
         5:  dummyDirectMessages3,
         6:  dummyDirectMessages4,
+        7:  dummyDirectMessages7,
         10: dummyGroupMessages10,
       };
       const msgs = msgMap[id] ?? [];
@@ -224,6 +226,7 @@ const dynamicRoutes: Array<[RegExp, (path: string) => unknown]> = [
           isRead: true,
           createdAt: m.createdAt,
           isSystem: m.isSystem ?? false,
+          invitationCard: m.invitationCard,
         })),
         totalElements: msgs.length,
         currentPage: 0,

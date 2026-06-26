@@ -193,7 +193,7 @@ export default function ProfileScreen() {
               icon="🎯"
               title="매칭 프로필"
               subtitle={matchingSubtitle}
-              onPress={() => router.push('/(tabs)/profile/matching-profile')}
+              onPress={() => router.push('/(tabs)/profile/matching-profile-card')}
             />
             <GridMenuItem
               icon="💼"

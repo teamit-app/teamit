@@ -1,5 +1,5 @@
 import { apiRequest } from './api';
-import { ChatRoom, Chat, Message } from '../types/message';
+import { ChatRoom, Chat, Message, InvitationCardData } from '../types/message';
 import { useOnboardingStore } from '../store/useOnboardingStore';
 import { dummyChatRooms } from '../data/chatRooms';
 
@@ -39,6 +39,7 @@ interface BackendChatMessage {
   isRead: boolean;
   createdAt: string;
   isSystem?: boolean;
+  invitationCard?: InvitationCardData;
 }
 
 interface BackendMessagePageResponse {
@@ -91,6 +92,7 @@ function adaptMessage(msg: BackendChatMessage, currentUserId: number): Message {
     createdAt: msg.createdAt,
     isSent: msg.senderId === currentUserId,
     isSystem: msg.isSystem ?? false,
+    invitationCard: msg.invitationCard,
   };
 }
 
