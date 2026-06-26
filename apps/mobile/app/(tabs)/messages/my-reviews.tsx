@@ -1,41 +1,16 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import {
-  View, Text, ScrollView, TouchableOpacity, StyleSheet,
+  View, Text, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Colors } from '../../../src/constants/colors';
 import { dummyChatRooms } from '../../../src/data/chatRooms';
 import { useReviewStore } from '../../../src/store/useReviewStore';
-
-// ── 더미: 내(id=1)가 chat 10에서 받은 리뷰 ──────────────────────────────────
-const DUMMY_RECEIVED = [
-  {
-    reviewerId:            9,
-    reviewerName:          '이유진',
-    reviewerAvatar:        '👩‍💻',
-    totalRating:           5,
-    responseSpeed:         '1시간 이내',
-    deadlineCompletion:    '항상 제때',
-    participationIntensity:'적극적 참여',
-    keywords: ['리더십이 있어요', '아이디어가 넘쳐요', '분위기 메이커예요', '책임감 있어요'],
-    comment: '팀장님 덕분에 좋은 팀 분위기에서 공모전을 마칠 수 있었어요. 다음에도 꼭 함께하고 싶습니다!',
-  },
-  {
-    reviewerId:            10,
-    reviewerName:          '박준혁',
-    reviewerAvatar:        '🎯',
-    totalRating:           4,
-    responseSpeed:         '1시간 이내',
-    deadlineCompletion:    '항상 제때',
-    participationIntensity:'소극적 참여',
-    keywords: ['책임감 있어요', '꼼꼼하게 작업해요'],
-    comment: '꼼꼼하게 프로젝트를 이끌어줘서 좋았어요.',
-  },
-];
+import { getReceivedReviews, ReceivedReview } from '../../../src/services/reviewService';
 
 // 온도 계산: 25 + (평균 별점 * 3)
-function calcTemp(reviews: typeof DUMMY_RECEIVED) {
+function calcTemp(reviews: ReceivedReview[]) {
   if (!reviews.length) return 36.5;
   const avg = reviews.reduce((s, r) => s + r.totalRating, 0) / reviews.length;
   return Math.round((25 + avg * 3) * 10) / 10;
@@ -44,12 +19,12 @@ function calcTemp(reviews: typeof DUMMY_RECEIVED) {
 // 통계 – 가장 많이 선택된 항목과 비율
 function topStat(arr: string[], options: string[]) {
   const top = options.find((v) => arr.includes(v)) ?? arr[0] ?? '—';
-  const pct  = Math.round((arr.filter((v) => v === top).length / arr.length) * 100);
+  const pct  = arr.length ? Math.round((arr.filter((v) => v === top).length / arr.length) * 100) : 0;
   return { top, pct };
 }
 
 // 키워드 빈도 집계
-function buildKeywords(reviews: typeof DUMMY_RECEIVED) {
+function buildKeywords(reviews: ReceivedReview[]) {
   const map: Record<string, number> = {};
   reviews.forEach((r) => r.keywords.forEach((k) => { map[k] = (map[k] ?? 0) + 1; }));
   return Object.entries(map).sort((a, b) => b[1] - a[1]).map(([text, count]) => ({ text, count }));
@@ -74,18 +49,29 @@ export default function MyReviewsScreen() {
   const submitted = getSubmittedReviews(chatIdNum);
   const allDone   = submitted.length >= reviewableMembers.length;
 
-  const temperature = calcTemp(DUMMY_RECEIVED);
+  const [receivedReviews, setReceivedReviews] = useState<ReceivedReview[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    if (!allDone) { setIsLoading(false); return; }
+    getReceivedReviews(chatIdNum)
+      .then(setReceivedReviews)
+      .catch((e) => console.error('[MyReviews] 리뷰 로드 실패:', e))
+      .finally(() => setIsLoading(false));
+  }, [chatIdNum, allDone]);
+
+  const temperature = calcTemp(receivedReviews);
   const barWidth    = Math.min((temperature / 40) * 100, 100);
 
   const speedOptions     = ['1시간 이내', '반나절 이내', '하루 이내', '이틀 이상', '잠수'];
   const deadlineOptions  = ['항상 제때', '대부분 제때', '가끔 늦음', '자주 늦음', '항상 늦음'];
   const intensityOptions = ['적극적 참여', '보통 참여', '소극적 참여', '참여하지 않음'];
 
-  const speedStat     = topStat(DUMMY_RECEIVED.map((r) => r.responseSpeed), speedOptions);
-  const deadlineStat  = topStat(DUMMY_RECEIVED.map((r) => r.deadlineCompletion), deadlineOptions);
-  const intensityStat = topStat(DUMMY_RECEIVED.map((r) => r.participationIntensity), intensityOptions);
+  const speedStat     = topStat(receivedReviews.map((r) => r.responseSpeed), speedOptions);
+  const deadlineStat  = topStat(receivedReviews.map((r) => r.deadlineCompletion), deadlineOptions);
+  const intensityStat = topStat(receivedReviews.map((r) => r.participationIntensity), intensityOptions);
 
-  const keywords = buildKeywords(DUMMY_RECEIVED);
+  const keywords = buildKeywords(receivedReviews);
 
   return (
     <SafeAreaView style={s.container} edges={['top']}>
@@ -102,8 +88,12 @@ export default function MyReviewsScreen() {
         <View style={{ width: 36 }} />
       </View>
 
-      {/* 잠금 화면 */}
-      {!allDone ? (
+      {/* 로딩 */}
+      {isLoading ? (
+        <View style={s.lockedWrap}>
+          <ActivityIndicator size="large" color={Colors.primary} />
+        </View>
+      ) : !allDone ? (
         <View style={s.lockedWrap}>
           <Text style={s.lockIcon}>🔒</Text>
           <Text style={s.lockTitle}>아직 받은 리뷰를 볼 수 없어요</Text>
@@ -172,13 +162,13 @@ export default function MyReviewsScreen() {
           {/* ── 카드 3: 팀원 리뷰 ── */}
           <View style={s.card}>
             <Text style={s.cardTitle}>팀원 리뷰</Text>
-            {DUMMY_RECEIVED.map((r, i) => (
+            {receivedReviews.map((r, i) => (
               <View key={r.reviewerId}>
                 {i > 0 && <View style={s.divider} />}
                 <View style={[s.reviewItem, i > 0 && s.reviewItemAfterDivider]}>
                   <View style={s.reviewHeader}>
                     <View style={s.avatarCircle}>
-                      <Text style={s.avatarText}>{r.reviewerAvatar}</Text>
+                      <Text style={s.avatarText}>{r.reviewerAvatar ?? '👤'}</Text>
                     </View>
                     <Text style={s.reviewerName}>{r.reviewerName}</Text>
                     <Text style={s.reviewStars}>{starLabel(r.totalRating)}</Text>
@@ -206,7 +196,7 @@ export default function MyReviewsScreen() {
           </TouchableOpacity>
         </ScrollView>
       )}
-    </SafeAreaView>
+      </SafeAreaView>
   );
 }
 

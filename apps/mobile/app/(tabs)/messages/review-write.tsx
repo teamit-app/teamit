@@ -11,7 +11,8 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Colors } from '../../../src/constants/colors';
 import { dummyChatRooms } from '../../../src/data/chatRooms';
-import { useReviewStore, ReviewDraft } from '../../../src/store/useReviewStore';
+import { useReviewStore } from '../../../src/store/useReviewStore';
+import { postReview } from '../../../src/services/reviewService';
 import { TeamMemberStatus } from '../../../src/types/message';
 
 // ── 리뷰 옵션 데이터 ──────────────────────────────────────────────────────────
@@ -157,6 +158,7 @@ export default function ReviewWriteScreen() {
   const [participationIntensity, setParticipationIntensity] = useState('');
   const [selectedKeywords,       setSelectedKeywords]       = useState<string[]>([]);
   const [comment,                setComment]                = useState('');
+  const [isSubmitting,           setIsSubmitting]           = useState(false);
 
   const resetInputs = () => {
     setTotalRating(0);
@@ -192,26 +194,41 @@ export default function ReviewWriteScreen() {
     setStep((s) => s - 1);
   };
 
-  const handleNext = () => {
+  const handleNext = async () => {
     if (step < 5) { setStep((s) => s + 1); return; }
 
     // step 5 → 제출
-    if (!selectedMember) return;
-    const review: ReviewDraft = {
-      memberId: selectedMember.id,
-      memberName: selectedMember.name,
-      totalRating,
-      responseSpeed,
-      deadlineCompletion,
-      participationIntensity,
-      keywords: selectedKeywords,
-      comment,
-    };
-    submitReview(chatIdNum, review);
-    router.replace({
-      pathname: '/(tabs)/messages/review-complete' as never,
-      params: { chatId, memberName: selectedMember.name },
-    });
+    if (!selectedMember || isSubmitting) return;
+    setIsSubmitting(true);
+    try {
+      await postReview(chatIdNum, {
+        receiverId: selectedMember.id,
+        totalRating,
+        responseSpeed,
+        deadlineCompletion,
+        participationIntensity,
+        keywords: selectedKeywords,
+        comment,
+      });
+      submitReview(chatIdNum, {
+        memberId: selectedMember.id,
+        memberName: selectedMember.name,
+        totalRating,
+        responseSpeed,
+        deadlineCompletion,
+        participationIntensity,
+        keywords: selectedKeywords,
+        comment,
+      });
+      router.replace({
+        pathname: '/(tabs)/messages/review-complete' as never,
+        params: { chatId, memberName: selectedMember.name },
+      });
+    } catch (e) {
+      console.error('[ReviewWrite] 리뷰 제출 실패:', e);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const alreadyReviewed = (memberId: number) =>
@@ -423,18 +440,20 @@ export default function ReviewWriteScreen() {
             <Text style={[s.nextBtnText, !canNext() && s.nextBtnTextDisabled]}>다음으로</Text>
           </TouchableOpacity>
         ) : (
-          // Steps 2–5: 이전 + 다음으로
+          // Steps 2–5: 이전 + 다음으로 (step 5는 제출)
           <View style={s.btnRow}>
             <TouchableOpacity style={s.prevBtn} onPress={handleBack} activeOpacity={0.8}>
               <Text style={s.prevBtnText}>이전</Text>
             </TouchableOpacity>
             <TouchableOpacity
-              style={[s.nextBtnFlex, !canNext() && s.nextBtnDisabled]}
+              style={[s.nextBtnFlex, (!canNext() || isSubmitting) && s.nextBtnDisabled]}
               onPress={handleNext}
-              disabled={!canNext()}
+              disabled={!canNext() || isSubmitting}
               activeOpacity={0.85}
             >
-              <Text style={[s.nextBtnText, !canNext() && s.nextBtnTextDisabled]}>다음으로</Text>
+              <Text style={[s.nextBtnText, (!canNext() || isSubmitting) && s.nextBtnTextDisabled]}>
+                {step === 5 && isSubmitting ? '제출 중...' : step === 5 ? '제출' : '다음으로'}
+              </Text>
             </TouchableOpacity>
           </View>
         )}
