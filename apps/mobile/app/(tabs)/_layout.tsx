@@ -18,7 +18,15 @@ export default function TabLayout() {
           },
         })}
       />
-      <Tabs.Screen name="profile" options={{ title: '내정보' }} />
+      <Tabs.Screen
+        name="profile"
+        options={{ title: '내정보' }}
+        listeners={({ navigation }) => ({
+          tabPress: () => {
+            navigation.navigate('profile', { screen: 'index' });
+          },
+        })}
+      />
     </Tabs>
   );
 }
