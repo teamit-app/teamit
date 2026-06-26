@@ -661,7 +661,7 @@ export default function ChatDetailScreen() {
     ? isTeamConfirmed
       ? `${confirmedCount}/${confirmedCount}명`
       : `${confirmedCount}/${totalCount}명 참여 중`
-    : chat.description ?? null;
+    : null;
   const dDay = isGroup ? chat.teamInfo?.dDay : undefined;
 
   return (
