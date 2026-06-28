@@ -338,6 +338,9 @@ export default function PostDetailScreen() {
             <InfoBlock label="팀 분위기">
               <Text style={sectionStyles.infoValue}>{post.recruiter.teamVibe}</Text>
             </InfoBlock>
+            <InfoBlock label="피드백 방식">
+              <Text style={sectionStyles.infoValue}>{post.recruiter.feedbackStyle}</Text>
+            </InfoBlock>
             <InfoBlock label="리더십">
               <Text style={sectionStyles.infoValue}>{post.recruiter.leadershipStyle}</Text>
             </InfoBlock>

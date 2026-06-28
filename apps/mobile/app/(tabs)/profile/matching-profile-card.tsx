@@ -8,13 +8,11 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { router, useLocalSearchParams } from 'expo-router';
-import { Colors } from '../../../../src/constants/colors';
-import { ScreenHeader } from '../../../../src/components/common/ScreenHeader';
-import { dummyContestDetails } from '../../../../src/data/recruitmentPosts';
-import { useBuildTeamStore } from '../../../../src/store/useBuildTeamStore';
-import { useMypageStore } from '../../../../src/store/useMypageStore';
-import { MatchingProfileData } from '../../../../src/types/mypage';
+import { router } from 'expo-router';
+import { Colors } from '../../../src/constants/colors';
+import { ScreenHeader } from '../../../src/components/common/ScreenHeader';
+import { useMypageStore } from '../../../src/store/useMypageStore';
+import { MatchingProfileData } from '../../../src/types/mypage';
 
 // ── 표시용 변환 헬퍼 ──────────────────────────────────────────────────────────
 
@@ -47,9 +45,10 @@ const LEADERSHIP_LABELS: Record<string, string> = {
 };
 
 function formatCard(p: MatchingProfileData) {
-  const regionStr = p.regions.length > 0
-    ? ` · ${p.regions[0].sido}${p.regions[0].sigungu ? ' ' + p.regions[0].sigungu : ''}`
-    : '';
+  const regionStr =
+    p.regions.length > 0
+      ? ` · ${p.regions[0].sido}${p.regions[0].sigungu ? ' ' + p.regions[0].sigungu : ''}`
+      : '';
   return {
     skills: p.skills.join(', '),
     purpose: EXPERIENCE_LABELS[p.experienceLevel],
@@ -57,19 +56,27 @@ function formatCard(p: MatchingProfileData) {
     meetingPreference: `${ONLINE_OFFLINE_LABELS[p.onlineOfflinePref]}${regionStr}`,
     teamVibe: `${TEAM_VIBE_LABELS[p.teamVibe - 1]} / ${FEEDBACK_LABELS[p.feedbackStyle - 1]}`,
     leadership: LEADERSHIP_LABELS[p.leadershipPref],
+    appealTitle: p.appealTitle,
+    appealContent: p.appealContent,
   };
 }
 
 // ── CardRow ───────────────────────────────────────────────────────────────────
 
-function CardRow({ label, value, onEdit }: { label: string; value: string; onEdit: () => void }) {
+interface CardRowProps {
+  label: string;
+  value: string;
+  onPressEdit: () => void;
+}
+
+function CardRow({ label, value, onPressEdit }: CardRowProps) {
   return (
     <View style={rowStyles.row}>
       <View style={rowStyles.left}>
         <Text style={rowStyles.label}>{label}</Text>
         <Text style={rowStyles.value}>{value}</Text>
       </View>
-      <TouchableOpacity onPress={onEdit} hitSlop={8} activeOpacity={0.7}>
+      <TouchableOpacity onPress={onPressEdit} hitSlop={8} activeOpacity={0.7}>
         <Text style={rowStyles.editText}>수정</Text>
       </TouchableOpacity>
     </View>
@@ -78,25 +85,17 @@ function CardRow({ label, value, onEdit }: { label: string; value: string; onEdi
 
 // ── Main Screen ───────────────────────────────────────────────────────────────
 
-export default function BuildTeamCardScreen() {
+export default function MatchingProfileCardScreen() {
   const insets = useSafeAreaInsets();
-  const { contestId } = useLocalSearchParams<{ contestId: string }>();
-  const id = Number(contestId);
-  const setContestId = useBuildTeamStore((s) => s.setContestId);
-
   const { matchingProfile, loadMatchingProfile } = useMypageStore();
   const [isLoading, setIsLoading] = useState(true);
-
-  const detail = dummyContestDetails.find((d) => d.contestId === id) ?? dummyContestDetails[0];
 
   useEffect(() => {
     loadMatchingProfile().then(() => {
       const profile = useMypageStore.getState().matchingProfile;
       if (!profile) {
-        // 작성된 참여카드 없음 → 매칭 프로필 질문지(어필글 제외 6스텝)로 이동
-        router.replace(
-          `/profile/matching-profile?returnTo=build-team&contestId=${id}` as never,
-        );
+        // 작성된 매칭 프로필 없음 → 질문지 전체 플로우로 이동
+        router.replace('/profile/matching-profile?returnTo=mypage-card' as never);
       } else {
         setIsLoading(false);
       }
@@ -105,18 +104,22 @@ export default function BuildTeamCardScreen() {
 
   const editStep = (step: number) => {
     router.push(
-      `/profile/matching-profile?mode=edit&startStep=${step}&returnTo=build-team&contestId=${id}` as never,
+      `/profile/matching-profile?mode=edit&startStep=${step}&returnTo=mypage-card` as never,
     );
   };
 
-  const handleNext = () => {
-    setContestId(id);
-    router.push(`/explore/build-team/recruit-count?contestId=${id}` as never);
+  const handleDone = () => {
+    router.back();
   };
 
   if (isLoading || !matchingProfile) {
     return (
-      <View style={[styles.container, { paddingTop: insets.top, justifyContent: 'center', alignItems: 'center' }]}>
+      <View
+        style={[
+          styles.container,
+          { paddingTop: insets.top, justifyContent: 'center', alignItems: 'center' },
+        ]}
+      >
         <ActivityIndicator size="large" color={Colors.primary} />
       </View>
     );
@@ -128,35 +131,49 @@ export default function BuildTeamCardScreen() {
     <View style={[styles.container, { paddingTop: insets.top }]}>
       <ScreenHeader title="참여 카드 확인" onBack={() => router.back()} />
 
-      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        <Text style={styles.title}>모집자님에 대해 알려주세요</Text>
+      <ScrollView
+        contentContainerStyle={styles.content}
+        showsVerticalScrollIndicator={false}
+      >
+        <Text style={styles.title}>최근 등록한 정보에요</Text>
         <Text style={styles.subtitle}>틀린 정보가 있으면 수정해 주세요</Text>
 
         <View style={styles.cardWrap}>
           <View style={styles.cardAccentBar} />
           <View style={styles.cardInner}>
             <Text style={styles.cardPreviewLabel}>참여 카드 미리보기</Text>
-            <Text style={styles.cardContestTitle}>{detail.title}</Text>
 
             <View style={styles.divider} />
 
-            <CardRow label="스킬" value={card.skills} onEdit={() => editStep(1)} />
-            <CardRow label="목적" value={card.purpose} onEdit={() => editStep(2)} />
-            <CardRow label="강도" value={card.intensity} onEdit={() => editStep(3)} />
+            <CardRow label="스킬" value={card.skills} onPressEdit={() => editStep(1)} />
+            <CardRow label="목적" value={card.purpose} onPressEdit={() => editStep(2)} />
+            <CardRow label="강도" value={card.intensity} onPressEdit={() => editStep(3)} />
             <CardRow
               label="온오프라인선호"
               value={card.meetingPreference}
-              onEdit={() => editStep(4)}
+              onPressEdit={() => editStep(4)}
             />
-            <CardRow label="팀분위기" value={card.teamVibe} onEdit={() => editStep(5)} />
-            <CardRow label="리더십" value={card.leadership} onEdit={() => editStep(6)} />
+            <CardRow label="팀분위기" value={card.teamVibe} onPressEdit={() => editStep(5)} />
+            <CardRow label="리더십" value={card.leadership} onPressEdit={() => editStep(6)} />
+
+            {/* 어필글 */}
+            <View style={rowStyles.row}>
+              <View style={rowStyles.left}>
+                <Text style={rowStyles.label}>어필글</Text>
+                <Text style={rowStyles.appealTitle}>제목: {card.appealTitle}</Text>
+                <Text style={rowStyles.appealContent}>내용: {card.appealContent}</Text>
+              </View>
+              <TouchableOpacity onPress={() => editStep(7)} hitSlop={8} activeOpacity={0.7}>
+                <Text style={rowStyles.editText}>수정</Text>
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
       </ScrollView>
 
       <View style={[styles.bottomBar, { paddingBottom: Math.max(insets.bottom, 16) }]}>
-        <TouchableOpacity style={styles.nextBtn} onPress={handleNext} activeOpacity={0.85}>
-          <Text style={styles.nextBtnText}>모집 조건 작성하기</Text>
+        <TouchableOpacity style={styles.doneBtn} onPress={handleDone} activeOpacity={0.85}>
+          <Text style={styles.doneBtnText}>저장하기</Text>
         </TouchableOpacity>
       </View>
     </View>
@@ -164,16 +181,15 @@ export default function BuildTeamCardScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: Colors.pageBg },
+  container: { flex: 1, backgroundColor: Colors.white },
   content: { paddingHorizontal: 20, paddingTop: 24, paddingBottom: 32 },
   title: { fontSize: 22, fontWeight: '700', color: Colors.dark, marginBottom: 6 },
-  subtitle: { fontSize: 14, color: Colors.gray, marginBottom: 24 },
+  subtitle: { fontSize: 14, color: Colors.gray, marginBottom: 20 },
   cardWrap: {
     borderRadius: 14,
     borderWidth: 1,
     borderColor: Colors.lightGray,
     overflow: 'hidden',
-    backgroundColor: Colors.white,
   },
   cardAccentBar: { height: 5, backgroundColor: Colors.primary },
   cardInner: { paddingTop: 16 },
@@ -182,14 +198,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: Colors.primary,
     paddingHorizontal: 16,
-    marginBottom: 6,
-  },
-  cardContestTitle: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: Colors.dark,
-    paddingHorizontal: 16,
-    marginBottom: 14,
+    paddingBottom: 14,
   },
   divider: { height: 1, backgroundColor: '#F0F0F0' },
   bottomBar: {
@@ -199,19 +208,19 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: Colors.lightGray,
   },
-  nextBtn: {
+  doneBtn: {
     backgroundColor: Colors.primary,
     borderRadius: 14,
     paddingVertical: 16,
     alignItems: 'center',
   },
-  nextBtnText: { fontSize: 16, fontWeight: '700', color: Colors.white },
+  doneBtnText: { fontSize: 16, fontWeight: '700', color: Colors.white },
 });
 
 const rowStyles = StyleSheet.create({
   row: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     justifyContent: 'space-between',
     paddingHorizontal: 16,
     paddingVertical: 14,
@@ -220,7 +229,9 @@ const rowStyles = StyleSheet.create({
     gap: 12,
   },
   left: { flex: 1 },
-  label: { fontSize: 12, color: Colors.grayMedium, marginBottom: 4 },
+  label: { fontSize: 12, color: Colors.grayMedium, marginBottom: 5 },
   value: { fontSize: 14, color: Colors.dark, lineHeight: 20 },
-  editText: { fontSize: 14, fontWeight: '500', color: Colors.primary },
+  editText: { fontSize: 14, fontWeight: '500', color: Colors.primary, marginTop: 1 },
+  appealTitle: { fontSize: 14, color: Colors.dark, lineHeight: 21, marginBottom: 4 },
+  appealContent: { fontSize: 14, color: Colors.dark, lineHeight: 21 },
 });

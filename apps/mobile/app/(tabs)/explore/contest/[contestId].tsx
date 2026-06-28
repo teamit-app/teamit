@@ -30,6 +30,12 @@ const normalizeMeetingType = (type: string) => {
 };
 
 function RecruitPostCard({ post, onPress }: { post: RecruitPost; onPress: () => void }) {
+  const meetingStr = `${normalizeMeetingType(post.meetingType)}${
+    post.location && (post.meetingType.includes('혼합') || post.meetingType.includes('오프라인'))
+      ? `·${post.location}`
+      : ''
+  }`;
+
   return (
     <TouchableOpacity style={postStyles.card} onPress={onPress} activeOpacity={0.85}>
       <View style={postStyles.topRow}>
@@ -49,29 +55,20 @@ function RecruitPostCard({ post, onPress }: { post: RecruitPost; onPress: () => 
           </View>
         )}
       </View>
-      <View style={postStyles.conditionRow}>
-        <View style={postStyles.conditionTag}>
-          <Text style={postStyles.conditionText}>{post.experienceCondition}</Text>
-        </View>
-        <View style={postStyles.conditionTag}>
-          <Text style={postStyles.conditionText}>
-            {normalizeMeetingType(post.meetingType)}
-            {post.location && (post.meetingType.includes('혼합') || post.meetingType.includes('오프라인'))
-              ? `·${post.location}`
-              : ''}
-          </Text>
-        </View>
-        <View style={postStyles.conditionTag}>
-          <Text style={postStyles.conditionText}>{post.intensity}</Text>
-        </View>
+      <View style={postStyles.metaRow}>
+        <Text style={postStyles.metaText}>{post.experienceCondition}</Text>
+        <Text style={postStyles.metaDot}> · </Text>
+        <Text style={postStyles.metaText}>{meetingStr}</Text>
+        <Text style={postStyles.metaDot}> · </Text>
+        <Text style={postStyles.metaText}>{post.intensity}</Text>
       </View>
       <View style={postStyles.bottomRow}>
         <Text style={postStyles.memberCount}>
           팀원 {post.currentMembers}/{post.totalMembers}명 모집 중
         </Text>
         <View style={postStyles.statsRow}>
-          <Text style={postStyles.stat}>채팅 {post.chatCount}</Text>
-          <Text style={postStyles.statHeart}> ♥{post.likeCount}</Text>
+          <Text style={postStyles.stat}>💬 {post.chatCount}</Text>
+          <Text style={postStyles.stat}>♥ {post.likeCount}</Text>
         </View>
       </View>
     </TouchableOpacity>
@@ -540,20 +537,13 @@ const postStyles = StyleSheet.create({
     justifyContent: 'space-between',
     marginBottom: 6,
   },
-  views: {
-    fontSize: 12,
-    color: Colors.grayMedium,
-  },
-  date: {
-    fontSize: 12,
-    color: Colors.grayMedium,
-  },
+  views: { fontSize: 12, color: Colors.grayMedium },
+  date:  { fontSize: 12, color: Colors.grayMedium },
   title: {
     fontSize: 15,
     fontWeight: '700',
     color: Colors.dark,
     marginBottom: 10,
-    paddingLeft: 8,
   },
   skillRow: {
     flexDirection: 'row',
@@ -567,46 +557,21 @@ const postStyles = StyleSheet.create({
     paddingHorizontal: 11,
     paddingVertical: 5,
   },
-  skillText: {
-    fontSize: 12,
-    color: Colors.primary,
-    fontWeight: '600',
-  },
-  conditionRow: {
+  skillText: { fontSize: 12, color: Colors.primary, fontWeight: '600' },
+  metaRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 6,
+    alignItems: 'center',
     marginBottom: 10,
   },
-  conditionTag: {
-    backgroundColor: Colors.pageBg,
-    borderRadius: 999,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-  },
-  conditionText: {
-    fontSize: 12,
-    color: Colors.gray,
-  },
+  metaText: { fontSize: 12, color: Colors.grayMedium },
+  metaDot:  { fontSize: 12, color: Colors.grayMedium },
   bottomRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
   },
-  memberCount: {
-    fontSize: 12,
-    color: Colors.gray,
-    fontWeight: '500',
-  },
-  statsRow: {
-    flexDirection: 'row',
-  },
-  stat: {
-    fontSize: 12,
-    color: Colors.grayMedium,
-  },
-  statHeart: {
-    fontSize: 12,
-    color: Colors.primary,
-  },
+  memberCount: { fontSize: 12, color: Colors.gray, fontWeight: '500' },
+  statsRow: { flexDirection: 'row', gap: 10 },
+  stat: { fontSize: 12, color: Colors.grayMedium },
 });

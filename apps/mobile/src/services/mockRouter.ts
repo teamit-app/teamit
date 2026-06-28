@@ -9,6 +9,7 @@ import {
   dummyDirectMessages2,
   dummyDirectMessages3,
   dummyDirectMessages4,
+  dummyDirectMessages7,
   dummyGroupMessages1,
   dummyGroupMessages2,
   dummyGroupMessages10,
@@ -178,6 +179,12 @@ const dynamicRoutes: Array<[RegExp, (path: string) => unknown]> = [
   // POST /users/contest-hearts/{contestId}, DELETE /users/contest-hearts/{contestId}
   [/^\/users\/contest-hearts\/\d+$/, () => null],
 
+  // POST /posts — 모집글 생성
+  [/^\/posts$/, () => ({ postId: Date.now(), title: '팀원을 모집합니다', status: 'OPEN' })],
+
+  // POST /posts/{postId}/invitations — 초대장 보내기
+  [/^\/posts\/\d+\/invitations$/, () => ({ invitationId: Date.now(), status: 'PENDING', chatRoomId: 5 })],
+
   // POST /users/invitations/{id}/decline, POST /users/invitations/{id}/accept
   [/^\/users\/invitations\/\d+\/(decline|accept)$/, () => null],
 
@@ -221,6 +228,7 @@ const dynamicRoutes: Array<[RegExp, (path: string) => unknown]> = [
         4:  dummyDirectMessages2,
         5:  dummyDirectMessages3,
         6:  dummyDirectMessages4,
+        7:  dummyDirectMessages7,
         10: dummyGroupMessages10,
       };
       const msgs = msgMap[id] ?? [];
@@ -233,6 +241,7 @@ const dynamicRoutes: Array<[RegExp, (path: string) => unknown]> = [
           isRead: true,
           createdAt: m.createdAt,
           isSystem: m.isSystem ?? false,
+          invitationCard: m.invitationCard,
         })),
         totalElements: msgs.length,
         currentPage: 0,

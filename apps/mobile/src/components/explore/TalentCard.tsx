@@ -5,6 +5,7 @@ import { PoolUser } from '../../types/talent';
 
 interface TalentCardProps {
   talent: PoolUser;
+  onPress?: () => void;
   onPressHeart?: () => void;
   onPressPropose?: () => void;
 }
@@ -14,9 +15,9 @@ const GENDER_LABEL: Record<PoolUser['gender'], string> = {
   FEMALE: '여성',
 };
 
-export function TalentCard({ talent, onPressHeart, onPressPropose }: TalentCardProps) {
+export function TalentCard({ talent, onPress, onPressHeart, onPressPropose }: TalentCardProps) {
   return (
-    <View style={styles.card}>
+    <TouchableOpacity style={styles.card} onPress={onPress} activeOpacity={0.85}>
       <View style={styles.topRow}>
         <View style={styles.avatar}>
           <Text style={styles.avatarEmoji}>🧑‍💻</Text>
@@ -60,10 +61,10 @@ export function TalentCard({ talent, onPressHeart, onPressPropose }: TalentCardP
           ))}
         </View>
         <TouchableOpacity style={styles.proposeBtn} onPress={onPressPropose} activeOpacity={0.85}>
-          <Text style={styles.proposeBtnText}>제안하기</Text>
+          <Text style={styles.proposeBtnText}>채팅하기</Text>
         </TouchableOpacity>
       </View>
-    </View>
+    </TouchableOpacity>
   );
 }
 

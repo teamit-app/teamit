@@ -83,6 +83,7 @@ export interface RecruitPostDetail extends RecruitPost {
     meetingType: string;
     location: string;
     teamVibe: string;
+    feedbackStyle: string;
     leadershipStyle: string;
   };
   comments: PostComment[];
@@ -98,6 +99,7 @@ export interface ParticipationCard {
   meetingPreference: string;
   location: string;
   teamVibe: string;
+  feedbackStyle: string;
   leadership: string;
   appealTitle: string;
   appealContent: string;

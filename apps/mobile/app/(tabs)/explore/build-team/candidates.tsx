@@ -11,6 +11,8 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { Colors } from '../../../../src/constants/colors';
 import { dummyCandidates } from '../../../../src/data/candidates';
 import { Candidate } from '../../../../src/types/team';
+import { useInvitationStore } from '../../../../src/store/useInvitationStore';
+import { sendInvitation } from '../../../../src/services/invitationService';
 
 const leadershipSymbol = (style: string) => {
   if (style.includes('가능') || style.includes('리더')) return '○';
@@ -69,22 +71,26 @@ function CandidateCard({
       onPress={onDetail}
       activeOpacity={0.85}
     >
-      {/* Row 1 : 온도+아바타 | 이름·학교·어필제목 | 체크 원 */}
+      {/* Row 1 : 아바타(온도 pill 오버레이) | 이름·학교·어필제목 | 체크 원 */}
       <View style={styles.profileRow}>
-        {/* 온도 + 아바타 */}
-        <View style={styles.avatarCol}>
-          <Text style={styles.tempText}>{candidate.temperature}°C</Text>
-          <View style={[styles.avatar, selected && styles.avatarSelected]}>
-            <Text style={styles.avatarEmoji}>🐱</Text>
+        {/* 아바타 + 온도 pill 오버레이 */}
+        <View style={styles.avatarWrap}>
+          <View style={styles.avatar}>
+            <Text style={styles.avatarEmoji}>🧑‍💻</Text>
+          </View>
+          <View style={styles.tempPillWrap}>
+            <View style={styles.tempPill}>
+              <Text style={styles.tempText}>{candidate.temperature}°C</Text>
+            </View>
           </View>
         </View>
 
         {/* 이름 · 학교 · 어필글 제목 */}
         <View style={styles.profileInfo}>
-          <Text style={styles.nameText}>
-            {candidate.name}
+          <View style={styles.nameRow}>
+            <Text style={styles.nameText}>{candidate.name}</Text>
             <Text style={styles.genderText}> {candidate.gender}</Text>
-          </Text>
+          </View>
           <View style={styles.schoolRow}>
             <Text style={styles.schoolText}>{candidate.school}</Text>
             {candidate.isVerified && (
@@ -109,13 +115,11 @@ function CandidateCard({
         </TouchableOpacity>
       </View>
 
-      {/* Row 2 : 기술 스택(회색 pill, 좌) + 지역(주황 pill, 우) */}
+      {/* Row 2 : 회색 pill(기술) + 주황 pill(지역) — 같은 줄에 좌정렬 */}
       <View style={styles.tagsRow}>
-        <View style={styles.skillGroup}>
-          {candidate.skills.map((sk) => (
-            <GrayPill key={sk} label={sk} />
-          ))}
-        </View>
+        {candidate.skills.map((sk) => (
+          <GrayPill key={sk} label={sk} />
+        ))}
         <OrangePill label={`${candidate.meetingType}·${candidate.location}`} />
       </View>
 
@@ -134,11 +138,63 @@ export default function CandidatesScreen() {
   const insets = useSafeAreaInsets();
   const { contestId } = useLocalSearchParams<{ contestId: string }>();
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
+  const [isSending, setIsSending] = useState(false);
+  const { addInvitationMessages } = useInvitationStore();
 
   const toggleSelect = (id: number) =>
     setSelectedIds((prev) =>
       prev.includes(id) ? prev.filter((i) => i !== id) : [...prev, id]
     );
+
+  const handleSendInvitations = async () => {
+    if (selectedIds.length === 0 || isSending) return;
+    setIsSending(true);
+    try {
+      const now = new Date().toISOString();
+      await Promise.all(
+        selectedIds.map(async (cid, i) => {
+          const candidate = dummyCandidates.find((c) => c.id === cid);
+          if (!candidate) return;
+          const { chatRoomId: chatId } = await sendInvitation(1, candidate.id);
+          const baseId = Date.now() + i * 100;
+          addInvitationMessages(chatId, [
+            {
+              id: baseId,
+              senderId: 1,
+              senderName: '나',
+              senderAvatar: '👨‍💻',
+              content: `티밋님이 ${candidate.name}님을 팀에 초대하셨어요! 🎉`,
+              createdAt: now,
+              isSent: true,
+            },
+            {
+              id: baseId + 1,
+              senderId: 1,
+              senderName: '나',
+              senderAvatar: '👨‍💻',
+              content: '',
+              createdAt: now,
+              isSent: true,
+              invitationCard: {
+                title: '팀원을 모집합니다',
+                currentMembers: 3,
+                totalMembers: 5,
+                contestName: contestId ? `공모전 #${contestId}` : '공모전',
+                senderName: '나',
+                postId: 1,
+                invitationId: 1,
+              },
+            },
+          ]);
+        })
+      );
+      router.replace('/(tabs)/messages?initialTab=chats' as never);
+    } catch (e) {
+      console.error('[Candidates] 초대장 전송 실패:', e);
+    } finally {
+      setIsSending(false);
+    }
+  };
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
@@ -179,8 +235,8 @@ export default function CandidatesScreen() {
       {/* ─ 하단 버튼 ─ */}
       <View style={[styles.bottomBar, { paddingBottom: Math.max(insets.bottom, 16) }]}>
         <TouchableOpacity
-          style={[styles.inviteBtn, selectedIds.length === 0 && styles.inviteBtnDisabled]}
-          onPress={selectedIds.length > 0 ? () => router.replace('/(tabs)/messages' as never) : undefined}
+          style={[styles.inviteBtn, (selectedIds.length === 0 || isSending) && styles.inviteBtnDisabled]}
+          onPress={handleSendInvitations}
           activeOpacity={selectedIds.length > 0 ? 0.85 : 1}
         >
           <Text style={[styles.inviteBtnText, selectedIds.length === 0 && styles.inviteBtnTextDisabled]}>
@@ -249,7 +305,7 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     borderColor: Colors.lightGray,
     paddingHorizontal: 14,
-    paddingTop: 14,
+    paddingTop: 18,
     paddingBottom: 12,
     gap: 10,
   },
@@ -258,21 +314,41 @@ const styles = StyleSheet.create({
   /* Row 1 - 프로필 */
   profileRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
 
-  avatarCol: { alignItems: 'center', gap: 2 },
-  tempText: { fontSize: 12, fontWeight: '700', color: Colors.primary },
+  /* 아바타 + 온도 pill 오버레이 */
+  avatarWrap: {
+    position: 'relative',
+    width: 56,
+    height: 56,
+    marginTop: 4,
+  },
   avatar: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: Colors.pageBg,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: Colors.ogTint,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  avatarSelected: { backgroundColor: Colors.ogTint },
-  avatarEmoji: { fontSize: 24 },
+  avatarEmoji: { fontSize: 28 },
+  tempPillWrap: {
+    position: 'absolute',
+    top: -9,
+    left: 0,
+    right: 0,
+    alignItems: 'center',
+    zIndex: 1,
+  },
+  tempPill: {
+    backgroundColor: '#fef3c7',
+    borderRadius: 999,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+  },
+  tempText: { fontSize: 11, fontWeight: '700', color: '#947340' },
 
   profileInfo: { flex: 1, gap: 3 },
-  nameText: { fontSize: 15, fontWeight: '700', color: Colors.dark },
+  nameRow: { flexDirection: 'row', alignItems: 'baseline', flexWrap: 'wrap' },
+  nameText: { fontSize: 16, fontWeight: '700', color: Colors.dark },
   genderText: { fontSize: 12, fontWeight: '400', color: Colors.grayMedium },
 
   schoolRow: { flexDirection: 'row', alignItems: 'center', gap: 5 },
@@ -281,7 +357,7 @@ const styles = StyleSheet.create({
     width: 15,
     height: 15,
     borderRadius: 8,
-    backgroundColor: Colors.primary,   // ← 주황색
+    backgroundColor: Colors.primary,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -291,43 +367,27 @@ const styles = StyleSheet.create({
 
   /* 체크 원 */
   checkCircle: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
     borderWidth: 1.5,
     borderColor: Colors.grayLight,
     alignItems: 'center',
     justifyContent: 'center',
   },
   checkCircleOn: { backgroundColor: Colors.primary, borderColor: Colors.primary },
-  checkMarkOn: { fontSize: 12, color: '#fff', fontWeight: '700' },
-  checkMarkOff: { fontSize: 12, color: Colors.grayLight, fontWeight: '700' },
+  checkMarkOn: { fontSize: 14, color: '#fff', fontWeight: '700' },
+  checkMarkOff: { fontSize: 14, color: Colors.grayLight, fontWeight: '700' },
 
-  /* Row 2 - 스킬(회색 pill) + 지역(주황 pill) */
+  /* Row 2 - 회색 pill + 주황 pill 모두 좌정렬 */
   tagsRow: {
     flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
     flexWrap: 'wrap',
     gap: 6,
   },
-  skillGroup: { flexDirection: 'row', gap: 6, flexWrap: 'wrap' },
 
-  /* Row 3 - 주황 pill 정보 + 더보기 */
-  infoRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: 6,
-  },
-  infoPills: { flexDirection: 'row', gap: 6, flex: 1, flexWrap: 'wrap' },
-  moreBtn: {
-    backgroundColor: Colors.primary,
-    borderRadius: 20,
-    paddingHorizontal: 14,
-    paddingVertical: 6,
-  },
-  moreBtnText: { fontSize: 12, fontWeight: '700', color: '#fff' },
+  /* Row 3 - 주황 pill 정보 */
+  infoPills: { flexDirection: 'row', gap: 6, flexWrap: 'wrap' },
 
   /* 하단 */
   bottomBar: {

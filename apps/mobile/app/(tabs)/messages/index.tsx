@@ -18,6 +18,7 @@ import { getChatRooms } from '../../../src/services/messageService';
 import { getInvitations } from '../../../src/services/invitationService';
 import { ChatRoom } from '../../../src/types/message';
 import { Invitation } from '../../../src/types/invitation';
+import { useReadStore } from '../../../src/store/useReadStore';
 
 type Tab = 'chats' | 'invitations';
 
@@ -40,6 +41,7 @@ export default function MessagesScreen() {
   const [invitations, setInvitations] = useState<Invitation[]>([]);
   const [sections, setSections] = useState<SectionData[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const { readChats, markInvitationAsRead } = useReadStore();
 
   useFocusEffect(
     useCallback(() => {
@@ -82,6 +84,7 @@ export default function MessagesScreen() {
   };
 
   const handleInvitationPress = (invitation: Invitation) => {
+    markInvitationAsRead(invitation.invitationId);
     router.push(
       `/messages/invitation-detail/${invitation.invitationId}?postId=${invitation.postId}` as never,
     );
@@ -149,7 +152,10 @@ export default function MessagesScreen() {
             keyExtractor={(item) => item.id.toString()}
             renderItem={({ item, section }) =>
               section.data.length === 0 ? null : (
-                <ChatRoomItem chatRoom={item} onPress={() => handleChatPress(item.id)} />
+                <ChatRoomItem
+                  chatRoom={readChats[item.id] ? { ...item, unreadCount: 0 } : item}
+                  onPress={() => handleChatPress(item.id)}
+                />
               )
             }
             renderSectionHeader={({ section }) => (
@@ -199,7 +205,10 @@ export default function MessagesScreen() {
               data={invitations}
               keyExtractor={(item) => item.invitationId.toString()}
               renderItem={({ item }) => (
-                <InvitationCard invitation={item} onPress={() => handleInvitationPress(item)} />
+                <InvitationCard
+                  invitation={item}
+                  onPress={() => handleInvitationPress(item)}
+                />
               )}
               contentContainerStyle={styles.invitationListContent}
             />
@@ -225,7 +234,11 @@ function InvitationCard({
   onPress: () => void;
 }) {
   return (
-    <TouchableOpacity style={inviteStyles.card} onPress={onPress} activeOpacity={0.85}>
+    <TouchableOpacity
+      style={inviteStyles.card}
+      onPress={onPress}
+      activeOpacity={0.85}
+    >
       <View style={inviteStyles.topRow}>
         <View style={inviteStyles.avatarCircle}>
           <Text style={inviteStyles.avatarEmoji}>🏆</Text>

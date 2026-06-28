@@ -4,6 +4,16 @@ export interface User {
   avatar: string;
 }
 
+export interface InvitationCardData {
+  title: string;
+  currentMembers: number;
+  totalMembers: number;
+  contestName: string;
+  senderName: string;
+  postId?: number;
+  invitationId?: number;
+}
+
 export interface Message {
   id: number;
   senderId: number;
@@ -13,6 +23,7 @@ export interface Message {
   createdAt: string;
   isSent: boolean; // 현재 사용자가 보낸 메시지인지 여부
   isSystem?: boolean;
+  invitationCard?: InvitationCardData;
 }
 
 export interface ChatRoom {

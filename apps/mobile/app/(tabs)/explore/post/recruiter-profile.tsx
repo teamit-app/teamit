@@ -148,6 +148,9 @@ export default function RecruiterProfileScreen() {
           <InfoRow label="팀 분위기">
             <Text style={s.infoValue}>{recruiter.teamVibe || mock.teamVibe}</Text>
           </InfoRow>
+          <InfoRow label="피드백 방식">
+            <Text style={s.infoValue}>{recruiter.feedbackStyle || mock.feedbackStyle}</Text>
+          </InfoRow>
           <InfoRow label="리더십">
             <Text style={s.infoValue}>{recruiter.leadershipStyle || mock.leadershipStyle}</Text>
           </InfoRow>

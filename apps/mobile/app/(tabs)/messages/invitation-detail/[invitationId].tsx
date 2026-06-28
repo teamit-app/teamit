@@ -168,6 +168,9 @@ export default function InvitationDetailScreen() {
 
   const userPosts = useRecruitPostStore((s) => s.userPosts);
 
+  // TODO: API 연동 필요 — GET /posts/{postId}
+  // 현재는 dummyRecruitPostDetails 하드코딩에서 읽어옴.
+  // 실서버 연동 시 postService.getPost(pid) 같은 API 호출로 교체.
   const post =
     userPosts.find((p) => p.postId === pid) ??
     dummyRecruitPostDetails.find((p) => p.postId === pid) ??
@@ -176,6 +179,9 @@ export default function InvitationDetailScreen() {
   const [comments, setComments] = useState(post.comments);
   const visibleComments = comments.filter((c) => !!c.content);
 
+  // TODO: API 연동 필요 — POST /posts/{postId}/comments
+  // 현재는 setComments()로 로컬 상태만 업데이트. 앱 재시작 시 댓글이 사라짐.
+  // 실서버 연동 시 API 호출 후 응답으로 받은 댓글 ID로 로컬 상태를 업데이트.
   const handleSend = () => {
     const text = commentText.trim();
     if (!text) return;

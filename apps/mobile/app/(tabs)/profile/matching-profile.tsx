@@ -10,7 +10,7 @@ import {
   PanResponder,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { Colors } from '../../../src/constants/colors';
 import { ScreenHeader } from '../../../src/components/common/ScreenHeader';
 import { RegionPickerModal } from '../../../src/components/common/RegionPickerModal';
@@ -436,7 +436,17 @@ export default function MatchingProfileScreen() {
   const { matchingProfile, loadMatchingProfile, updateMatchingProfile } =
     useMypageStore();
 
-  const [step, setStep] = useState(1);
+  // URL params: mode=edit (단일 스텝 수정) | returnTo=participate|build-team | startStep | contestId
+  const { mode, startStep, returnTo, contestId: contestParam } =
+    useLocalSearchParams<{ mode?: string; startStep?: string; returnTo?: string; contestId?: string }>();
+
+  const isEditMode = mode === 'edit';
+  const totalSteps = returnTo === 'build-team' ? 6 : TOTAL_STEPS;
+  const initialStep = isEditMode
+    ? Math.min(Math.max(Number(startStep) || 1, 1), totalSteps)
+    : 1;
+
+  const [step, setStep] = useState(initialStep);
   const [saving, setSaving] = useState(false);
 
   // Step 1
@@ -487,6 +497,14 @@ export default function MatchingProfileScreen() {
     });
   }, []);
 
+  // edit mode: 탭 간 화면 재사용 시 URL params 변경을 step에 반영
+  useEffect(() => {
+    if (isEditMode) {
+      const s = Math.min(Math.max(Number(startStep) || 1, 1), totalSteps);
+      setStep(s);
+    }
+  }, [mode, startStep]);
+
   const toggleSkill = (skill: string) => {
     setSkills((prev) =>
       prev.includes(skill) ? prev.filter((s) => s !== skill) : [...prev, skill],
@@ -501,12 +519,30 @@ export default function MatchingProfileScreen() {
     ? ALL_SKILLS
     : (SKILL_CATEGORIES[skillCategory] ?? []);
 
-  const goNext = () => setStep((s) => Math.min(s + 1, TOTAL_STEPS));
+  const goNext = () => setStep((s) => Math.min(s + 1, totalSteps));
   const goPrev = () => {
-    if (step === 1) {
+    if (isEditMode) {
+      navigateAfterAction();
+    } else if (step === 1) {
       router.back();
     } else {
       setStep((s) => s - 1);
+    }
+  };
+
+  const navigateAfterAction = () => {
+    if (returnTo === 'participate') {
+      router.replace(`/explore/participate?contestId=${contestParam}` as never);
+    } else if (returnTo === 'build-team') {
+      router.replace(`/explore/build-team/${contestParam}` as never);
+    } else if (returnTo === 'mypage-card') {
+      if (isEditMode) {
+        router.back();
+      } else {
+        router.replace('/profile/matching-profile-card' as never);
+      }
+    } else {
+      router.back();
     }
   };
 
@@ -526,7 +562,7 @@ export default function MatchingProfileScreen() {
     };
     try {
       await updateMatchingProfile(data);
-      router.back();
+      navigateAfterAction();
     } catch {
       Alert.alert('오류', '저장에 실패했어요. 다시 시도해주세요.');
     } finally {
@@ -535,7 +571,7 @@ export default function MatchingProfileScreen() {
   };
 
   const handleSkip = () => {
-    router.back();
+    navigateAfterAction();
   };
 
   return (
@@ -870,38 +906,57 @@ export default function MatchingProfileScreen() {
         )}
         {/* ── 하단 버튼 ─────────────────────────────────── */}
         <View style={[styles.footer, { marginBottom: insets.bottom + 8 }]}>
-          {step === 1 && (
-            <TouchableOpacity style={styles.nextBtn} onPress={goNext}>
-              <Text style={styles.nextBtnText}>다음으로</Text>
-            </TouchableOpacity>
-          )}
-
-          {step >= 2 && step <= 6 && (
+          {isEditMode ? (
+            // 단일 스텝 수정 모드: 취소 + 저장
             <View style={styles.footerRow}>
-              <TouchableOpacity style={styles.prevBtn} onPress={goPrev}>
-                <Text style={styles.prevBtnText}>이전</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.nextBtn} onPress={goNext}>
-                <Text style={styles.nextBtnText}>다음으로</Text>
-              </TouchableOpacity>
-            </View>
-          )}
-
-          {step === 7 && (
-            <View style={styles.footerRow}>
-              <TouchableOpacity style={styles.prevBtn} onPress={handleSkip}>
-                <Text style={styles.prevBtnText}>건너뛰기</Text>
+              <TouchableOpacity style={styles.prevBtn} onPress={navigateAfterAction}>
+                <Text style={styles.prevBtnText}>취소</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={[styles.nextBtn, saving && styles.btnDisabled]}
                 onPress={handleSave}
                 disabled={saving}
               >
-                <Text style={styles.nextBtnText}>
-                  {saving ? '저장 중...' : '완료'}
-                </Text>
+                <Text style={styles.nextBtnText}>{saving ? '저장 중...' : '저장'}</Text>
               </TouchableOpacity>
             </View>
+          ) : (
+            <>
+              {step === 1 && (
+                <TouchableOpacity style={styles.nextBtn} onPress={goNext}>
+                  <Text style={styles.nextBtnText}>다음으로</Text>
+                </TouchableOpacity>
+              )}
+              {step >= 2 && step <= totalSteps - 1 && (
+                <View style={styles.footerRow}>
+                  <TouchableOpacity style={styles.prevBtn} onPress={goPrev}>
+                    <Text style={styles.prevBtnText}>이전</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity style={styles.nextBtn} onPress={goNext}>
+                    <Text style={styles.nextBtnText}>다음으로</Text>
+                  </TouchableOpacity>
+                </View>
+              )}
+              {step === totalSteps && (
+                <View style={styles.footerRow}>
+                  <TouchableOpacity
+                    style={styles.prevBtn}
+                    onPress={totalSteps === TOTAL_STEPS ? handleSkip : goPrev}
+                  >
+                    <Text style={styles.prevBtnText}>
+                      {totalSteps === TOTAL_STEPS ? '건너뛰기' : '이전'}
+                    </Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.nextBtn, saving && styles.btnDisabled]}
+                    onPress={handleSave}
+                    disabled={saving}
+                  >
+                    <Text style={styles.nextBtnText}>{saving ? '저장 중...' : '완료'}</Text>
+                  </TouchableOpacity>
+                </View>
+              )}
+            </>
           )}
         </View>
       </ScrollView>

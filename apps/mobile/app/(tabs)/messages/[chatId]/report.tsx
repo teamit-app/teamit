@@ -29,6 +29,9 @@ export default function ReportScreen() {
   const [selectedReason, setSelectedReason] = useState<string | null>(null);
   const [description, setDescription] = useState('');
 
+  // TODO: API 연동 필요 — POST /reports (또는 백엔드 확정 엔드포인트)
+  // 현재는 router.back()만 호출하며 실제 신고 내용이 서버로 전송되지 않음.
+  // 실서버 연동 시: await reportService.submitReport({ chatRoomId: chatId, reason: selectedReason, description })
   const handleSubmit = () => {
     router.back();
   };
