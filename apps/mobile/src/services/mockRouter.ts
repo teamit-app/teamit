@@ -1,4 +1,5 @@
 import { dummyContests } from '../data/contests';
+import { dummyContestDetails, dummyRecruitPosts, dummyRecruitPostDetails } from '../data/recruitmentPosts';
 import { dummyTalents } from '../data/talents';
 import { dummyNotifications } from '../data/notifications';
 import { dummyMatchingStatus } from '../data/matchingStatus';
@@ -164,12 +165,70 @@ const staticRoutes: Record<string, () => unknown> = {
 // ※ 순서 중요 — 더 구체적인 패턴이 앞에 와야 함
 
 const dynamicRoutes: Array<[RegExp, (path: string) => unknown]> = [
-  // GET /contests/:id
+  // GET /contests/:id — ContestDetailResponse 포맷
   [
     /^\/contests\/(\d+)$/,
     (path) => {
       const id = Number(path.split('/')[2]);
-      return dummyContests.find((c) => c.contestId === id) ?? null;
+      const detail = dummyContestDetails.find((d) => d.contestId === id);
+      if (!detail) return null;
+      return {
+        contestId: detail.contestId,
+        title: detail.title,
+        organizer: detail.organizer,
+        category: detail.category,
+        endDate: detail.endDate,
+        dDay: detail.dDay,
+        isNew: detail.isNew,
+        targetAudience: detail.targetAudience,
+        fields: detail.fields,
+        prizeScale: detail.prizeScale,
+        registrationPeriod: detail.registrationPeriod,
+        registrationUrl: detail.registrationUrl,
+      };
+    },
+  ],
+
+  // GET /contests/:id/posts
+  [
+    /^\/contests\/(\d+)\/posts$/,
+    (path) => {
+      const id = Number(path.split('/')[2]);
+      return dummyRecruitPosts.filter((p) => p.contestId === id);
+    },
+  ],
+
+  // GET /posts/:id — RecruitPostDetail 포맷 보장
+  [
+    /^\/posts\/(\d+)$/,
+    (path) => {
+      const id = Number(path.split('/')[2]);
+      const detail = dummyRecruitPostDetails.find((p) => p.postId === id);
+      if (detail) return detail;
+      const base = dummyRecruitPosts.find((p) => p.postId === id);
+      if (!base) return null;
+      // RecruitPost → RecruitPostDetail 기본값으로 채워서 반환
+      return {
+        ...base,
+        teamName: base.title + ' 팀',
+        contestName: '',
+        contestPeriod: '',
+        content: '',
+        members: [],
+        genderCondition: '상관없음',
+        schoolCondition: '상관없음',
+        recruiter: {
+          name: '모집자',
+          skills: [],
+          experienceCount: '',
+          intensity: base.intensity,
+          meetingType: base.meetingType,
+          location: base.location,
+          teamVibe: '',
+          leadershipStyle: '',
+        },
+        comments: [],
+      };
     },
   ],
 

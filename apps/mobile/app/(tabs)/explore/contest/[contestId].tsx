@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -6,6 +6,7 @@ import {
   TouchableOpacity,
   StyleSheet,
   Linking,
+  ActivityIndicator,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
@@ -13,9 +14,9 @@ import { Colors } from '../../../../src/constants/colors';
 import { ScreenHeader } from '../../../../src/components/common/ScreenHeader';
 import { SortBottomSheet } from '../../../../src/components/explore/SortBottomSheet';
 import { useExploreStore } from '../../../../src/store/useExploreStore';
-import { useRecruitPostStore } from '../../../../src/store/useRecruitPostStore';
-import { dummyContestDetails, dummyRecruitPosts } from '../../../../src/data/recruitmentPosts';
-import { SortOption, RecruitPost } from '../../../../src/types/contest';
+import { getContestById } from '../../../../src/services/contestService';
+import { getPostsByContest } from '../../../../src/services/postService';
+import { SortOption, RecruitPost, ContestDetail } from '../../../../src/types/contest';
 
 const SORT_LABEL: Record<SortOption, string> = {
   LATEST: '최신순',
@@ -24,8 +25,8 @@ const SORT_LABEL: Record<SortOption, string> = {
 };
 
 const normalizeMeetingType = (type: string) => {
-  if (type.includes('혼합')) return '온오프라인혼합';
-  if (type.includes('오프라인')) return '오프라인';
+  if (type === 'MIXED' || type.includes('혼합')) return '온오프라인혼합';
+  if (type === 'OFFLINE' || type.includes('오프라인')) return '오프라인';
   return '온라인';
 };
 
@@ -80,25 +81,42 @@ export default function ContestDetailScreen() {
   const { contestId } = useLocalSearchParams<{ contestId: string }>();
   const [sortVisible, setSortVisible] = useState(false);
   const [sortOption, setSortOption] = useState<SortOption>('LATEST');
+  const [detail, setDetail] = useState<ContestDetail | null>(null);
+  const [posts, setPosts] = useState<RecruitPost[]>([]);
+  const [loading, setLoading] = useState(true);
 
   const contests = useExploreStore((s) => s.contests);
   const toggleContestHeart = useExploreStore((s) => s.toggleContestHeart);
 
   const id = Number(contestId);
-  const storeContest = contests.find((c) => c.contestId === id);
-  const detail = dummyContestDetails.find((d) => d.contestId === id) ?? dummyContestDetails[0];
-  const isHearted = storeContest?.isHearted ?? detail.isHearted;
 
-  const userPosts = useRecruitPostStore((s) => s.userPosts);
-  const allPosts: RecruitPost[] = [
-    ...userPosts.filter((p) => p.contestId === id),
-    ...dummyRecruitPosts.filter((p) => p.contestId === id),
-  ];
-  const sortedPosts = [...allPosts].sort((a, b) => {
+  useEffect(() => {
+    Promise.all([getContestById(id), getPostsByContest(id)])
+      .then(([contestData, postsData]) => {
+        setDetail(contestData);
+        setPosts(postsData);
+      })
+      .catch(console.error)
+      .finally(() => setLoading(false));
+  }, [id]);
+
+  const storeContest = contests.find((c) => c.contestId === id);
+  const isHearted = storeContest?.isHearted ?? detail?.isHearted ?? false;
+
+  const sortedPosts = [...posts].sort((a, b) => {
     if (sortOption === 'POPULAR') return b.chatCount + b.likeCount - (a.chatCount + a.likeCount);
     if (sortOption === 'DEADLINE') return a.postId - b.postId;
     return b.postId - a.postId;
   });
+
+  if (loading || !detail) {
+    return (
+      <View style={[styles.container, { paddingTop: insets.top }]}>
+        <ScreenHeader title="공모전 세부 정보" onBack={() => router.back()} />
+        <ActivityIndicator style={{ flex: 1 }} color={Colors.primary} />
+      </View>
+    );
+  }
 
   const formattedEndDate = detail.endDate.replace(/-/g, '.');
 
