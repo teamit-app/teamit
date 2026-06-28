@@ -21,6 +21,8 @@ import {
   dummyContestRegistrations,
   dummyPostApplications,
   dummyReceivedApplicationPosts,
+  dummyPostApplicants,
+  dummyLikedPosts,
 } from '../data/mypage';
 
 // ─── 정적 라우트: 정확한 경로 일치 ───────────────────────────────────────────
@@ -138,6 +140,7 @@ const staticRoutes: Record<string, () => unknown> = {
   '/users/contest-registrations': () => dummyContestRegistrations,
   '/users/my-applications': () => dummyPostApplications,
   '/users/received-applications': () => dummyReceivedApplicationPosts,
+  '/users/liked-posts': () => dummyLikedPosts,
   '/users/careers/contests': () => ({
     careerItemId: Date.now(),
     careerType: 'CONTEST',
@@ -180,6 +183,12 @@ const dynamicRoutes: Array<[RegExp, (path: string) => unknown]> = [
 
   // DELETE /users/careers/{careerItemId}
   [/^\/users\/careers\/\d+$/, () => null],
+
+  // GET /users/posts/{postId}/applicants
+  [/^\/users\/posts\/\d+\/applicants$/, () => dummyPostApplicants],
+
+  // GET /users/posts/{postId}/candidates
+  [/^\/users\/posts\/\d+\/candidates$/, () => dummyPostApplicants.slice(0, 2)],
 
   // POST|GET /users/educations/{educationId}/verification
   [

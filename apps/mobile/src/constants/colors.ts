@@ -17,4 +17,11 @@ export const Colors = {
   backgroundWhite: '#FFFFFF',
   border:          '#E0E0E0',
   error:           '#D32F2F',
+
+  // ── 신규 컬러 (마이페이지 개편) ─────────────────────────────
+  tempBadgeBg:   '#FFFBD3',
+  tempBadgeText: '#DDA90D',
+  roleTagBg:     '#EFF0FF',
+  roleTagText:   '#5959CC',
+  segmentBg:     '#FFF3E0',
 } as const;

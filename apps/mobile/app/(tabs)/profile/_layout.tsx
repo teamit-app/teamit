@@ -16,6 +16,9 @@ export default function ProfileStackLayout() {
       <Stack.Screen name="add-contest" />
       <Stack.Screen name="add-certificate" />
       <Stack.Screen name="matching-profile" />
+      <Stack.Screen name="applicants" />
+      <Stack.Screen name="applicant-detail" />
+      <Stack.Screen name="likes" />
       <Stack.Screen name="post/[postId]" />
     </Stack>
   );

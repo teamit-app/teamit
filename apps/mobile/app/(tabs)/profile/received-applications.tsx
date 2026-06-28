@@ -5,52 +5,63 @@ import {
   ScrollView,
   TouchableOpacity,
   StyleSheet,
-  Alert,
+  Modal,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { Colors } from '../../../src/constants/colors';
 import { ScreenHeader } from '../../../src/components/common/ScreenHeader';
 import { getReceivedApplicationPosts } from '../../../src/services/mypageService';
-import { ReceivedApplicationPost, TalentPoolCandidate } from '../../../src/types/mypage';
-
-function CandidateRow({ candidate }: { candidate: TalentPoolCandidate }) {
-  return (
-    <View style={styles.candidateRow}>
-      <View style={styles.candidateAvatar}>
-        <Text style={styles.candidateAvatarText}>🧑‍💻</Text>
-      </View>
-      <View style={styles.candidateInfo}>
-        <Text style={styles.candidateName}>{candidate.nickname}</Text>
-        <Text style={styles.candidateSkills} numberOfLines={1}>
-          {candidate.skills.join(', ')}
-        </Text>
-        <Text style={styles.candidateStyle}>
-          {candidate.workStyle} · {candidate.intensity}
-        </Text>
-      </View>
-      <TouchableOpacity
-        style={styles.proposeBtn}
-        onPress={() =>
-          Alert.alert('제안하기', `${candidate.nickname}님께 제안을 보낼까요?`)
-        }
-      >
-        <Text style={styles.proposeBtnText}>제안하기</Text>
-      </TouchableOpacity>
-    </View>
-  );
-}
+import { ReceivedApplicationPost } from '../../../src/types/mypage';
 
 export default function ReceivedApplicationsScreen() {
   const insets = useSafeAreaInsets();
   const [posts, setPosts] = useState<ReceivedApplicationPost[]>([]);
   const [loading, setLoading] = useState(true);
+  const [selectedPost, setSelectedPost] = useState<ReceivedApplicationPost | null>(null);
+  const [modalVisible, setModalVisible] = useState(false);
 
   useEffect(() => {
     getReceivedApplicationPosts()
       .then(setPosts)
       .finally(() => setLoading(false));
   }, []);
+
+  const openModal = (post: ReceivedApplicationPost) => {
+    setSelectedPost(post);
+    setModalVisible(true);
+  };
+
+  const closeModal = () => {
+    setModalVisible(false);
+    setSelectedPost(null);
+  };
+
+  const handleGoToPost = () => {
+    if (!selectedPost) return;
+    closeModal();
+    router.push({
+      pathname: '/(tabs)/profile/post/[postId]',
+      params: {
+        postId: selectedPost.postId,
+        contestId: selectedPost.contestId,
+        fromMyPosts: 'true',
+      },
+    });
+  };
+
+  const handleGoToApplicants = () => {
+    if (!selectedPost) return;
+    closeModal();
+    router.push({
+      pathname: '/(tabs)/profile/applicants',
+      params: {
+        postId: selectedPost.postId,
+        postTitle: selectedPost.postTitle,
+        contestTitle: selectedPost.contestTitle,
+      },
+    });
+  };
 
   if (loading) {
     return (
@@ -88,47 +99,58 @@ export default function ReceivedApplicationsScreen() {
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 32 }}>
         {posts.map((post) => (
-          <View key={post.postId} style={styles.postCard}>
-            {/* 카드 헤더: 공모전명 + 수정 버튼 */}
-            <TouchableOpacity
-              style={styles.postHeader}
-              activeOpacity={0.7}
-              onPress={() =>
-                router.push({
-                  pathname: '/(tabs)/profile/post/[postId]',
-                  params: {
-                    postId: post.postId,
-                    contestId: post.contestId,
-                    fromMyPosts: 'true',
-                  },
-                })
-              }
-            >
-              <View style={styles.postHeaderLeft}>
-                <Text style={styles.postContest}>{post.contestTitle}</Text>
-                <Text style={styles.postTitle} numberOfLines={2}>{post.postTitle}</Text>
-                <Text style={styles.postMeta}>작성일: {post.createdAt}</Text>
+          <TouchableOpacity
+            key={post.postId}
+            style={styles.postCard}
+            activeOpacity={0.7}
+            onPress={() => openModal(post)}
+          >
+            <View style={styles.cardLeft}>
+              <Text style={styles.postContest}>{post.contestTitle}</Text>
+              <Text style={styles.postTitle} numberOfLines={2}>{post.postTitle}</Text>
+              <Text style={styles.postMeta}>작성일: {post.createdAt}</Text>
+            </View>
+            <View style={styles.cardRight}>
+              <View style={styles.applicantBadge}>
+                <Text style={styles.applicantBadgeText}>지원자 {post.applicantCount}명</Text>
               </View>
-              <View style={styles.postHeaderRight}>
-                <View style={styles.applicantBadge}>
-                  <Text style={styles.applicantBadgeText}>지원자 {post.applicantCount}명</Text>
-                </View>
+            </View>
+          </TouchableOpacity>
+        ))}
+      </ScrollView>
+
+      {/* 모집글 관리 옵션 모달 */}
+      <Modal
+        transparent
+        visible={modalVisible}
+        animationType="fade"
+        onRequestClose={closeModal}
+      >
+        <TouchableOpacity style={styles.overlay} activeOpacity={1} onPress={closeModal}>
+          <View style={styles.modalBox} onStartShouldSetResponder={() => true}>
+            <Text style={styles.modalTitle}>모집글 관리</Text>
+            <Text style={styles.modalSubtitle} numberOfLines={2}>{selectedPost?.postTitle}</Text>
+
+            <View style={styles.modalDivider} />
+
+            <TouchableOpacity style={styles.menuItem} onPress={handleGoToPost} activeOpacity={0.7}>
+              <Text style={styles.menuIcon}>📝</Text>
+              <View style={styles.menuTexts}>
+                <Text style={styles.menuItemTitle}>모집글 확인 및 수정하기</Text>
+                <Text style={styles.menuItemSub}>작성한 모집글의 내용 확인 및 수정</Text>
               </View>
             </TouchableOpacity>
 
-            <View style={styles.talentPoolSection}>
-              <Text style={styles.talentPoolTitle}>해당 공모전에 후보 등록한 인재풀</Text>
-              {post.talentPool.length === 0 ? (
-                <Text style={styles.noTalent}>인재풀에 등록된 후보가 없어요</Text>
-              ) : (
-                post.talentPool.map((candidate) => (
-                  <CandidateRow key={candidate.userId} candidate={candidate} />
-                ))
-              )}
-            </View>
+            <TouchableOpacity style={styles.menuItem} onPress={handleGoToApplicants} activeOpacity={0.7}>
+              <Text style={styles.menuIcon}>👥</Text>
+              <View style={styles.menuTexts}>
+                <Text style={styles.menuItemTitle}>지원자 및 후보자 확인하기</Text>
+                <Text style={styles.menuItemSub}>해당 모집글 지원자와 공모전 후보자 목록 확인</Text>
+              </View>
+            </TouchableOpacity>
           </View>
-        ))}
-      </ScrollView>
+        </TouchableOpacity>
+      </Modal>
     </View>
   );
 }
@@ -153,63 +175,63 @@ const styles = StyleSheet.create({
     marginHorizontal: 16,
     marginTop: 12,
     borderRadius: 12,
-    overflow: 'hidden',
-  },
-  postHeader: {
+    padding: 16,
     flexDirection: 'row',
     alignItems: 'flex-start',
-    padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.lightGray,
   },
-  postHeaderLeft: { flex: 1, marginRight: 10 },
-  postHeaderRight: { alignItems: 'flex-end', gap: 8 },
+  cardLeft: { flex: 1, marginRight: 10 },
+  cardRight: { alignItems: 'flex-end' },
   postContest: { fontSize: 12, color: Colors.gray, marginBottom: 4 },
   postTitle: { fontSize: 15, fontWeight: '700', color: Colors.dark, marginBottom: 4 },
   postMeta: { fontSize: 12, color: Colors.grayMedium },
   applicantBadge: {
-    backgroundColor: Colors.ogTint,
+    backgroundColor: '#ffedde',
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 10,
   },
-  applicantBadgeText: { fontSize: 12, fontWeight: '600', color: Colors.primary },
+  applicantBadgeText: { fontSize: 12, fontWeight: '600', color: '#ff6a1c' },
 
-  talentPoolSection: { padding: 16 },
-  talentPoolTitle: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: Colors.gray,
-    marginBottom: 8,
+  // 모달
+  overlay: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0,0,0,0.5)',
   },
-  noTalent: { fontSize: 13, color: Colors.grayMedium, textAlign: 'center', paddingVertical: 8 },
-
-  candidateRow: {
+  modalBox: {
+    width: 318,
+    borderRadius: 20,
+    backgroundColor: Colors.white,
+    paddingHorizontal: 20,
+    paddingTop: 22,
+    paddingBottom: 10,
+  },
+  modalTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: Colors.dark,
+    textAlign: 'center',
+  },
+  modalSubtitle: {
+    fontSize: 13,
+    color: Colors.gray,
+    textAlign: 'center',
+    marginTop: 4,
+  },
+  modalDivider: {
+    height: 1,
+    backgroundColor: Colors.lightGray,
+    marginVertical: 16,
+  },
+  menuItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 10,
-    borderTopWidth: 1,
-    borderTopColor: Colors.lightGray,
+    paddingVertical: 12,
+    gap: 12,
   },
-  candidateAvatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: Colors.pageBg,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 10,
-  },
-  candidateAvatarText: { fontSize: 20 },
-  candidateInfo: { flex: 1 },
-  candidateName: { fontSize: 14, fontWeight: '600', color: Colors.dark },
-  candidateSkills: { fontSize: 12, color: Colors.gray, marginTop: 2 },
-  candidateStyle: { fontSize: 12, color: Colors.grayMedium, marginTop: 1 },
-  proposeBtn: {
-    paddingHorizontal: 14,
-    paddingVertical: 7,
-    borderRadius: 8,
-    backgroundColor: Colors.primary,
-  },
-  proposeBtnText: { fontSize: 13, fontWeight: '600', color: Colors.white },
+  menuIcon: { fontSize: 20 },
+  menuTexts: { flex: 1 },
+  menuItemTitle: { fontSize: 14, fontWeight: '600', color: Colors.dark },
+  menuItemSub: { fontSize: 12, color: Colors.grayMedium, marginTop: 2 },
 });
