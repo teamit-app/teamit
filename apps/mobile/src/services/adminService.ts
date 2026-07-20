@@ -2,7 +2,7 @@ import { apiRequest } from './api';
 import { tokenStorage } from './tokenStorage';
 import { ContestCategory } from '../types/contest';
 
-const BASE_URL = process.env.EXPO_PUBLIC_API_URL ?? 'https://api.teamit.app/api/v1';
+const BASE_URL = process.env.EXPO_PUBLIC_API_URL ?? 'https://api.teamit.kr/api/v1';
 
 export interface PendingEducation {
   educationId: number;

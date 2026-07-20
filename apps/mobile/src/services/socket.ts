@@ -5,7 +5,7 @@ import { BackendNotification } from './notificationService';
 import { BackendChatMessage } from './messageService';
 
 const IS_MOCK = process.env.EXPO_PUBLIC_API_MODE === 'mock';
-const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL ?? 'https://api.teamit.app/api/v1';
+const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL ?? 'https://api.teamit.kr/api/v1';
 
 // API_BASE_URL은 "http(s)://host/api/v1" 형태 — 웹소켓 엔드포인트는 같은 호스트의
 // "ws(s)://host/ws"(REST와 별개 prefix, WebSocketConfig 참고)이므로 변환해서 사용한다
