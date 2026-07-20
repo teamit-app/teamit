@@ -12,11 +12,15 @@ public interface UserRepository extends JpaRepository<User, Long> {
 
     Optional<User> findByKakaoId(Long kakaoId);
 
+    Optional<User> findByNickname(String nickname);
+
     @Query(value = "SELECT DISTINCT u FROM User u " +
             "LEFT JOIN UserSkill us ON us.user = u " +
             "LEFT JOIN us.skill s " +
             "LEFT JOIN UserRegion r ON r.user = u " +
-            "WHERE (:skillId IS NULL OR us.skill.id = :skillId) " +
+            "WHERE u.name IS NOT NULL " +
+            "AND u.isMatchingActive = true " +
+            "AND (:skillId IS NULL OR us.skill.id = :skillId) " +
             "AND (:sido IS NULL OR r.sido = :sido) " +
             "AND (:keyword IS NULL OR " +
             "     LOWER(u.nickname) LIKE LOWER(CONCAT('%', :keyword, '%')) OR " +
@@ -26,7 +30,9 @@ public interface UserRepository extends JpaRepository<User, Long> {
             "LEFT JOIN UserSkill us ON us.user = u " +
             "LEFT JOIN us.skill s " +
             "LEFT JOIN UserRegion r ON r.user = u " +
-            "WHERE (:skillId IS NULL OR us.skill.id = :skillId) " +
+            "WHERE u.name IS NOT NULL " +
+            "AND u.isMatchingActive = true " +
+            "AND (:skillId IS NULL OR us.skill.id = :skillId) " +
             "AND (:sido IS NULL OR r.sido = :sido) " +
             "AND (:keyword IS NULL OR " +
             "     LOWER(u.nickname) LIKE LOWER(CONCAT('%', :keyword, '%')) OR " +

@@ -10,4 +10,6 @@ public interface UserRegionRepository extends JpaRepository<UserRegion, Long> {
     void deleteAllByUserId(Long userId);
 
     List<UserRegion> findAllByUserId(Long userId);
+
+    List<UserRegion> findAllByUserIdIn(List<Long> userIds);
 }

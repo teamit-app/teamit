@@ -9,5 +9,5 @@ import java.util.List;
 @Builder
 public class HeartedUserListResponse {
 
-    private List<HeartedUserResponse> content;
+    private List<UserPoolResponse> content;
 }
