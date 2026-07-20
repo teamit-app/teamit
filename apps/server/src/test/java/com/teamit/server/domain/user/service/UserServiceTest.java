@@ -13,9 +13,10 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.LocalDate;
 
+import java.util.Optional;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
 
 @ExtendWith(MockitoExtension.class)
@@ -30,24 +31,22 @@ class UserServiceTest {
     @Test
     void 기본정보_저장_성공() {
         // given
+        Long userId = 1L;
         OnboardingBasicRequest request = new OnboardingBasicRequest();
         request.setNickname("김티밋");
         request.setName("김민준");
         request.setGender(Gender.MALE);
         request.setBirthDate(LocalDate.of(2002, 5, 11));
 
-        User savedUser = User.builder()
-                .nickname("김티밋")
-                .name("김민준")
-                .gender(Gender.MALE)
-                .birthDate(LocalDate.of(2002, 5, 11))
+        User existingUser = User.builder()
+                .nickname("이전닉네임")
                 .isMatchingActive(false)
                 .build();
 
-        given(userRepository.save(any(User.class))).willReturn(savedUser);
+        given(userRepository.findById(userId)).willReturn(Optional.of(existingUser));
 
         // when
-        OnboardingBasicResponse response = userService.saveBasicInfo(request);
+        OnboardingBasicResponse response = userService.saveBasicInfo(userId, request);
 
         // then
         assertThat(response.getNickname()).isEqualTo("김티밋");
@@ -57,20 +56,20 @@ class UserServiceTest {
     }
 
     @Test
-    void 기본정보_저장_닉네임_null이면_예외() {
+    void 기본정보_저장_사용자_없으면_예외() {
         // given
+        Long userId = 1L;
         OnboardingBasicRequest request = new OnboardingBasicRequest();
-        request.setNickname(null);
+        request.setNickname("김티밋");
         request.setName("김민준");
         request.setGender(Gender.MALE);
         request.setBirthDate(LocalDate.of(2002, 5, 11));
 
-        given(userRepository.save(any(User.class)))
-                .willThrow(new IllegalArgumentException("닉네임은 필수입니다"));
+        given(userRepository.findById(userId)).willReturn(Optional.empty());
 
         // when & then
-        assertThatThrownBy(() -> userService.saveBasicInfo(request))
+        assertThatThrownBy(() -> userService.saveBasicInfo(userId, request))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessage("닉네임은 필수입니다");
+                .hasMessage("사용자를 찾을 수 없습니다");
     }
 }

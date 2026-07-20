@@ -1,7 +1,3 @@
-# 시드 데이터 (로컬 테스트용)
-seed.sql
-**/seed.sql
-
 # Spring Boot
 apps/server/.gradle/
 apps/server/build/
@@ -10,6 +6,10 @@ apps/server/out/
 apps/server/.idea/
 apps/server/src/main/resources/application-local.yml
 apps/server/src/main/resources/application-prod.yml
+apps/server/uploads/
+apps/server/*.log
+apps/server/hs_err_pid*.log
+apps/server/replay_pid*.log
 
 # React Native
 apps/mobile/node_modules/

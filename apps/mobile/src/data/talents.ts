@@ -7,6 +7,7 @@ export const dummyTalents: PoolUser[] = [
     gender: 'MALE',
     schoolName: '연세대학교',
     major: '컴퓨터공학',
+    status: 'ATTENDING',
     verified: true,
     skills: [
       { skillName: 'React', level: 3 },
@@ -22,6 +23,7 @@ export const dummyTalents: PoolUser[] = [
     gender: 'MALE',
     schoolName: '연세대학교',
     major: '경영학',
+    status: 'GRADUATED',
     verified: true,
     skills: [
       { skillName: '기획', level: 3 },
@@ -37,6 +39,7 @@ export const dummyTalents: PoolUser[] = [
     gender: 'FEMALE',
     schoolName: '홍익대학교',
     major: '시각디자인학',
+    status: 'ATTENDING',
     verified: false,
     skills: [
       { skillName: 'Figma', level: 3 },
@@ -52,6 +55,7 @@ export const dummyTalents: PoolUser[] = [
     gender: 'MALE',
     schoolName: '고려대학교',
     major: '산업공학',
+    status: 'GRADUATED',
     verified: true,
     skills: [
       { skillName: 'Python', level: 3 },
@@ -70,6 +74,7 @@ export const dummyTalentDetails: TalentDetail[] = [
     gender: 'MALE',
     schoolName: '연세대학교',
     major: '컴퓨터공학과',
+    status: 'ATTENDING',
     verified: true,
     skills: [
       { skillName: 'React', level: 3 },
@@ -80,14 +85,14 @@ export const dummyTalentDetails: TalentDetail[] = [
     isMatchingActive: true,
     isHearted: false,
     location: '서울 강남구',
-    temperature: 32,
+    averageRating: 4.2,
     appealTitle: '열정 넘치는 개발자!',
     appealContent:
       '안녕하세요! 백엔드 개발에 관심이 있는 김티밋입니다\n뽑아만 주신다면 열심히 참여하겠습니다🔥',
     skillsDisplay: ['React', 'TypeScript', 'Figma'],
-    contestExperienceDetail: '4회 이상 (경험을 바탕으로 결과를 만들고 싶어요)',
+    contestExperienceDetail: '4회 이상 · 수상 목적',
     intensityDetail: '적당히 (주 3~5시간)',
-    meetingPreference: '혼합 · 서울 강남구',
+    meetingPreference: '온오프라인 모두 가능 · 서울 강남구',
     teamVibeDetail: '성과 중심',
     feedbackStyleDetail: '부드러운 피드백',
     leadershipDetail: '필요하면 가능',
@@ -109,9 +114,9 @@ export const dummyTalentDetails: TalentDetail[] = [
       { text: '약속한 역할을 책임감 있게 해냈어요', count: 3 },
     ],
     teamReviews: [
-      { content: '소통이 빨라서 협업하기 편했어요.', reviewer: '국립중앙도서관 데이터 활용 공모전 참가자' },
-      { content: '책임감 있게 끝까지 함께해줬어요.',  reviewer: '2025 대학생 창업 아이디어 공모전 참가자' },
-      { content: '아이디어가 넘쳐서 팀에 활력을 줬어요.', reviewer: 'SW 해커톤 2025 팀 참가자' },
+      { content: '소통이 빨라서 협업하기 편했어요.', rating: 4.5 },
+      { content: '책임감 있게 끝까지 함께해줬어요.', rating: 5 },
+      { content: '아이디어가 넘쳐서 팀에 활력을 줬어요.', rating: 4 },
     ],
     recruitPosts: [
       {
@@ -138,6 +143,7 @@ export const dummyTalentDetails: TalentDetail[] = [
     gender: 'MALE',
     schoolName: '연세대학교',
     major: '경영학',
+    status: 'GRADUATED',
     verified: true,
     skills: [
       { skillName: '기획', level: 3 },
@@ -147,11 +153,11 @@ export const dummyTalentDetails: TalentDetail[] = [
     isMatchingActive: true,
     isHearted: false,
     location: '서울 마포구',
-    temperature: 28,
+    averageRating: 3.5,
     appealTitle: '꼼꼼한 기획자를 찾으신다면!',
     appealContent: '기획 경험 2년, 공모전 수상 경험 있습니다.\n완성도 높은 결과물을 목표로 합니다.',
     skillsDisplay: ['기획', 'PPT', 'Notion'],
-    contestExperienceDetail: '1~3회 (새로운 경험을 쌓고 싶어요)',
+    contestExperienceDetail: '1~3회 · 경험 목적',
     intensityDetail: '적당하게 (주 4~7시간)',
     meetingPreference: '온라인 위주',
     teamVibeDetail: '균형 중시',
@@ -172,7 +178,7 @@ export const dummyTalentDetails: TalentDetail[] = [
       { text: '소통이 빨라요',     count: 2 },
     ],
     teamReviews: [
-      { content: '기획력이 탁월해서 팀 방향을 잘 잡아줬어요.', reviewer: '2024 스타트업 아이디어 공모전 참가자' },
+      { content: '기획력이 탁월해서 팀 방향을 잘 잡아줬어요.', rating: 5 },
     ],
   },
   {
@@ -181,6 +187,7 @@ export const dummyTalentDetails: TalentDetail[] = [
     gender: 'FEMALE',
     schoolName: '홍익대학교',
     major: '시각디자인학',
+    status: 'ATTENDING',
     verified: false,
     skills: [
       { skillName: 'Figma', level: 3 },
@@ -190,13 +197,13 @@ export const dummyTalentDetails: TalentDetail[] = [
     isMatchingActive: true,
     isHearted: false,
     location: '서울 홍대입구',
-    temperature: 36,
+    averageRating: 4.5,
     appealTitle: '트렌드에 민감한 디자이너!',
     appealContent: '디자인으로 팀의 완성도를 높여드릴게요.\n포트폴리오 보유, 브랜드 디자인 특기.',
     skillsDisplay: ['Figma', 'Illustrator', 'Photoshop'],
-    contestExperienceDetail: '1~3회 (경험은 있지만 더 발전하고 싶어요)',
+    contestExperienceDetail: '1~3회 · 경험 목적',
     intensityDetail: '가볍게 (주 1~3시간)',
-    meetingPreference: '혼합형',
+    meetingPreference: '온오프라인 모두 가능',
     teamVibeDetail: '팀 분위기 우선',
     feedbackStyleDetail: '부드럽게',
     leadershipDetail: '리더는 안 하고 싶어요',
@@ -217,7 +224,7 @@ export const dummyTalentDetails: TalentDetail[] = [
       { text: '꼼꼼하게 작업해요', count: 3 },
     ],
     teamReviews: [
-      { content: '디자인 감각이 탁월해서 결과물이 빛났어요.', reviewer: '2024 브랜드 디자인 공모전 참가자' },
+      { content: '디자인 감각이 탁월해서 결과물이 빛났어요.', rating: 5 },
     ],
   },
   {
@@ -226,6 +233,7 @@ export const dummyTalentDetails: TalentDetail[] = [
     gender: 'MALE',
     schoolName: '고려대학교',
     major: '산업공학',
+    status: 'GRADUATED',
     verified: true,
     skills: [
       { skillName: 'Python', level: 3 },
@@ -235,11 +243,11 @@ export const dummyTalentDetails: TalentDetail[] = [
     isMatchingActive: false,
     isHearted: false,
     location: '경기 성남시',
-    temperature: 24,
+    averageRating: 3.0,
     appealTitle: '데이터로 결과를 만드는 분석가',
     appealContent: 'Python과 데이터 분석으로 팀에 기여할 수 있습니다.\n꼼꼼하고 책임감 있게 임합니다.',
     skillsDisplay: ['Python', '데이터분석', 'SQL'],
-    contestExperienceDetail: '1~3회 (경험은 있지만 더 발전하고 싶어요)',
+    contestExperienceDetail: '1~3회 · 경험 목적',
     intensityDetail: '적당하게 (주 4~7시간)',
     meetingPreference: '온라인 위주',
     teamVibeDetail: '결과 우선',

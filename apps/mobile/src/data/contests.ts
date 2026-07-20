@@ -12,6 +12,7 @@ export const dummyContests: Contest[] = [
     dDay: 94,
     isNew: true,
     isHearted: true,
+    isRegisteredAsParticipant: false,
   },
   {
     contestId: 2,
@@ -24,6 +25,7 @@ export const dummyContests: Contest[] = [
     dDay: 3,
     isNew: false,
     isHearted: true,
+    isRegisteredAsParticipant: false,
   },
   {
     contestId: 3,
@@ -36,6 +38,7 @@ export const dummyContests: Contest[] = [
     dDay: 30,
     isNew: false,
     isHearted: false,
+    isRegisteredAsParticipant: false,
   },
   {
     contestId: 4,
@@ -48,6 +51,7 @@ export const dummyContests: Contest[] = [
     dDay: 5,
     isNew: false,
     isHearted: false,
+    isRegisteredAsParticipant: false,
   },
   {
     contestId: 5,
@@ -60,6 +64,7 @@ export const dummyContests: Contest[] = [
     dDay: 60,
     isNew: true,
     isHearted: false,
+    isRegisteredAsParticipant: false,
   },
   {
     contestId: 6,
@@ -72,5 +77,6 @@ export const dummyContests: Contest[] = [
     dDay: 2,
     isNew: false,
     isHearted: false,
+    isRegisteredAsParticipant: false,
   },
 ];

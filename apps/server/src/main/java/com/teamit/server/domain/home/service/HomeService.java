@@ -15,10 +15,10 @@ public class HomeService {
     @Transactional(readOnly = true)
     public MatchingStatusResponse getMatchingStatus(Long userId) {
         long receivedInvitationCount = homeRepository.countPendingInvitations(userId);
-        long appliedTeamCount = homeRepository.countApplications(userId);
+        long myPostApplicantCount = homeRepository.countApplicantsToMyPosts(userId);
         return MatchingStatusResponse.builder()
                 .receivedInvitationCount(receivedInvitationCount)
-                .appliedTeamCount(appliedTeamCount)
+                .myPostApplicantCount(myPostApplicantCount)
                 .build();
     }
 }

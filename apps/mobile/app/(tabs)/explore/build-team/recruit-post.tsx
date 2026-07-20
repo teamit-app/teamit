@@ -13,7 +13,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
 import { Colors } from '../../../../src/constants/colors';
 import { useBuildTeamStore } from '../../../../src/store/useBuildTeamStore';
-import { dummyRecruitPostDetails } from '../../../../src/data/recruitmentPosts';
+import { getPostDetail, updatePost } from '../../../../src/services/postService';
 
 const TOTAL_STEPS = 5;
 const CURRENT_STEP = 4;
@@ -38,20 +38,37 @@ const GUIDE_ITEMS = [
 
 export default function RecruitPostScreen() {
   const insets = useSafeAreaInsets();
-  const { contestId, editPostId } = useLocalSearchParams<{ contestId: string; editPostId?: string }>();
+  const { contestId, editPostId, sourceTab, returnToConfirm, fullEdit } = useLocalSearchParams<{
+    contestId: string;
+    editPostId?: string;
+    sourceTab?: string;
+    returnToConfirm?: string;
+    fullEdit?: string;
+  }>();
   const isEditMode = !!editPostId;
+  // 팀원이 아직 없어서 위저드 전체(모집인원·기술·조건)를 거쳐 들어온 경우에만 true.
+  // 팀원이 있으면 [postId].tsx가 이 화면으로 곧장 보내며 이 값을 안 실어 보낸다
+  const isFullEdit = isEditMode && fullEdit === 'true';
   const postTitle = useBuildTeamStore((s) => s.postTitle);
   const postContent = useBuildTeamStore((s) => s.postContent);
   const setPostTitle = useBuildTeamStore((s) => s.setPostTitle);
   const setPostContent = useBuildTeamStore((s) => s.setPostContent);
+  const recruitCount = useBuildTeamStore((s) => s.recruitCount);
+  const requiredSkills = useBuildTeamStore((s) => s.requiredSkills);
+  const genderCondition = useBuildTeamStore((s) => s.genderCondition);
+  const schoolCondition = useBuildTeamStore((s) => s.schoolCondition);
+  const meetingType = useBuildTeamStore((s) => s.meetingType);
+  const experienceCondition = useBuildTeamStore((s) => s.experienceCondition);
+  const purposeCondition = useBuildTeamStore((s) => s.purposeCondition);
 
   useEffect(() => {
     if (editPostId) {
-      const existing = dummyRecruitPostDetails.find((p) => p.postId === Number(editPostId));
-      if (existing) {
-        setPostTitle(existing.title);
-        setPostContent(existing.content);
-      }
+      getPostDetail(Number(editPostId))
+        .then((d) => {
+          setPostTitle(d.title);
+          setPostContent(d.description ?? '');
+        })
+        .catch(() => {});
     }
   }, [editPostId]);
 
@@ -76,6 +93,14 @@ export default function RecruitPostScreen() {
 
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <Text style={styles.pageTitle}>모집 공고를 어필할 모집글을 작성해요</Text>
+
+        {isEditMode && !isFullEdit && (
+          <View style={styles.lockedNotice}>
+            <Text style={styles.lockedNoticeText}>
+              이미 합류한 팀원이 있어서 어필글만 수정할 수 있어요. 모집 인원·필요 기술·참여 조건은 바꿀 수 없어요.
+            </Text>
+          </View>
+        )}
 
         {/* 제목 입력 */}
         <View style={styles.inputSection}>
@@ -136,7 +161,30 @@ export default function RecruitPostScreen() {
           onPress={() => {
             if (!canSubmit) return;
             if (isEditMode) {
-              router.back();
+              const tab = sourceTab ?? 'explore';
+              const payload = isFullEdit
+                ? {
+                    title: postTitle,
+                    description: postContent,
+                    recruitCount,
+                    onlineOffline: meetingType === '온라인' ? 'ONLINE' : meetingType === '오프라인' ? 'OFFLINE' : 'MIXED',
+                    genderCondition: genderCondition === '동성만' ? 'SAME' : 'ANY',
+                    schoolCondition: schoolCondition === '학교 상관없음' ? 'ANY' : 'SAME_SCHOOL',
+                    experienceCondition,
+                    purposeCondition,
+                    requiredSkills: requiredSkills.map((name) => ({ skillId: null, skillNameCustom: name })),
+                  }
+                : { title: postTitle, description: postContent };
+              updatePost(Number(editPostId), payload)
+                .finally(() => {
+                  router.replace({
+                    pathname: `/(tabs)/${tab}/post/[postId]` as any,
+                    params: { postId: editPostId, contestId },
+                  });
+                });
+            } else if (returnToConfirm === 'true') {
+              // confirm → push로 들어온 수정 화면이므로 되돌아갈 땐 replace (사유: recruit-count.tsx 참고)
+              router.replace(`/explore/build-team/recruit-confirm?contestId=${contestId}` as never);
             } else {
               router.push(`/explore/build-team/recruit-confirm?contestId=${contestId}` as never);
             }
@@ -185,6 +233,15 @@ const styles = StyleSheet.create({
   // 본문
   content: { paddingHorizontal: 20, paddingTop: 28, paddingBottom: 32 },
   pageTitle: { fontSize: 20, fontWeight: '700', color: Colors.dark, marginBottom: 24 },
+
+  lockedNotice: {
+    backgroundColor: Colors.pageBg,
+    borderRadius: 12,
+    padding: 14,
+    marginBottom: 20,
+    marginTop: -12,
+  },
+  lockedNoticeText: { fontSize: 13, color: Colors.grayMedium, lineHeight: 19 },
 
   // 입력 섹션
   inputSection: { marginBottom: 20 },

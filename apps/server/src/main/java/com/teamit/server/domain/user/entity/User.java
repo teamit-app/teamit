@@ -62,4 +62,14 @@ public class User extends BaseTimeEntity {
         this.gender = gender;
         this.birthDate = birthDate;
     }
+
+    /** 매칭 활성화 상태 변경 */
+    public void setMatchingActive(boolean isMatchingActive) {
+        this.isMatchingActive = isMatchingActive;
+    }
+
+    /** 프로필 사진 등록/변경 */
+    public void updateProfileImage(String profileImageUrl) {
+        this.profileImageUrl = profileImageUrl;
+    }
 }

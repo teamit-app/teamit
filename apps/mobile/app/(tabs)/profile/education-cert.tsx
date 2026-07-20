@@ -4,13 +4,15 @@ import {
   Text,
   TouchableOpacity,
   StyleSheet,
-  Alert,
   ScrollView,
   ActionSheetIOS,
   Platform,
+  Image,
+  Modal,
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import * as DocumentPicker from 'expo-document-picker';
+import { Alert } from '../../../src/utils/alert';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { Colors } from '../../../src/constants/colors';
@@ -48,6 +50,17 @@ const CHECKLIST_ITEMS = [
   '발급일이 3개월 이내예요',
 ];
 
+// fileName이 없을 때(권한 제한 등) mimeType으로 확장자를 유추하는 최후 수단
+function extensionFromMimeType(mimeType?: string): string {
+  switch (mimeType) {
+    case 'image/png': return 'png';
+    case 'image/heic': return 'heic';
+    case 'image/webp': return 'webp';
+    case 'image/jpeg':
+    default: return 'jpg';
+  }
+}
+
 // ──────────────────────────────────────────────────
 // ProgressDots
 // ──────────────────────────────────────────────────
@@ -80,12 +93,16 @@ export default function EducationCertScreen() {
   const [step, setStep] = useState<Step>(1);
   const [docType, setDocType] = useState<DocType>('ENROLLMENT_CERT');
   const [fileName, setFileName] = useState('');
+  const [fileUri, setFileUri] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [fileChooserVisible, setFileChooserVisible] = useState(false);
+
+  const isImageFile = /\.(jpe?g|png|heic|webp)$/i.test(fileName);
 
   // Step 2 체크리스트 상태
   const [checklist, setChecklist] = useState([false, false, false]);
 
-  const educationId = profile?.education?.educationId ?? 1;
+  const educationId = profile?.education?.educationId;
 
   const toggleCheck = (idx: number) => {
     setChecklist((prev) => prev.map((v, i) => (i === idx ? !v : v)));
@@ -103,8 +120,11 @@ export default function EducationCertScreen() {
       allowsEditing: false,
     });
     if (!result.canceled && result.assets[0]) {
-      const uri = result.assets[0].uri;
-      setFileName(uri.split('/').pop() ?? '선택된_이미지.jpg');
+      const asset = result.assets[0];
+      // 웹에서는 uri가 data:/blob: 형태라 uri에서 파일명을 유추할 수 없다 —
+      // 피커가 제공하는 fileName/mimeType을 우선 사용해야 확장자가 정확히 남는다.
+      setFileName(asset.fileName ?? `선택된_이미지.${extensionFromMimeType(asset.mimeType)}`);
+      setFileUri(asset.uri);
     }
   };
 
@@ -115,6 +135,7 @@ export default function EducationCertScreen() {
     });
     if (!result.canceled && result.assets[0]) {
       setFileName(result.assets[0].name);
+      setFileUri(result.assets[0].uri);
     }
   };
 
@@ -130,6 +151,9 @@ export default function EducationCertScreen() {
           if (buttonIndex === 2) pickFromFiles();
         }
       );
+    } else if (Platform.OS === 'web') {
+      // web에서는 window.confirm이 3지선다를 표현할 수 없어 작은 모달로 대체
+      setFileChooserVisible(true);
     } else {
       Alert.alert('파일 첨부', '첨부 방법을 선택해주세요', [
         { text: '취소', style: 'cancel' },
@@ -144,9 +168,14 @@ export default function EducationCertScreen() {
       Alert.alert('알림', '파일을 선택해주세요.');
       return;
     }
+    if (!educationId) {
+      Alert.alert('알림', '먼저 학교 정보를 저장해주세요.');
+      router.back();
+      return;
+    }
     setSubmitting(true);
     try {
-      await submitEducationCert(educationId, { docType, fileName });
+      await submitEducationCert(educationId, { docType, fileUri, fileName });
       await reloadProfile();
       setStep(3);
     } catch {
@@ -233,13 +262,17 @@ export default function EducationCertScreen() {
               {/* 점선 박스 — 파일 카드 + 변경 버튼 */}
               <View style={styles.uploadArea}>
                 <View style={styles.fileSelectedCard}>
-                  <Text style={styles.fileSelectedIcon}>📄</Text>
+                  {isImageFile && fileUri ? (
+                    <Image source={{ uri: fileUri }} style={styles.fileSelectedThumb} />
+                  ) : (
+                    <Text style={styles.fileSelectedIcon}>📄</Text>
+                  )}
                   <View style={styles.fileSelectedInfo}>
                     <Text style={styles.fileSelectedName} numberOfLines={2}>{fileName}</Text>
                     <Text style={styles.fileSelectedType}>{docType === 'STUDENT_ID' ? '학생증' : '재학증명서'}</Text>
                   </View>
                   <TouchableOpacity
-                    onPress={() => setFileName('')}
+                    onPress={() => { setFileName(''); setFileUri(''); }}
                     style={styles.fileRemoveBtn}
                     hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                   >
@@ -270,6 +303,42 @@ export default function EducationCertScreen() {
             </View>
           )}
         </ScrollView>
+
+        {/* 웹 전용 파일 첨부 선택 모달 (ActionSheetIOS/Alert 3지선다를 web에서 대체) */}
+        <Modal
+          visible={fileChooserVisible}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setFileChooserVisible(false)}
+        >
+          <TouchableOpacity
+            style={fileChooserStyles.overlay}
+            activeOpacity={1}
+            onPress={() => setFileChooserVisible(false)}
+          >
+            <View style={fileChooserStyles.box}>
+              <Text style={fileChooserStyles.title}>첨부 방법을 선택해주세요</Text>
+              <TouchableOpacity
+                style={fileChooserStyles.option}
+                onPress={() => { setFileChooserVisible(false); pickFromAlbum(); }}
+              >
+                <Text style={fileChooserStyles.optionText}>앨범에서 선택</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={fileChooserStyles.option}
+                onPress={() => { setFileChooserVisible(false); pickFromFiles(); }}
+              >
+                <Text style={fileChooserStyles.optionText}>파일에서 선택</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={fileChooserStyles.cancelOption}
+                onPress={() => setFileChooserVisible(false)}
+              >
+                <Text style={fileChooserStyles.cancelText}>취소</Text>
+              </TouchableOpacity>
+            </View>
+          </TouchableOpacity>
+        </Modal>
       </View>
     );
   }
@@ -300,14 +369,22 @@ export default function EducationCertScreen() {
             </Text>
           </View>
 
-          {/* 파일 카드 */}
-          <View style={styles.fileCard}>
-            <Text style={styles.fileCardIcon}>📄</Text>
-            <View style={styles.fileCardInfo}>
-              <Text style={styles.fileCardName}>{fileName}</Text>
-              <Text style={styles.fileCardSize}>2.3MB · JPG</Text>
+          {/* 파일 미리보기 */}
+          {isImageFile && fileUri ? (
+            <View style={styles.filePreviewCard}>
+              <Image source={{ uri: fileUri }} style={styles.filePreviewImage} resizeMode="contain" />
+              <View style={styles.filePreviewInfoRow}>
+                <Text style={styles.fileCardName} numberOfLines={1}>{fileName}</Text>
+              </View>
             </View>
-          </View>
+          ) : (
+            <View style={styles.fileCard}>
+              <Text style={styles.fileCardIcon}>📄</Text>
+              <View style={styles.fileCardInfo}>
+                <Text style={styles.fileCardName}>{fileName}</Text>
+              </View>
+            </View>
+          )}
 
           {/* 체크리스트 */}
           <View style={styles.checklistCard}>
@@ -623,6 +700,12 @@ const styles = StyleSheet.create({
   fileSelectedIcon: {
     fontSize: 32,
   },
+  fileSelectedThumb: {
+    width: 44,
+    height: 44,
+    borderRadius: 8,
+    backgroundColor: Colors.pageBg,
+  },
   fileSelectedInfo: {
     flex: 1,
   },
@@ -711,9 +794,24 @@ const styles = StyleSheet.create({
     color: Colors.dark,
     marginBottom: 4,
   },
-  fileCardSize: {
-    fontSize: 13,
-    color: Colors.grayMedium,
+
+  // ── 파일 미리보기 (Step 2, 이미지) ──
+  filePreviewCard: {
+    marginHorizontal: 16,
+    marginTop: 8,
+    borderRadius: 12,
+    backgroundColor: Colors.white,
+    borderWidth: 1,
+    borderColor: Colors.lightGray,
+    overflow: 'hidden',
+  },
+  filePreviewImage: {
+    width: '100%',
+    height: 320,
+    backgroundColor: Colors.pageBg,
+  },
+  filePreviewInfoRow: {
+    padding: 14,
   },
 
   // ── 체크리스트 (Step 2) ──
@@ -780,10 +878,9 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   completeCenter: {
-    flex: 1,
     alignItems: 'center',
-    justifyContent: 'center',
     paddingHorizontal: 24,
+    paddingTop: 32,
     paddingBottom: 24,
   },
   completeIcon: {
@@ -875,5 +972,50 @@ const styles = StyleSheet.create({
     fontSize: 15,
     color: Colors.gray,
     fontWeight: '500',
+  },
+});
+
+const fileChooserStyles = StyleSheet.create({
+  overlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.45)',
+    justifyContent: 'flex-end',
+  },
+  box: {
+    backgroundColor: Colors.white,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    paddingHorizontal: 20,
+    paddingTop: 20,
+    paddingBottom: 32,
+  },
+  title: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: Colors.gray,
+    textAlign: 'center',
+    marginBottom: 12,
+  },
+  option: {
+    paddingVertical: 16,
+    borderTopWidth: 1,
+    borderTopColor: '#F0F0F0',
+    alignItems: 'center',
+  },
+  optionText: {
+    fontSize: 16,
+    color: Colors.dark,
+  },
+  cancelOption: {
+    marginTop: 8,
+    paddingVertical: 16,
+    borderRadius: 12,
+    backgroundColor: Colors.pageBg,
+    alignItems: 'center',
+  },
+  cancelText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: Colors.gray,
   },
 });

@@ -51,6 +51,9 @@ function DrumColumn({ items, initialIndex, onChange }: DrumColumnProps) {
         snapToInterval={ITEM_HEIGHT}
         decelerationRate={Platform.OS === 'ios' ? 'fast' : 0.98}
         onMomentumScrollEnd={handleScrollEnd}
+        // react-native-web은 터치 모멘텀 개념이 없어 onMomentumScrollEnd를 호출하지 않고
+        // 스크롤이 멈췄을 때도 onScroll만 재호출하므로, 웹에서는 onScroll로 선택값을 갱신한다.
+        onScroll={Platform.OS === 'web' ? handleScrollEnd : undefined}
         contentContainerStyle={{ paddingVertical: ITEM_HEIGHT * CENTER_IDX }}
         scrollEventThrottle={16}
         bounces={false}
@@ -133,7 +136,8 @@ interface DrumRollPickerProps {
   onCancel: () => void;
 }
 
-const YEARS = Array.from({ length: 41 }, (_, i) => `${1980 + i}년`);
+const CURRENT_YEAR = new Date().getFullYear();
+const YEARS = Array.from({ length: CURRENT_YEAR - 1980 + 1 }, (_, i) => `${1980 + i}년`);
 const MONTHS = Array.from({ length: 12 }, (_, i) => `${i + 1}월`);
 const DAYS = Array.from({ length: 31 }, (_, i) => `${i + 1}일`);
 

@@ -1,24 +1,37 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
   ScrollView,
   TouchableOpacity,
   StyleSheet,
+  ActivityIndicator,
+  Image,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { router, useLocalSearchParams } from 'expo-router';
+import { router, useLocalSearchParams, useSegments } from 'expo-router';
 import { Colors } from '../../../../src/constants/colors';
-import { dummyTalentDetails } from '../../../../src/data/talents';
+import { EDUCATION_STATUS_LABEL } from '../../../../src/constants/education';
 import { getOrCreateDirectChatRoom } from '../../../../src/services/messageService';
-import { TalentRecruitPost } from '../../../../src/types/talent';
+import { getUserDetail } from '../../../../src/services/talentService';
+import { useAuthStore } from '../../../../src/store/useAuthStore';
+import { useExploreStore } from '../../../../src/store/useExploreStore';
+import { TalentDetail, TalentRecruitPost } from '../../../../src/types/talent';
+import { ReviewStatsCard } from '../../../../src/components/profile/ReviewStatsCard';
+import { requireAuthForChat } from '../../../../src/utils/authGuard';
+import { resolveImageUrl } from '../../../../src/utils/imageUrl';
+
+const IS_MOCK = process.env.EXPO_PUBLIC_API_MODE === 'mock';
 
 const GENDER_LABEL: Record<string, string> = { MALE: '남성', FEMALE: '여성' };
-const KEYWORD_SHOW = 4;
 
 // ── 소섹션 타이틀 ──────────────────────────────────────────────────────────────
 function SectionTitle({ title }: { title: string }) {
-  return <Text style={s.sectionTitle}>{title}</Text>;
+  return (
+    <View style={s.sectionTitleWrap}>
+      <Text style={s.sectionTitle}>{title}</Text>
+    </View>
+  );
 }
 
 // ── 참여 정보 행 ───────────────────────────────────────────────────────────────
@@ -39,44 +52,23 @@ function InfoRow({
   );
 }
 
-// ── 온도 진행 바 ───────────────────────────────────────────────────────────────
-function TempBar({ value, max = 40 }: { value: number; max?: number }) {
-  return (
-    <View style={s.barWrap}>
-      <View style={s.barTrack}>
-        <View style={[s.barFill, { width: `${(value / max) * 100}%` as any }]} />
-      </View>
-      <View style={s.barScale}>
-        <Text style={s.barScaleText}>0</Text>
-        <Text style={s.barScaleText}>{max}</Text>
-      </View>
-    </View>
-  );
-}
-
-// ── 통계 행 ───────────────────────────────────────────────────────────────────
-function StatRow({ label, value }: { label: string; value: string }) {
-  return (
-    <View style={s.statRow}>
-      <Text style={s.statLabel}>{label}</Text>
-      <Text style={s.statValue}>{value}</Text>
-    </View>
-  );
-}
-
 // ── 모집글 카드 ───────────────────────────────────────────────────────────────
 function RecruitPostCard({ post }: { post: TalentRecruitPost }) {
+  // profile/messages 탭에 alias된 화면에서도 쓰이므로 explore를 하드코딩하지 않는다
+  const segments = useSegments();
+  const sourceTab = (segments[1] as string) ?? 'explore';
+
   return (
     <TouchableOpacity
       style={s.recruitCard}
       activeOpacity={0.85}
       onPress={() =>
-        router.push(`/explore/post/${post.postId}` as never)
+        router.push(`/${sourceTab}/post/${post.postId}?contestId=${post.contestId}` as never)
       }
     >
       <View style={s.recruitTopRow}>
         <Text style={s.recruitViews}>조회 {post.views}</Text>
-        <Text style={s.recruitDate}>{post.createdAt}</Text>
+        <Text style={s.recruitDate}>{post.createdAt.replace(/-/g, '.')}</Text>
       </View>
       <Text style={s.recruitTitle}>{post.title}</Text>
       <View style={s.pillRow}>
@@ -87,14 +79,14 @@ function RecruitPostCard({ post }: { post: TalentRecruitPost }) {
         ))}
       </View>
       <View style={s.recruitMetaRow}>
-        <Text style={s.recruitMeta}>{post.experienceCondition}</Text>
-        <Text style={s.recruitMetaDot}> · </Text>
-        <Text style={s.recruitMeta}>
-          {post.meetingType}
-          {post.location ? ` ${post.location}` : ''}
-        </Text>
-        <Text style={s.recruitMetaDot}> · </Text>
-        <Text style={s.recruitMeta}>{post.intensity}</Text>
+        {[post.experienceCondition, [post.meetingType, post.location].filter(Boolean).join(' '), post.intensity]
+          .filter(Boolean)
+          .map((part, i) => (
+            <React.Fragment key={i}>
+              {i > 0 && <Text style={s.recruitMetaDot}> · </Text>}
+              <Text style={s.recruitMeta}>{part}</Text>
+            </React.Fragment>
+          ))}
       </View>
       <View style={s.recruitBottomRow}>
         <Text style={s.recruitTeamCount}>
@@ -114,20 +106,67 @@ export default function TalentDetailScreen() {
   const insets = useSafeAreaInsets();
   const { userId } = useLocalSearchParams<{ userId: string }>();
   const [hearted, setHearted] = useState(false);
+  const [detail, setDetail] = useState<TalentDetail | null>(null);
+  const currentUserId = useAuthStore((s) => s.currentUserId);
+  const toggleTalentHeartInStore = useExploreStore((s) => s.toggleTalentHeart);
+  const isMe = detail?.userId === currentUserId;
+  const segments = useSegments();
+  const sourceTab = (segments[1] as string) ?? 'explore';
 
-  const detail = dummyTalentDetails.find((d) => d.userId === Number(userId))
-    ?? dummyTalentDetails[0];
+  useEffect(() => {
+    if (IS_MOCK) {
+      // mock 모드: 로컬 더미 데이터 사용
+      import('../../../../src/data/talents').then(({ dummyTalentDetails }) => {
+        const found = dummyTalentDetails.find((d) => d.userId === Number(userId))
+          ?? dummyTalentDetails[0];
+        setDetail(found);
+        setHearted(found.isHearted);
+      });
+    } else {
+      // 서버 모드: API 호출
+      getUserDetail(Number(userId))
+        .then((d) => {
+          setDetail(d);
+          setHearted(d.isHearted);
+        })
+        .catch(console.error);
+    }
+  }, [userId]);
 
-  const extraKeywords = detail.reviewKeywords.length - KEYWORD_SHOW;
+  // useExploreStore를 통해 토글해야 탐색 > 인재풀 목록의 하트 상태도 함께 갱신된다
+  // (그 store가 인재 좋아요의 단일 진실 공급원 역할을 함)
+  const handleToggleHeart = async () => {
+    if (!detail) return;
+    const prev = hearted;
+    setHearted(!prev);
+    try {
+      await toggleTalentHeartInStore(detail.userId, prev);
+    } catch (e) {
+      console.error('[TalentDetail] 하트 처리 실패:', e);
+      setHearted(prev);
+    }
+  };
 
   const handleChat = async () => {
+    if (!detail) return;
+    if (!requireAuthForChat(`/${sourceTab}/talent/${detail.userId}`)) return;
     try {
       const chatRoomId = await getOrCreateDirectChatRoom(detail.userId);
-      router.push(`/messages/${chatRoomId}` as never);
+      // messages 탭은 채팅방이 자기 자신의 [chatId] 화면이라 /chat 접두사가 없다
+      const chatPath = sourceTab === 'messages' ? `/messages/${chatRoomId}` : `/${sourceTab}/chat/${chatRoomId}`;
+      router.push(chatPath as never);
     } catch {
       // 채팅방 생성 실패 시 무시
     }
   };
+
+  if (!detail) {
+    return (
+      <View style={[s.container, { paddingTop: insets.top, alignItems: 'center', justifyContent: 'center' }]}>
+        <ActivityIndicator size="large" color={Colors.primary} />
+      </View>
+    );
+  }
 
   return (
     <View style={[s.container, { paddingTop: insets.top }]}>
@@ -147,7 +186,11 @@ export default function TalentDetailScreen() {
         <View style={s.profileCard}>
           <View style={s.profileTop}>
             <View style={s.avatar}>
-              <Text style={s.avatarEmoji}>🧑‍💻</Text>
+              {resolveImageUrl(detail.profileImageUrl) ? (
+                <Image source={{ uri: resolveImageUrl(detail.profileImageUrl)! }} style={s.avatarImage} />
+              ) : (
+                <Text style={s.avatarEmoji}>🧑‍💻</Text>
+              )}
             </View>
 
             <View style={s.profileInfo}>
@@ -155,11 +198,19 @@ export default function TalentDetailScreen() {
                 <Text style={s.name}>{detail.nickname}</Text>
                 <Text style={s.gender}>{GENDER_LABEL[detail.gender]}</Text>
                 <View style={s.tempPill}>
-                  <Text style={s.tempPillText}>{detail.temperature}°C</Text>
+                  <Text style={s.tempPillText}>★ {detail.averageRating.toFixed(1)}</Text>
                 </View>
+                {isMe && (
+                  <View style={s.meBadge}>
+                    <Text style={s.meBadgeText}>나</Text>
+                  </View>
+                )}
               </View>
               <View style={s.schoolRow}>
-                <Text style={s.school}>{detail.schoolName} {detail.major}</Text>
+                <Text style={s.school}>
+                  {detail.schoolName} {detail.major}
+                  {detail.status ? ` · ${EDUCATION_STATUS_LABEL[detail.status]}` : ''}
+                </Text>
                 {detail.verified && (
                   <View style={s.verifiedDot}>
                     <Text style={s.verifiedCheck}>✓</Text>
@@ -172,7 +223,7 @@ export default function TalentDetailScreen() {
             {/* 우측: 하트 + 채팅하기 pill */}
             <View style={s.rightActions}>
               <TouchableOpacity
-                onPress={() => setHearted((p) => !p)}
+                onPress={handleToggleHeart}
                 hitSlop={8}
                 style={s.heartBtn}
               >
@@ -180,9 +231,11 @@ export default function TalentDetailScreen() {
                   {hearted ? '♥' : '♡'}
                 </Text>
               </TouchableOpacity>
-              <TouchableOpacity style={s.chatPill} onPress={handleChat} activeOpacity={0.85}>
-                <Text style={s.chatPillText}>채팅하기</Text>
-              </TouchableOpacity>
+              {!isMe && (
+                <TouchableOpacity style={s.chatPill} onPress={handleChat} activeOpacity={0.85}>
+                  <Text style={s.chatPillText}>채팅하기</Text>
+                </TouchableOpacity>
+              )}
             </View>
           </View>
         </View>
@@ -206,7 +259,7 @@ export default function TalentDetailScreen() {
               ))}
             </View>
           </InfoRow>
-          <InfoRow label="공모전 참여 경험">
+          <InfoRow label="공모전 참여 경험 및 목적">
             <Text style={s.infoValue}>{detail.contestExperienceDetail}</Text>
           </InfoRow>
           <InfoRow label="참여 강도">
@@ -266,57 +319,24 @@ export default function TalentDetailScreen() {
 
         {/* ── 리뷰 ── */}
         <SectionTitle title="리뷰" />
-        <View style={s.card}>
-          <Text style={s.tempCardLabel}>티밋 온도</Text>
-          <View style={s.tempScoreRow}>
-            <Text style={s.tempScore}>{detail.temperature}</Text>
-            <Text style={s.tempScoreMax}> / 40</Text>
-          </View>
-          <TempBar value={detail.temperature} />
-
-          <View style={s.statDivider} />
-          <StatRow label="총평"       value={detail.reviewStats.totalRating} />
-          <StatRow label="응답 속도"  value={detail.reviewStats.responseSpeed} />
-          <StatRow label="마감 완수"  value={detail.reviewStats.deadlineCompletion} />
-          <StatRow label="참여 강도"  value={detail.reviewStats.participationIntensity} />
-
-          {detail.reviewKeywords.length > 0 && (
-            <>
-              <View style={s.reviewInnerDivider} />
-              <View style={s.keywordRow}>
-                {detail.reviewKeywords.slice(0, KEYWORD_SHOW).map((kw) => (
-                  <View key={kw.text} style={s.keywordPill}>
-                    <Text style={s.keywordText}>{kw.text}</Text>
-                    <View style={s.kwCountBadge}>
-                      <Text style={s.kwCountText}>{kw.count}</Text>
-                    </View>
-                  </View>
-                ))}
-                {extraKeywords > 0 && (
-                  <View style={s.keywordPill}>
-                    <Text style={s.keywordText}>+{extraKeywords}</Text>
-                  </View>
-                )}
-              </View>
-            </>
-          )}
-
-          {detail.teamReviews.length > 0 && (
-            <>
-              <View style={s.reviewInnerDivider} />
-              <View style={s.reviewHeader}>
-                <Text style={s.reviewHeaderTitle}>💬 팀원 리뷰</Text>
-                <Text style={s.reviewCount}>{detail.teamReviews.length}개</Text>
-              </View>
-              {detail.teamReviews.map((r, i) => (
-                <View key={i} style={[s.reviewItem, i > 0 && s.reviewItemBorder]}>
-                  <Text style={s.reviewContent}>"{r.content}"</Text>
-                  <Text style={s.reviewReviewer}>{r.reviewer}</Text>
-                </View>
-              ))}
-            </>
-          )}
-        </View>
+        <ReviewStatsCard
+          averageRating={detail.averageRating}
+          stats={[
+            { label: '총평', value: detail.reviewStats.totalRating },
+            { label: '응답 속도', value: detail.reviewStats.responseSpeed },
+            { label: '마감 완수', value: detail.reviewStats.deadlineCompletion },
+            { label: '참여 강도', value: detail.reviewStats.participationIntensity },
+          ].filter((row) => row.value !== '')}
+          keywords={detail.reviewKeywords}
+          reviewCount={detail.teamReviews.length}
+          comments={detail.teamReviews.slice(0, 3)}
+          onPressReviews={() =>
+            router.push({
+              pathname: `/${sourceTab}/all-reviews` as never,
+              params: { userId: detail.userId.toString() },
+            })
+          }
+        />
 
         <View style={{ height: 24 }} />
       </ScrollView>
@@ -366,7 +386,9 @@ const s = StyleSheet.create({
     backgroundColor: Colors.pageBg,
     alignItems: 'center',
     justifyContent: 'center',
+    overflow: 'hidden',
   },
+  avatarImage: { width: 60, height: 60 },
   avatarEmoji: { fontSize: 30 },
   profileInfo: { flex: 1, gap: 5 },
   nameRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 5 },
@@ -379,6 +401,13 @@ const s = StyleSheet.create({
     paddingVertical: 2,
   },
   tempPillText: { fontSize: 12, color: Colors.primary, fontWeight: '700' },
+  meBadge: {
+    backgroundColor: Colors.dark,
+    borderRadius: 999,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+  },
+  meBadgeText: { fontSize: 11, fontWeight: '700', color: Colors.white },
   schoolRow: { flexDirection: 'row', alignItems: 'center', gap: 5 },
   school: { fontSize: 13, color: Colors.gray },
   verifiedDot: {
@@ -419,13 +448,19 @@ const s = StyleSheet.create({
   appealBody: { fontSize: 14, color: Colors.gray, lineHeight: 22 },
 
   /* 섹션 타이틀 */
+  sectionTitleWrap: {
+    alignSelf: 'flex-start',
+    marginHorizontal: 16,
+    marginTop: 24,
+    marginBottom: 10,
+    borderBottomWidth: 2,
+    borderBottomColor: Colors.primary,
+    paddingBottom: 4,
+  },
   sectionTitle: {
     fontSize: 16,
     fontWeight: '700',
     color: Colors.dark,
-    marginHorizontal: 16,
-    marginTop: 24,
-    marginBottom: 10,
   },
 
   /* 공통 카드 */
@@ -502,79 +537,4 @@ const s = StyleSheet.create({
   },
   awardPillText: { fontSize: 12, color: Colors.primary, fontWeight: '600' },
   expRole: { fontSize: 13, color: Colors.gray },
-
-  /* 리뷰 카드 */
-  tempCardLabel: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: Colors.dark,
-    paddingHorizontal: 16,
-    paddingTop: 16,
-    marginBottom: 4,
-  },
-  tempScoreRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-end',
-    paddingHorizontal: 16,
-    marginBottom: 10,
-  },
-  tempScore: { fontSize: 52, fontWeight: '700', color: Colors.primary, lineHeight: 56 },
-  tempScoreMax: { fontSize: 18, color: Colors.grayMedium, marginBottom: 6 },
-  barWrap: { marginHorizontal: 16, marginBottom: 8 },
-  barTrack: {
-    height: 10,
-    backgroundColor: Colors.lightGray,
-    borderRadius: 5,
-    overflow: 'hidden',
-  },
-  barFill: { height: '100%', backgroundColor: Colors.primary, borderRadius: 5 },
-  barScale: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 4 },
-  barScaleText: { fontSize: 11, color: Colors.grayLight },
-  statDivider: { height: 1, backgroundColor: '#F0F0F0', marginTop: 4 },
-  statRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F7F7F7',
-  },
-  statLabel: { fontSize: 13, color: Colors.grayMedium, width: 72 },
-  statValue: { fontSize: 13, color: Colors.dark, flex: 1, textAlign: 'right' },
-  reviewInnerDivider: { height: 1, backgroundColor: '#F0F0F0' },
-  keywordRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, padding: 16 },
-  keywordPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    borderWidth: 1.5,
-    borderColor: Colors.primary,
-    borderRadius: 999,
-    paddingHorizontal: 12,
-    paddingVertical: 7,
-    backgroundColor: Colors.white,
-  },
-  keywordText: { fontSize: 12, color: Colors.primary, fontWeight: '600' },
-  kwCountBadge: {
-    width: 18,
-    height: 18,
-    borderRadius: 9,
-    backgroundColor: Colors.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  kwCountText: { fontSize: 10, color: Colors.white, fontWeight: '700' },
-  reviewHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: 16,
-  },
-  reviewHeaderTitle: { fontSize: 14, fontWeight: '700', color: Colors.dark },
-  reviewCount: { fontSize: 13, color: Colors.grayMedium },
-  reviewItem: { paddingHorizontal: 16, paddingVertical: 14 },
-  reviewItemBorder: { borderTopWidth: 1, borderTopColor: '#F5F5F5' },
-  reviewContent: { fontSize: 14, color: Colors.dark, lineHeight: 22, marginBottom: 5 },
-  reviewReviewer: { fontSize: 12, color: Colors.grayMedium },
 });

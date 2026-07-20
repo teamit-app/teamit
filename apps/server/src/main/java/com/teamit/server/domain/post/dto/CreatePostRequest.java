@@ -3,6 +3,8 @@ package com.teamit.server.domain.post.dto;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
+import java.util.List;
+
 @Getter
 @NoArgsConstructor
 public class CreatePostRequest {
@@ -11,7 +13,10 @@ public class CreatePostRequest {
     private Long contestId;
     private Integer recruitCount;
     private String deadline;
-    private String onlineOffline;   // ONLINE / OFFLINE / MIXED
-    private String genderCondition; // ANY / SAME / OPPOSITE
-    private String schoolCondition; // ANY / SAME_SCHOOL
+    private String onlineOffline;
+    private String genderCondition;
+    private String schoolCondition;
+    private String experienceCondition;
+    private String purposeCondition;
+    private List<RequiredSkillRequest> requiredSkills;
 }

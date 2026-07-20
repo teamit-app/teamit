@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -8,26 +8,48 @@ import {
   Modal,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { router } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import { Colors } from '../../../src/constants/colors';
 import { ScreenHeader } from '../../../src/components/common/ScreenHeader';
-import { getReceivedApplicationPosts } from '../../../src/services/mypageService';
-import { ReceivedApplicationPost } from '../../../src/types/mypage';
+import { getMyPosts, PostListItem } from '../../../src/services/postService';
+
+const normalizeMeetingType = (type?: string) => {
+  if (!type) return '';
+  if (type === 'MIXED') return '온오프라인혼합';
+  if (type === 'OFFLINE') return '오프라인';
+  return '온라인';
+};
+
+const genderLabel = (recruiterGender?: string, genderCondition?: string) => {
+  const genderText = recruiterGender === 'MALE' ? '남성' : recruiterGender === 'FEMALE' ? '여성' : '';
+  const conditionText = genderCondition === 'SAME' ? '동성만' : '성별 무관';
+  return [genderText, conditionText].filter(Boolean).join(' · ');
+};
 
 export default function ReceivedApplicationsScreen() {
   const insets = useSafeAreaInsets();
-  const [posts, setPosts] = useState<ReceivedApplicationPost[]>([]);
+  const [posts, setPosts] = useState<PostListItem[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selectedPost, setSelectedPost] = useState<ReceivedApplicationPost | null>(null);
+  const [selectedPost, setSelectedPost] = useState<PostListItem | null>(null);
   const [modalVisible, setModalVisible] = useState(false);
 
-  useEffect(() => {
-    getReceivedApplicationPosts()
-      .then(setPosts)
-      .finally(() => setLoading(false));
-  }, []);
+  const isFirstLoad = useRef(true);
 
-  const openModal = (post: ReceivedApplicationPost) => {
+  useFocusEffect(
+    useCallback(() => {
+      if (isFirstLoad.current) {
+        setLoading(true);
+      }
+      getMyPosts()
+        .then(setPosts)
+        .finally(() => {
+          setLoading(false);
+          isFirstLoad.current = false;
+        });
+    }, []),
+  );
+
+  const openModal = (post: PostListItem) => {
     setSelectedPost(post);
     setModalVisible(true);
   };
@@ -57,8 +79,8 @@ export default function ReceivedApplicationsScreen() {
       pathname: '/(tabs)/profile/applicants',
       params: {
         postId: selectedPost.postId,
-        postTitle: selectedPost.postTitle,
-        contestTitle: selectedPost.contestTitle,
+        postTitle: selectedPost.title,
+        contestTitle: selectedPost.contestTitle ?? '',
       },
     });
   };
@@ -98,25 +120,68 @@ export default function ReceivedApplicationsScreen() {
       <ScreenHeader title="내 모집글" onBack={() => router.back()} />
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 32 }}>
-        {posts.map((post) => (
-          <TouchableOpacity
-            key={post.postId}
-            style={styles.postCard}
-            activeOpacity={0.7}
-            onPress={() => openModal(post)}
-          >
-            <View style={styles.cardLeft}>
-              <Text style={styles.postContest}>{post.contestTitle}</Text>
-              <Text style={styles.postTitle} numberOfLines={2}>{post.postTitle}</Text>
-              <Text style={styles.postMeta}>작성일: {post.createdAt}</Text>
-            </View>
-            <View style={styles.cardRight}>
-              <View style={styles.applicantBadge}>
-                <Text style={styles.applicantBadgeText}>지원자 {post.applicantCount}명</Text>
+        {posts.map((post) => {
+          const meetingStr = `${normalizeMeetingType(post.onlineOffline)}${
+            post.region && (post.onlineOffline === 'OFFLINE' || post.onlineOffline === 'MIXED')
+              ? `·${post.region}`
+              : ''
+          }`;
+
+          return (
+            <TouchableOpacity
+              key={post.postId}
+              style={styles.postCard}
+              activeOpacity={0.7}
+              onPress={() => openModal(post)}
+            >
+              <View style={styles.cardHeader}>
+                <Text style={styles.contestLabel} numberOfLines={1}>
+                  {post.contestTitle ?? '공모전'}
+                </Text>
+                <Text style={styles.date}>{post.createdAt}</Text>
               </View>
-            </View>
-          </TouchableOpacity>
-        ))}
+              <View style={styles.titleRow}>
+                <Text style={styles.postTitle} numberOfLines={2}>{post.title}</Text>
+                {post.status === 'CLOSED' && (
+                  <View style={styles.closedBadge}>
+                    <Text style={styles.closedBadgeText}>마감</Text>
+                  </View>
+                )}
+              </View>
+              {!!post.skills?.length && (
+                <View style={styles.skillRow}>
+                  {post.skills.slice(0, 3).map((skill) => (
+                    <View key={skill} style={styles.skillTag}>
+                      <Text style={styles.skillText}>{skill}</Text>
+                    </View>
+                  ))}
+                  {post.skills.length > 3 && (
+                    <View style={styles.skillTag}>
+                      <Text style={styles.skillText}>+{post.skills.length - 3}</Text>
+                    </View>
+                  )}
+                </View>
+              )}
+              <View style={styles.metaRow}>
+                <Text style={styles.metaText}>{post.experienceCondition}</Text>
+                <Text style={styles.metaDot}> · </Text>
+                <Text style={styles.metaText}>{meetingStr}</Text>
+                <Text style={styles.metaDot}> · </Text>
+                <Text style={styles.metaText}>{genderLabel(post.recruiterGender, post.genderCondition)}</Text>
+              </View>
+              <View style={styles.bottomRow}>
+                <View style={styles.applicantBadge}>
+                  <Text style={styles.applicantBadgeText}>지원자 {post.applicantCount ?? 0}명</Text>
+                </View>
+                <View style={styles.statsRow}>
+                  <Text style={styles.stat}>조회 {post.viewCount ?? 0}</Text>
+                  <Text style={styles.stat}>💬 {post.commentCount ?? 0}</Text>
+                  <Text style={styles.stat}>♥ {post.likeCount ?? 0}</Text>
+                </View>
+              </View>
+            </TouchableOpacity>
+          );
+        })}
       </ScrollView>
 
       {/* 모집글 관리 옵션 모달 */}
@@ -129,7 +194,7 @@ export default function ReceivedApplicationsScreen() {
         <TouchableOpacity style={styles.overlay} activeOpacity={1} onPress={closeModal}>
           <View style={styles.modalBox} onStartShouldSetResponder={() => true}>
             <Text style={styles.modalTitle}>모집글 관리</Text>
-            <Text style={styles.modalSubtitle} numberOfLines={2}>{selectedPost?.postTitle}</Text>
+            <Text style={styles.modalSubtitle} numberOfLines={2}>{selectedPost?.title}</Text>
 
             <View style={styles.modalDivider} />
 
@@ -174,16 +239,61 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.white,
     marginHorizontal: 16,
     marginTop: 12,
-    borderRadius: 12,
-    padding: 16,
-    flexDirection: 'row',
-    alignItems: 'flex-start',
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#EEEEEE',
+    padding: 14,
   },
-  cardLeft: { flex: 1, marginRight: 10 },
-  cardRight: { alignItems: 'flex-end' },
-  postContest: { fontSize: 12, color: Colors.gray, marginBottom: 4 },
-  postTitle: { fontSize: 15, fontWeight: '700', color: Colors.dark, marginBottom: 4 },
-  postMeta: { fontSize: 12, color: Colors.grayMedium },
+  cardHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  date: { fontSize: 11, color: Colors.grayMedium },
+  contestLabel: { fontSize: 11, color: Colors.primary, fontWeight: '600', flex: 1, marginRight: 8 },
+  titleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 10,
+  },
+  postTitle: { flex: 1, fontSize: 15, fontWeight: '700', color: Colors.dark },
+  closedBadge: {
+    backgroundColor: Colors.lightGray,
+    borderRadius: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+  },
+  closedBadgeText: { fontSize: 11, fontWeight: '700', color: Colors.grayMedium },
+  skillRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+    marginBottom: 8,
+  },
+  skillTag: {
+    backgroundColor: Colors.ogTint,
+    borderRadius: 999,
+    paddingHorizontal: 11,
+    paddingVertical: 5,
+  },
+  skillText: { fontSize: 12, color: Colors.primary, fontWeight: '600' },
+  metaRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  metaText: { fontSize: 12, color: Colors.grayMedium },
+  metaDot: { fontSize: 12, color: Colors.grayMedium },
+  bottomRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  statsRow: { flexDirection: 'row', gap: 10 },
+  stat: { fontSize: 12, color: Colors.grayMedium },
   applicantBadge: {
     backgroundColor: '#ffedde',
     paddingHorizontal: 10,

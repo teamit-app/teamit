@@ -448,6 +448,7 @@ export const dummyChatRooms: ChatRoom[] = [
       totalCount: 3,
       dDay: 0,
       isExpired: true,
+      teamConfirmed: true,
       members: [
         { id: 1,  name: '나',     role: '기획',   avatar: '👑',  filled: true, isHost: true },
         { id: 9,  name: '이유진', role: '디자인', avatar: '👩‍💻', filled: true },

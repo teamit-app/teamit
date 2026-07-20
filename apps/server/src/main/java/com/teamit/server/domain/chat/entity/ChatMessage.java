@@ -29,10 +29,34 @@ public class ChatMessage extends BaseTimeEntity {
     @Column(name = "content", nullable = false, columnDefinition = "TEXT")
     private String content;
 
+    // null(레거시 데이터) = TEXT로 취급
+    @Enumerated(EnumType.STRING)
+    @Column(name = "message_type", columnDefinition = "VARCHAR(20)")
+    private MessageType messageType;
+
+    // INVITATION_CARD 타입일 때 TeamInvitation.id를 가리킴
+    @Column(name = "reference_id")
+    private Long referenceId;
+
     @Builder
-    public ChatMessage(ChatRoom chatRoom, User sender, String content) {
+    public ChatMessage(ChatRoom chatRoom, User sender, String content,
+                       MessageType messageType, Long referenceId) {
         this.chatRoom = chatRoom;
         this.sender = sender;
         this.content = content;
+        this.messageType = messageType;
+        this.referenceId = referenceId;
+    }
+
+    public static ChatMessage text(ChatRoom chatRoom, User sender, String content) {
+        return new ChatMessage(chatRoom, sender, content, MessageType.TEXT, null);
+    }
+
+    public static ChatMessage system(ChatRoom chatRoom, User actor, String content) {
+        return new ChatMessage(chatRoom, actor, content, MessageType.SYSTEM, null);
+    }
+
+    public static ChatMessage invitationCard(ChatRoom chatRoom, User sender, String fallbackContent, Long invitationId) {
+        return new ChatMessage(chatRoom, sender, fallbackContent, MessageType.INVITATION_CARD, invitationId);
     }
 }

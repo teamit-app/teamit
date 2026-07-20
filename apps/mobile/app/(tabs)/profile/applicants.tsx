@@ -10,7 +10,9 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
 import { Colors } from '../../../src/constants/colors';
 import { ScreenHeader } from '../../../src/components/common/ScreenHeader';
-import { getPostApplicants, getContestCandidates } from '../../../src/services/mypageService';
+import { getPostApplicants, getContestCandidates, getAllContestCandidates } from '../../../src/services/mypageService';
+import { getHeartedTalents } from '../../../src/services/talentService';
+import { useExploreStore } from '../../../src/store/useExploreStore';
 import { PostApplicant } from '../../../src/types/mypage';
 
 type Tab = 'applicants' | 'candidates';
@@ -30,7 +32,7 @@ function ApplicantCard({
     <TouchableOpacity style={card.container} onPress={onPress} activeOpacity={0.75}>
       <View style={card.topRow}>
         <View style={card.tempBadge}>
-          <Text style={card.tempText}>{person.temperature}°C</Text>
+          <Text style={card.tempText}>★ {person.averageRating.toFixed(1)}</Text>
         </View>
         <TouchableOpacity onPress={onToggleHeart} hitSlop={10}>
           <Text style={[card.heartIcon, isHearted && card.heartIconActive]}>
@@ -71,7 +73,6 @@ function ApplicantCard({
       <View style={card.pillRow}>
         {[
           person.meetingTypeLabel,
-          person.experienceLabel,
           person.intensityLabel,
           person.leadershipLabel,
         ].map((label, i) => (
@@ -189,44 +190,77 @@ export default function ApplicantsScreen() {
   const { postId, postTitle, contestTitle } =
     useLocalSearchParams<{ postId: string; postTitle: string; contestTitle: string }>();
 
+  const toggleTalentHeartInStore = useExploreStore((s) => s.toggleTalentHeart);
   const [tab, setTab] = useState<Tab>('applicants');
   const [applicants, setApplicants] = useState<PostApplicant[]>([]);
   const [candidates, setCandidates] = useState<PostApplicant[]>([]);
+  const [allCandidates, setAllCandidates] = useState<PostApplicant[]>([]);
+  const [allPage, setAllPage] = useState(0);
+  const [allTotalPages, setAllTotalPages] = useState(0);
+  const [allLoadingMore, setAllLoadingMore] = useState(false);
   const [likedIds, setLikedIds] = useState<Set<number>>(new Set());
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const pid = Number(postId);
-    Promise.all([getPostApplicants(pid), getContestCandidates(pid)])
-      .then(([apps, cands]) => {
+    Promise.all([
+      getPostApplicants(pid),
+      getContestCandidates(pid),
+      getAllContestCandidates(pid, 0),
+      getHeartedTalents().catch(() => []),
+    ])
+      .then(([apps, cands, allCands, hearted]) => {
         setApplicants(apps);
         setCandidates(cands);
+        setAllCandidates(allCands.content);
+        setAllPage(allCands.currentPage);
+        setAllTotalPages(allCands.totalPages);
+        setLikedIds(new Set(hearted.map((t) => t.userId)));
       })
       .finally(() => setLoading(false));
   }, [postId]);
 
-  const toggleHeart = (userId: number) => {
+  const loadMoreAllCandidates = () => {
+    const pid = Number(postId);
+    if (allLoadingMore || allPage + 1 >= allTotalPages) return;
+    setAllLoadingMore(true);
+    getAllContestCandidates(pid, allPage + 1)
+      .then((res) => {
+        setAllCandidates((prev) => [...prev, ...res.content]);
+        setAllPage(res.currentPage);
+        setAllTotalPages(res.totalPages);
+      })
+      .catch(console.error)
+      .finally(() => setAllLoadingMore(false));
+  };
+
+  // 인재풀 하트와 동일한 대상 — useExploreStore를 거쳐야 탐색 > 인재풀 목록/상세정보에도 그대로 반영된다
+  const toggleHeart = async (userId: number) => {
+    const wasLiked = likedIds.has(userId);
     setLikedIds((prev) => {
       const next = new Set(prev);
-      if (next.has(userId)) next.delete(userId);
+      if (wasLiked) next.delete(userId);
       else next.add(userId);
       return next;
     });
+    try {
+      await toggleTalentHeartInStore(userId, wasLiked);
+    } catch (e) {
+      console.error('[Applicants] 하트 처리 실패:', e);
+      setLikedIds((prev) => {
+        const next = new Set(prev);
+        if (wasLiked) next.add(userId);
+        else next.delete(userId);
+        return next;
+      });
+    }
   };
 
   const navigateToDetail = (person: PostApplicant) => {
-    router.push({
-      pathname: '/(tabs)/profile/applicant-detail',
-      params: {
-        postId: String(postId),
-        userId: String(person.userId),
-        tab,
-      },
-    });
+    // profile 탭 내부에서 탐색 탭으로 절대경로 push하면 뒤로가기가 탐색 탭으로 튀는 문제가 있어
+    // profile 탭 안에 alias 라우트(profile/talent/[userId])를 두고 그쪽으로 push한다
+    router.push(`/profile/talent/${person.userId}` as never);
   };
-
-  const currentList = tab === 'applicants' ? applicants : candidates;
-  const subtitleLabel = tab === 'applicants' ? '모집글 지원자' : '매칭된 팀원 후보';
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
@@ -267,29 +301,93 @@ export default function ApplicantsScreen() {
           showsVerticalScrollIndicator={false}
           contentContainerStyle={styles.listContent}
         >
-          {/* 섹션 소제목 */}
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionLabel}>{subtitleLabel}</Text>
-            <Text style={styles.sectionHint}>카드를 클릭하면 상세정보를 확인할 수 있습니다</Text>
-          </View>
+          {tab === 'applicants' ? (
+            <>
+              {/* 섹션 소제목 */}
+              <View style={styles.sectionHeader}>
+                <Text style={styles.sectionLabel}>모집글 지원자</Text>
+                <Text style={styles.sectionHint}>카드를 클릭하면 상세정보를 확인할 수 있습니다</Text>
+              </View>
 
-          {currentList.length === 0 ? (
-            <View style={styles.emptyBox}>
-              <Text style={styles.emptyIcon}>{tab === 'applicants' ? '📋' : '👥'}</Text>
-              <Text style={styles.emptyText}>
-                {tab === 'applicants' ? '아직 지원자가 없어요' : '후보로 등록된 인재가 없어요'}
-              </Text>
-            </View>
+              {applicants.length === 0 ? (
+                <View style={styles.emptyBox}>
+                  <Text style={styles.emptyIcon}>📋</Text>
+                  <Text style={styles.emptyText}>아직 지원자가 없어요</Text>
+                </View>
+              ) : (
+                applicants.map((person) => (
+                  <ApplicantCard
+                    key={person.userId}
+                    person={person}
+                    isHearted={likedIds.has(person.userId)}
+                    onToggleHeart={() => toggleHeart(person.userId)}
+                    onPress={() => navigateToDetail(person)}
+                  />
+                ))
+              )}
+            </>
           ) : (
-            currentList.map((person) => (
-              <ApplicantCard
-                key={person.userId}
-                person={person}
-                isHearted={likedIds.has(person.userId)}
-                onToggleHeart={() => toggleHeart(person.userId)}
-                onPress={() => navigateToDetail(person)}
-              />
-            ))
+            <>
+              {/* 매칭된 후보 */}
+              <View style={styles.sectionHeader}>
+                <Text style={styles.sectionLabel}>매칭된 팀원 후보</Text>
+                <Text style={styles.sectionHint}>카드를 클릭하면 상세정보를 확인할 수 있습니다</Text>
+              </View>
+
+              {candidates.length === 0 ? (
+                <View style={styles.emptyBox}>
+                  <Text style={styles.emptyIcon}>🔍</Text>
+                  <Text style={styles.emptyText}>조건에 맞는 후보가 없어요</Text>
+                </View>
+              ) : (
+                candidates.map((person) => (
+                  <ApplicantCard
+                    key={person.userId}
+                    person={person}
+                    isHearted={likedIds.has(person.userId)}
+                    onToggleHeart={() => toggleHeart(person.userId)}
+                    onPress={() => navigateToDetail(person)}
+                  />
+                ))
+              )}
+
+              {/* 전체 후보 — 매칭 조건과 무관하게 이 공모전에 등록된 모든 후보 */}
+              <View style={[styles.sectionHeader, styles.allSectionHeader]}>
+                <Text style={styles.sectionLabel}>전체 후보</Text>
+                <Text style={styles.sectionHint}>이 공모전에 후보로 등록한 모든 사람이에요</Text>
+              </View>
+
+              {allCandidates.length === 0 ? (
+                <View style={styles.emptyBox}>
+                  <Text style={styles.emptyIcon}>👥</Text>
+                  <Text style={styles.emptyText}>후보로 등록한 사람이 없어요</Text>
+                </View>
+              ) : (
+                <>
+                  {allCandidates.map((person) => (
+                    <ApplicantCard
+                      key={person.userId}
+                      person={person}
+                      isHearted={likedIds.has(person.userId)}
+                      onToggleHeart={() => toggleHeart(person.userId)}
+                      onPress={() => navigateToDetail(person)}
+                    />
+                  ))}
+                  {allPage + 1 < allTotalPages && (
+                    <TouchableOpacity
+                      style={styles.loadMoreBtn}
+                      onPress={loadMoreAllCandidates}
+                      disabled={allLoadingMore}
+                      activeOpacity={0.7}
+                    >
+                      <Text style={styles.loadMoreBtnText}>
+                        {allLoadingMore ? '불러오는 중...' : '더보기'}
+                      </Text>
+                    </TouchableOpacity>
+                  )}
+                </>
+              )}
+            </>
           )}
         </ScrollView>
       )}
@@ -350,6 +448,12 @@ const styles = StyleSheet.create({
   sectionHeader: {
     marginBottom: 12,
   },
+  allSectionHeader: {
+    marginTop: 20,
+    paddingTop: 16,
+    borderTopWidth: 1,
+    borderTopColor: '#F0F0F0',
+  },
   sectionLabel: {
     fontSize: 13,
     fontWeight: '600',
@@ -367,4 +471,15 @@ const styles = StyleSheet.create({
   },
   emptyIcon: { fontSize: 36, marginBottom: 10 },
   emptyText: { fontSize: 14, color: Colors.grayMedium },
+
+  loadMoreBtn: {
+    alignItems: 'center',
+    paddingVertical: 14,
+    marginTop: 4,
+  },
+  loadMoreBtnText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: Colors.primary,
+  },
 });

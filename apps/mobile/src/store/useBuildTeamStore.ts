@@ -8,16 +8,19 @@ interface BuildTeamState {
   schoolCondition: string;
   meetingType: string;
   experienceCondition: string;
+  purposeCondition: string;
   postTitle: string;
   postContent: string;
 
   setContestId: (id: number) => void;
   setRecruitCount: (n: number) => void;
   toggleSkill: (skill: string) => void;
+  setRequiredSkills: (skills: string[]) => void;
   setGenderCondition: (v: string) => void;
   setSchoolCondition: (v: string) => void;
   setMeetingType: (v: string) => void;
   setExperienceCondition: (v: string) => void;
+  setPurposeCondition: (v: string) => void;
   setPostTitle: (v: string) => void;
   setPostContent: (v: string) => void;
   reset: () => void;
@@ -31,6 +34,7 @@ const defaultState = {
   schoolCondition: '학교 상관없음',
   meetingType: '혼합',
   experienceCondition: '공모전 경험 무관',
+  purposeCondition: '참여 목적 무관',
   postTitle: '',
   postContent: '',
 };
@@ -46,10 +50,12 @@ export const useBuildTeamStore = create<BuildTeamState>((set) => ({
         ? s.requiredSkills.filter((sk) => sk !== skill)
         : [...s.requiredSkills, skill],
     })),
+  setRequiredSkills: (skills) => set({ requiredSkills: skills }),
   setGenderCondition: (v) => set({ genderCondition: v }),
   setSchoolCondition: (v) => set({ schoolCondition: v }),
   setMeetingType: (v) => set({ meetingType: v }),
   setExperienceCondition: (v) => set({ experienceCondition: v }),
+  setPurposeCondition: (v) => set({ purposeCondition: v }),
   setPostTitle: (v) => set({ postTitle: v }),
   setPostContent: (v) => set({ postContent: v }),
   reset: () => set(defaultState),

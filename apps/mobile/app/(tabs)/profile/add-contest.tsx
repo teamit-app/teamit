@@ -6,15 +6,15 @@ import {
   TouchableOpacity,
   ScrollView,
   StyleSheet,
-  Alert,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
+import { Alert } from '../../../src/utils/alert';
 import { Colors } from '../../../src/constants/colors';
 import { ScreenHeader } from '../../../src/components/common/ScreenHeader';
 import { DrumRollPicker } from '../../../src/components/common/DrumRollPicker';
 import { useMypageStore } from '../../../src/store/useMypageStore';
-import { addContestCareer } from '../../../src/services/mypageService';
+import { addContestCareer, updateContestCareer } from '../../../src/services/mypageService';
 import { AwardStatus } from '../../../src/types/mypage';
 
 const ROLES = [
@@ -26,7 +26,6 @@ const ROLES = [
   'AI',
   '데이터 분석',
   '마케팅',
-  '직접 입력하기',
 ];
 
 const AWARD_OPTIONS: { value: AwardStatus; label: string }[] = [
@@ -48,24 +47,48 @@ function parseDate(dateStr: string): { year: number; month: number; day: number 
 
 export default function AddContestScreen() {
   const insets = useSafeAreaInsets();
-  const { addCareerLocal } = useMypageStore();
+  const { addCareerLocal, updateCareerLocal } = useMypageStore();
+  const params = useLocalSearchParams<{
+    careerItemId?: string;
+    contestName?: string;
+    roles?: string;
+    startDate?: string;
+    endDate?: string;
+    awardStatus?: AwardStatus;
+  }>();
+  const isEditMode = !!params.careerItemId;
 
-  const [contestName, setContestName] = useState('');
-  const [selectedRoles, setSelectedRoles] = useState<string[]>([]);
-  const [startDate, setStartDate] = useState('2024-01-01');
-  const [endDate, setEndDate] = useState('2024-06-30');
-  const [awardStatus, setAwardStatus] = useState<AwardStatus>('NOT_AWARDED');
+  const [contestName, setContestName] = useState(params.contestName ?? '');
+  const [selectedRoles, setSelectedRoles] = useState<string[]>(
+    params.roles ? params.roles.split(',') : [],
+  );
+  const [startDate, setStartDate] = useState(params.startDate || '2024-01-01');
+  const [endDate, setEndDate] = useState(params.endDate || '2024-06-30');
+  const [awardStatus, setAwardStatus] = useState<AwardStatus>(params.awardStatus ?? 'NOT_AWARDED');
   const [saving, setSaving] = useState(false);
   const [showStartPicker, setShowStartPicker] = useState(false);
   const [showEndPicker, setShowEndPicker] = useState(false);
+  const [showCustomRoleInput, setShowCustomRoleInput] = useState(false);
+  const [customRoleText, setCustomRoleText] = useState('');
 
   const startParsed = parseDate(startDate);
   const endParsed = parseDate(endDate);
+  const customSelectedRoles = selectedRoles.filter((r) => !ROLES.includes(r));
 
   const toggleRole = (role: string) => {
     setSelectedRoles((prev) =>
       prev.includes(role) ? prev.filter((r) => r !== role) : [...prev, role],
     );
+  };
+
+  const handleAddCustomRole = () => {
+    const trimmed = customRoleText.trim();
+    if (!trimmed) return;
+    if (!selectedRoles.includes(trimmed)) {
+      setSelectedRoles((prev) => [...prev, trimmed]);
+    }
+    setCustomRoleText('');
+    setShowCustomRoleInput(false);
   };
 
   const handleSave = async () => {
@@ -80,19 +103,28 @@ export default function AddContestScreen() {
 
     setSaving(true);
     try {
-      const result = await addContestCareer({
+      const data = {
         contestName: contestName.trim(),
         roles: selectedRoles,
         startDate,
         endDate,
         awardStatus,
-      });
-      addCareerLocal(result);
-      Alert.alert('등록 완료', '공모전 경험이 등록되었어요.', [
-        { text: '확인', onPress: () => router.back() },
-      ]);
+      };
+      if (isEditMode) {
+        const result = await updateContestCareer(Number(params.careerItemId), data);
+        updateCareerLocal(result);
+        Alert.alert('수정 완료', '공모전 경험이 수정되었어요.', [
+          { text: '확인', onPress: () => router.back() },
+        ]);
+      } else {
+        const result = await addContestCareer(data);
+        addCareerLocal(result);
+        Alert.alert('등록 완료', '공모전 경험이 등록되었어요.', [
+          { text: '확인', onPress: () => router.back() },
+        ]);
+      }
     } catch {
-      Alert.alert('오류', '등록에 실패했어요. 다시 시도해주세요.');
+      Alert.alert('오류', `${isEditMode ? '수정' : '등록'}에 실패했어요. 다시 시도해주세요.`);
     } finally {
       setSaving(false);
     }
@@ -100,7 +132,7 @@ export default function AddContestScreen() {
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
-      <ScreenHeader title="공모전 추가" onBack={() => router.back()} />
+      <ScreenHeader title={isEditMode ? '공모전 수정' : '공모전 추가'} onBack={() => router.back()} />
 
       <ScrollView
         showsVerticalScrollIndicator={false}
@@ -144,7 +176,51 @@ export default function AddContestScreen() {
                 </TouchableOpacity>
               );
             })}
+            {customSelectedRoles.map((role) => (
+              <TouchableOpacity
+                key={role}
+                style={[styles.chip, styles.chipSelected]}
+                onPress={() => toggleRole(role)}
+                activeOpacity={0.7}
+              >
+                <Text style={[styles.chipText, styles.chipTextSelected]}>{role} ✕</Text>
+              </TouchableOpacity>
+            ))}
+            <TouchableOpacity
+              style={[styles.chip, showCustomRoleInput && styles.chipSelected]}
+              onPress={() => setShowCustomRoleInput((v) => !v)}
+              activeOpacity={0.7}
+            >
+              <Text
+                style={[styles.chipText, showCustomRoleInput && styles.chipTextSelected]}
+              >
+                ✏ 직접 입력하기
+              </Text>
+            </TouchableOpacity>
           </View>
+
+          {showCustomRoleInput && (
+            <View style={styles.customRoleRow}>
+              <TextInput
+                style={styles.customRoleInput}
+                placeholder="역할명을 입력하세요"
+                placeholderTextColor={Colors.grayMedium}
+                value={customRoleText}
+                onChangeText={setCustomRoleText}
+                maxLength={20}
+                returnKeyType="done"
+                onSubmitEditing={handleAddCustomRole}
+                autoFocus
+              />
+              <TouchableOpacity
+                style={styles.customRoleAddBtn}
+                onPress={handleAddCustomRole}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.customRoleAddBtnText}>추가</Text>
+              </TouchableOpacity>
+            </View>
+          )}
         </View>
 
         {/* 활동 기간 */}
@@ -203,7 +279,7 @@ export default function AddContestScreen() {
           disabled={saving}
         >
           <Text style={styles.saveBtnText}>
-            {saving ? '저장 중...' : '저장하기'}
+            {saving ? '저장 중...' : isEditMode ? '수정하기' : '저장하기'}
           </Text>
         </TouchableOpacity>
       </View>
@@ -286,6 +362,35 @@ const styles = StyleSheet.create({
   },
   chipText: { fontSize: 13, color: Colors.gray },
   chipTextSelected: { color: Colors.primary, fontWeight: '600' },
+
+  customRoleRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginTop: 10,
+  },
+  customRoleInput: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: Colors.lightGray,
+    borderRadius: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    fontSize: 14,
+    color: Colors.dark,
+    backgroundColor: Colors.pageBg,
+  },
+  customRoleAddBtn: {
+    paddingHorizontal: 16,
+    borderRadius: 10,
+    backgroundColor: Colors.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  customRoleAddBtnText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: Colors.white,
+  },
 
   dateRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   dateSep: { fontSize: 16, color: Colors.gray },

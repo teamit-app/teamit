@@ -3,7 +3,6 @@ package com.teamit.server.domain.auth.service;
 import com.teamit.server.domain.auth.dto.*;
 import com.teamit.server.domain.auth.entity.RefreshToken;
 import com.teamit.server.domain.auth.repository.RefreshTokenRepository;
-import com.teamit.server.domain.education.repository.EducationRepository;
 import com.teamit.server.domain.user.entity.User;
 import com.teamit.server.domain.user.repository.UserRepository;
 import com.teamit.server.global.jwt.JwtTokenProvider;
@@ -21,7 +20,6 @@ public class AuthService {
 
     private final UserRepository userRepository;
     private final RefreshTokenRepository refreshTokenRepository;
-    private final EducationRepository educationRepository;
     private final KakaoOAuthService kakaoOAuthService;
     private final JwtTokenProvider jwtTokenProvider;
 
@@ -51,8 +49,8 @@ public class AuthService {
                     .build());
         }
 
-        // 마지막 온보딩 단계(학력)까지 완료했는지 체크
-        boolean needsOnboarding = !educationRepository.existsByUserId(user.getId());
+        // 온보딩(기본정보 입력)을 완료했는지 체크 — 지역/학력은 온보딩과 무관하게 마이페이지에서 별도 입력
+        boolean needsOnboarding = user.getName() == null;
 
         String accessToken = jwtTokenProvider.createAccessToken(user.getId());
         String refreshToken = jwtTokenProvider.createRefreshToken(user.getId());

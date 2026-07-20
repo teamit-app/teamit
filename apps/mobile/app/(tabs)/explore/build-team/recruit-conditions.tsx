@@ -29,6 +29,13 @@ const EXPERIENCE_OPTIONS = [
   { value: '공모전 경험자 선호', label: '경험자 선호', icon: '📚', desc: '공모전 경험자만 선호해요' },
 ];
 
+// 하드필터가 아니라 우대 조건 — 일치하면 후보 매칭 점수에 가산점만 준다
+const PURPOSE_OPTIONS = [
+  { value: '참여 목적 무관', label: '무관', icon: '🤝', desc: '참여 목적은 상관없어요' },
+  { value: '경험 선호', label: '경험 선호', icon: '🌱', desc: '경험을 목적으로 하는 팀원을 우대해요' },
+  { value: '수상 선호', label: '수상 선호', icon: '🏆', desc: '수상을 목적으로 하는 팀원을 우대해요' },
+];
+
 function ConditionCard({
   icon,
   label,
@@ -92,14 +99,25 @@ function Section({
 
 export default function RecruitConditionsScreen() {
   const insets = useSafeAreaInsets();
-  const { contestId, returnToConfirm } = useLocalSearchParams<{ contestId: string; returnToConfirm: string }>();
+  const { contestId, returnToConfirm, editPostId, sourceTab, fullEdit } = useLocalSearchParams<{
+    contestId: string;
+    returnToConfirm: string;
+    editPostId?: string;
+    sourceTab?: string;
+    fullEdit?: string;
+  }>();
+  const editSuffix = editPostId
+    ? `&editPostId=${editPostId}&sourceTab=${sourceTab ?? 'explore'}&fullEdit=${fullEdit ?? ''}`
+    : '';
 
   const gender = useBuildTeamStore((s) => s.genderCondition);
   const school = useBuildTeamStore((s) => s.schoolCondition);
   const experience = useBuildTeamStore((s) => s.experienceCondition);
+  const purpose = useBuildTeamStore((s) => s.purposeCondition);
   const setGender = useBuildTeamStore((s) => s.setGenderCondition);
   const setSchool = useBuildTeamStore((s) => s.setSchoolCondition);
   const setExperience = useBuildTeamStore((s) => s.setExperienceCondition);
+  const setPurpose = useBuildTeamStore((s) => s.setPurposeCondition);
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
@@ -137,6 +155,12 @@ export default function RecruitConditionsScreen() {
           selected={experience}
           onSelect={setExperience}
         />
+        <Section
+          title="참여 목적 우대"
+          options={PURPOSE_OPTIONS}
+          selected={purpose}
+          onSelect={setPurpose}
+        />
       </ScrollView>
 
       <View style={[styles.bottomBar, { paddingBottom: Math.max(insets.bottom, 16) }]}>
@@ -144,8 +168,9 @@ export default function RecruitConditionsScreen() {
           style={styles.nextBtn}
           onPress={() =>
             returnToConfirm === 'true'
-                ? router.push(`/explore/build-team/recruit-confirm?contestId=${contestId}` as never)
-                : router.push(`/explore/build-team/recruit-post?contestId=${contestId}` as never)
+                // confirm → push로 들어온 수정 화면이므로 되돌아갈 땐 replace (사유: recruit-count.tsx 참고)
+                ? router.replace(`/explore/build-team/recruit-confirm?contestId=${contestId}` as never)
+                : router.push(`/explore/build-team/recruit-post?contestId=${contestId}${editSuffix}` as never)
           }
           activeOpacity={0.85}
         >
@@ -205,12 +230,14 @@ const styles = StyleSheet.create({
   },
   cardRow: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     gap: 10,
   },
 
   // 조건 카드
   card: {
-    flex: 1,
+    flexGrow: 1,
+    flexBasis: '45%',
     backgroundColor: Colors.pageBg,
     borderRadius: 14,
     borderWidth: 1.5,

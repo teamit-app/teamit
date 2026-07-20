@@ -65,14 +65,15 @@ export interface MyProfile {
   birthDate: string;
   profileImageUrl: string | null;
   isMatchingActive: boolean;
-  temperature: number;
-  maxTemperature: number;
+  averageRating: number;
   regions: UserRegion[];
   education: UserEducation | null;
   skills: UserSkillItem[];
   careers: CareerItem[];
   reviews: TeamReview[];
 }
+
+export type ParticipationPurpose = 'EXPERIENCE' | 'AWARD';
 
 export interface MatchingProfileData {
   skills: string[];
@@ -83,6 +84,7 @@ export interface MatchingProfileData {
   teamVibe: number;
   feedbackStyle: number;
   leadershipPref: LeadershipPref;
+  participationPurpose: ParticipationPurpose;
   appealTitle: string;
   appealContent: string;
 }
@@ -120,11 +122,14 @@ export interface PostApplication {
 
 export interface ParticipantCardData {
   skills: string[];
-  experienceCount: string;
-  intensity: string;
-  onlineOffline: string;
+  experienceLevel: number | null;
+  intensityLevel: number | null;
+  onlineOfflinePref: string | null;
   region: string;
-  leadership: string;
+  teamVibe: number | null;
+  feedbackStyle: number | null;
+  leadershipPref: string | null;
+  participationPurpose: string | null;
   appealTitle: string;
   appealContent: string;
 }
@@ -150,7 +155,7 @@ export interface TalentPoolCandidate {
 export interface PostApplicant {
   userId: number;
   nickname: string;
-  temperature: number;
+  averageRating: number;
   gender: Gender;
   school: string;
   isSchoolVerified: boolean;
@@ -163,6 +168,13 @@ export interface PostApplicant {
   leadershipLabel: string;
   appealTitle: string;
   appealContent: string;
+}
+
+export interface PostApplicantPage {
+  content: PostApplicant[];
+  totalElements: number;
+  totalPages: number;
+  currentPage: number;
 }
 
 export interface LikedPost {

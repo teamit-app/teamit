@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import {
   View,
   Text,
@@ -10,6 +10,8 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { Colors } from '../../../../src/constants/colors';
 
 import { useBuildTeamStore } from '../../../../src/store/useBuildTeamStore';
+import { getPostDetail } from '../../../../src/services/postService';
+import { getContestRegistrations } from '../../../../src/services/mypageService';
 
 const MIN = 1;
 const MAX = 8;
@@ -18,18 +20,55 @@ const CURRENT_STEP = 1;
 
 export default function RecruitCountScreen() {
   const insets = useSafeAreaInsets();
-  const { contestId, returnToConfirm } = useLocalSearchParams<{ contestId: string; returnToConfirm: string }>();
+  const { contestId, returnToConfirm, editPostId, sourceTab, fullEdit } = useLocalSearchParams<{
+    contestId: string;
+    returnToConfirm: string;
+    editPostId?: string;
+    sourceTab?: string;
+    fullEdit?: string;
+  }>();
   const count = useBuildTeamStore((s) => s.recruitCount);
   const setRecruitCount = useBuildTeamStore((s) => s.setRecruitCount);
+
+  // 기존 모집글 전체 수정 위저드의 첫 진입점 — 여기서 한 번만 서버 값을 읽어와
+  // 스토어 전체(모집 인원·기술·조건·어필글)를 채워두면, 뒤 단계들은 그대로 이어받는다.
+  // 활동 방식은 모집글 자체가 아니라 모집자 본인의 참여 카드(후보 등록) 값을 그대로 따르므로
+  // (recruit-conditions.tsx에서 더 이상 따로 묻지 않음) 참여 카드 목록에서 이 공모전 등록건을 찾아서 채운다
+  useEffect(() => {
+    if (!editPostId) return;
+    Promise.all([
+      getPostDetail(Number(editPostId)),
+      getContestRegistrations().catch(() => []),
+    ]).then(([d, registrations]) => {
+      const store = useBuildTeamStore.getState();
+      store.setRecruitCount(d.recruitCount ?? 2);
+      store.setRequiredSkills(d.skills ?? []);
+      store.setGenderCondition(d.genderCondition === 'SAME' ? '동성만' : '상관없음');
+      store.setSchoolCondition(d.schoolCondition === 'SAME_SCHOOL' ? '같은 학교만' : '학교 상관없음');
+      const myRegistration = registrations.find((r) => r.contestId === Number(contestId));
+      const pref = myRegistration?.participantCard.onlineOfflinePref;
+      store.setMeetingType(pref === 'ONLINE' ? '온라인' : pref === 'OFFLINE' ? '오프라인' : '혼합');
+      store.setExperienceCondition(d.experienceCondition || '공모전 경험 무관');
+      store.setPostTitle(d.title);
+      store.setPostContent(d.description ?? '');
+    }).catch(() => {});
+  }, [editPostId]);
 
   const dec = () => { if (count > MIN) setRecruitCount(count - 1); };
   const inc = () => { if (count < MAX) setRecruitCount(count + 1); };
 
+  const editSuffix = editPostId
+    ? `&editPostId=${editPostId}&sourceTab=${sourceTab ?? 'explore'}&fullEdit=${fullEdit ?? ''}`
+    : '';
+
   const goNext = () => {
     if (returnToConfirm === 'true') {
-      router.push(`/explore/build-team/recruit-confirm?contestId=${contestId}` as never);
+      // confirm에서 "수정"으로 push해 들어온 화면이므로, 되돌아갈 땐 push가 아니라 replace로
+      // 스택에서 이 수정 화면 자체를 제거해야 함 — push하면 confirm이 스택에 중복으로 쌓여서
+      // 뒤로가기를 눌렀을 때 방금 지나온 다른 수정 화면으로 엉뚱하게 튐
+      router.replace(`/explore/build-team/recruit-confirm?contestId=${contestId}` as never);
     } else {
-      router.push(`/explore/build-team/recruit-skills?contestId=${contestId}` as never);
+      router.push(`/explore/build-team/recruit-skills?contestId=${contestId}${editSuffix}` as never);
     }
   };
 

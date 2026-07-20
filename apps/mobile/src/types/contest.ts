@@ -22,6 +22,7 @@ export interface Contest {
   dDay: number;
   isNew: boolean;
   isHearted: boolean;
+  isRegisteredAsParticipant: boolean;
 }
 
 export interface ContestDetail extends Contest {
@@ -31,6 +32,9 @@ export interface ContestDetail extends Contest {
   registrationPeriod: string;
   registrationUrl: string;
   hasRegisteredForMatching: boolean;
+  // 공모전 상세내용 본문(줄바꿈 포함) + 포스터 이미지 URL — 관리자가 등록/수정
+  content?: string;
+  imageUrl?: string;
 }
 
 export interface TeamMember {
@@ -59,12 +63,19 @@ export interface RecruitPost {
   likeCount: number;
   skills: string[];
   experienceCondition: string;
+  purposeCondition?: string;
   meetingType: string;
   location: string;
   intensity: string;
+  genderCondition?: string;
+  genderConditionLabel?: string;
+  schoolConditionLabel?: string;
+  recruiterGender?: string;
   currentMembers: number;
   totalMembers: number;
   isHearted: boolean;
+  ownerUserId?: number;
+  status?: string;
 }
 
 export interface RecruitPostDetail extends RecruitPost {

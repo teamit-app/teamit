@@ -14,6 +14,9 @@ public interface ContestRepository extends JpaRepository<Contest, Long> {
 
     List<Contest> findByEndDateGreaterThanEqualOrderByCreatedAtDesc(LocalDate today);
 
+    // 관리자 공모전 관리 화면용 전체 목록
+    List<Contest> findAllByOrderByIdDesc();
+
     // category: enum name string, null means no filter
     // statusEndMin / statusEndMax / statusEndBefore: date range for status filter, null means no filter
     // keyword: LIKE search on title, organizer, category column

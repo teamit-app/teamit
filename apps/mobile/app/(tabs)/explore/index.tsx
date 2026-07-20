@@ -11,7 +11,9 @@ import { ContestCard } from '../../../src/components/explore/ContestCard';
 import { TalentCard } from '../../../src/components/explore/TalentCard';
 import { CategoryFilterModal, CategoryFilter } from '../../../src/components/explore/CategoryFilterModal';
 import { useExploreStore } from '../../../src/store/useExploreStore';
+import { useAuthStore } from '../../../src/store/useAuthStore';
 import { getOrCreateDirectChatRoom } from '../../../src/services/messageService';
+import { requireAuthForChat } from '../../../src/utils/authGuard';
 
 type MainTab = 'POOL' | 'CONTEST';
 type SortFilter = 'ALL' | 'LATEST' | 'POPULAR';
@@ -36,11 +38,13 @@ export default function ExploreScreen() {
   const loadData = useExploreStore((s) => s.loadData);
   const toggleTalentHeart = useExploreStore((s) => s.toggleTalentHeart);
   const toggleContestHeart = useExploreStore((s) => s.toggleContestHeart);
+  const currentUserId = useAuthStore((s) => s.currentUserId);
 
   const handlePropose = async (targetUserId: number) => {
+    if (!requireAuthForChat(`/explore/talent/${targetUserId}`)) return;
     try {
       const chatRoomId = await getOrCreateDirectChatRoom(targetUserId);
-      router.push(`/messages/${chatRoomId}` as never);
+      router.push(`/explore/chat/${chatRoomId}` as never);
     } catch (e) {
       console.error('[Explore] 채팅방 생성 실패:', e);
     }
@@ -136,8 +140,9 @@ export default function ExploreScreen() {
                 <TalentCard
                   key={talent.userId}
                   talent={talent}
+                  isMe={talent.userId === currentUserId}
                   onPress={() => router.push(`/explore/talent/${talent.userId}` as never)}
-                  onPressHeart={() => toggleTalentHeart(talent.userId)}
+                  onPressHeart={() => toggleTalentHeart(talent.userId, talent.isHearted)}
                   onPressPropose={() => handlePropose(talent.userId)}
                 />
               ))

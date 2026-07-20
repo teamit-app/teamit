@@ -1,20 +1,22 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
   TouchableOpacity,
   ScrollView,
   StyleSheet,
-  Alert,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { router, useLocalSearchParams } from 'expo-router';
+import { router } from 'expo-router';
+import { Alert } from '../../../src/utils/alert';
 import { Colors } from '../../../src/constants/colors';
 import { ScreenHeader } from '../../../src/components/common/ScreenHeader';
 import { SearchBottomSheet } from '../../../src/components/common/SearchBottomSheet';
 import { useMypageStore } from '../../../src/store/useMypageStore';
 import { SCHOOL_LIST, MAJOR_LIST } from '../../../src/data/schools';
 import { EducationStatus, VerificationStatus } from '../../../src/types/mypage';
+import { submitEducation } from '../../../src/services/onboardingService';
+import { cancelEducationCert } from '../../../src/services/mypageService';
 
 // ──────────────────────────────────────────────────
 // Constants
@@ -35,12 +37,14 @@ function CertStatusCard({
   verificationRejectReason,
   schoolName,
   verificationSubmittedAt,
+  onCancelSubmission,
 }: {
   verificationStatus: VerificationStatus;
   verificationFileName?: string;
   verificationRejectReason?: string | null;
   schoolName: string;
   verificationSubmittedAt?: string;
+  onCancelSubmission: () => void;
 }) {
   if (verificationStatus === 'NONE') {
     return (
@@ -56,20 +60,8 @@ function CertStatusCard({
         <View style={styles.warningBox}>
           <Text style={styles.warningTitle}>아직 학교 인증이 완료되지 않았어요</Text>
           <Text style={styles.warningDesc}>
-            인증하면 프로필에 뱃지가 표시되고 매칭 신뢰도가 높아져요
+            * 인증하면 프로필에 뱃지가 표시되고 매칭 신뢰도가 높아져요
           </Text>
-          <View style={styles.warningBtnRow}>
-            <TouchableOpacity style={styles.warningOutlineBtn} activeOpacity={0.7}>
-              <Text style={styles.warningOutlineBtnText}>확인</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.warningFillBtn}
-              onPress={() => router.push('/(tabs)/profile/education-cert')}
-              activeOpacity={0.7}
-            >
-              <Text style={styles.warningFillBtnText}>서류 제출하기</Text>
-            </TouchableOpacity>
-          </View>
         </View>
       </View>
     );
@@ -89,14 +81,16 @@ function CertStatusCard({
             <Text style={styles.submittedFileIcon}>📄</Text>
             <View style={{ flex: 1 }}>
               <Text style={styles.submittedFileName}>{verificationFileName}</Text>
-              <View style={styles.submittedFileBtnRow}>
-                <TouchableOpacity style={styles.submittedFileBtn} activeOpacity={0.7}>
-                  <Text style={styles.submittedFileBtnText}>제출 확인</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.submittedFileBtn} activeOpacity={0.7}>
-                  <Text style={[styles.submittedFileBtnText, { color: Colors.error }]}>취소하기</Text>
-                </TouchableOpacity>
-              </View>
+              {verificationSubmittedAt ? (
+                <Text style={styles.submittedFileDate}>{verificationSubmittedAt} 제출</Text>
+              ) : null}
+              <TouchableOpacity
+                style={styles.cancelSubmitBtn}
+                onPress={onCancelSubmission}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.cancelSubmitBtnText}>제출 취소하기</Text>
+              </TouchableOpacity>
             </View>
           </View>
         ) : null}
@@ -126,23 +120,17 @@ function CertStatusCard({
       <View style={styles.statusCardRed}>
         <Text style={styles.statusCardRedText}>❌ 인증 실패</Text>
         <Text style={styles.statusCardDesc}>서류 내용이 확인되지 않았어요</Text>
-        {verificationRejectReason ? (
-          <Text style={styles.rejectReason}>
-            · {verificationRejectReason}
-          </Text>
-        ) : (
-          <Text style={styles.rejectReason}>
-            · 제출하신 이미지의 해상도가 낮아 정보 확인이 어려워요
-          </Text>
-        )}
+        <View style={styles.rejectReasonBox}>
+          <Text style={styles.rejectReasonTitle}>반려 사유</Text>
+          {verificationRejectReason ? (
+            <Text style={styles.rejectReason}>· {verificationRejectReason}</Text>
+          ) : (
+            <Text style={styles.rejectReason}>
+              · 제출하신 이미지의 해상도가 낮아 정보 확인이 어려워요
+            </Text>
+          )}
+        </View>
       </View>
-      <TouchableOpacity
-        style={styles.resubmitBtn}
-        onPress={() => router.push('/(tabs)/profile/education-cert')}
-        activeOpacity={0.7}
-      >
-        <Text style={styles.resubmitBtnText}>다시 제출하기</Text>
-      </TouchableOpacity>
     </View>
   );
 }
@@ -152,9 +140,7 @@ function CertStatusCard({
 // ──────────────────────────────────────────────────
 export default function EducationScreen() {
   const insets = useSafeAreaInsets();
-  const { profile, reloadProfile } = useMypageStore();
-  const { mode } = useLocalSearchParams<{ mode?: string }>();
-  const isEditMode = mode === 'edit';
+  const { profile, updateEducationLocal } = useMypageStore();
 
   const [schoolName, setSchoolName] = useState('');
   const [educationStatus, setEducationStatus] =
@@ -170,29 +156,108 @@ export default function EducationScreen() {
   const verificationStatus: VerificationStatus =
     profile?.education?.verificationStatus ?? 'NONE';
 
+  // profile이 최초로 로드될 때 한 번만 폼을 채운다 (입력 중인 값이 덮어써지지 않도록).
+  const initializedRef = useRef(false);
   useEffect(() => {
-    if (profile?.education) {
+    if (profile?.education && !initializedRef.current) {
       setSchoolName(profile.education.schoolName);
       setEducationStatus(profile.education.status);
       setMajor(profile.education.major);
       setSubMajor(profile.education.subMajor ?? null);
+      initializedRef.current = true;
     }
   }, [profile]);
 
-  const handleSave = async () => {
+  // 저장 후 이동할 곳: 'back' = 저장하기 버튼, 'cert' = 파일 업로드 버튼(저장 후 바로 인증 화면으로)
+  const trySave = (nextAction: 'back' | 'cert') => {
     if (!schoolName.trim()) {
       Alert.alert('알림', '학교명을 입력해주세요.');
       return;
     }
+
+    const schoolChanged = profile?.education?.schoolName !== schoolName.trim();
+    const majorChanged = (profile?.education?.major ?? '') !== (major || '');
+    const subMajorChanged = (profile?.education?.subMajor ?? null) !== (subMajor || null);
+    const willResetVerification =
+      (schoolChanged || majorChanged || subMajorChanged) && verificationStatus !== 'NONE';
+
+    if (willResetVerification) {
+      Alert.alert(
+        '학력 정보 변경 안내',
+        '신입학·편입·전과·복수전공 추가 등으로 학교 또는 전공 정보가 바뀌면 기존 인증 뱃지가 사라지고 다시 인증을 받아야 해요. 계속하시겠어요?',
+        [
+          { text: '취소', style: 'cancel' },
+          { text: '계속', onPress: () => doSave(true, nextAction) },
+        ],
+      );
+      return;
+    }
+
+    doSave(false, nextAction);
+  };
+
+  const handleSave = () => trySave('back');
+
+  // 학교/전공 입력 중 바로 서류 인증으로 넘어갈 때도 입력한 학력을 먼저 저장해 educationId를 확보한다.
+  const handleUploadPress = () => trySave('cert');
+
+  const doSave = async (resetVerification: boolean, nextAction: 'back' | 'cert') => {
     setLoading(true);
     try {
-      await reloadProfile();
-      router.back();
+      const educationId = await submitEducation(0, {
+        schoolName: schoolName.trim(),
+        status: educationStatus,
+        majorType: subMajor ? 'DOUBLE' : 'SINGLE',
+        major: major || '',
+        subMajor: subMajor || null,
+      });
+      updateEducationLocal({
+        educationId,
+        schoolName: schoolName.trim(),
+        status: educationStatus,
+        major: major || '',
+        subMajor: subMajor || null,
+        verified: resetVerification ? false : profile?.education?.verified ?? false,
+        verificationStatus: resetVerification ? 'NONE' : verificationStatus,
+      });
+      if (nextAction === 'cert') {
+        router.push('/(tabs)/profile/education-cert');
+      } else {
+        router.back();
+      }
     } catch {
       Alert.alert('오류', '저장에 실패했어요. 다시 시도해주세요.');
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleCancelSubmission = () => {
+    const educationId = profile?.education?.educationId;
+    if (!educationId) return;
+    Alert.alert('제출 취소', '제출한 서류를 취소할까요?', [
+      { text: '아니오', style: 'cancel' },
+      {
+        text: '취소하기',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            await cancelEducationCert(educationId);
+            updateEducationLocal({
+              educationId,
+              schoolName,
+              status: educationStatus,
+              major: major || '',
+              subMajor: subMajor || null,
+              verified: false,
+              verificationStatus: 'NONE',
+            });
+          } catch {
+            Alert.alert('오류', '취소에 실패했어요. 다시 시도해주세요.');
+          }
+        },
+      },
+    ]);
   };
 
   return (
@@ -302,51 +367,55 @@ export default function EducationScreen() {
         </View>
 
         {/* ── 학교 인증 섹션 ── */}
-        {isEditMode && verificationStatus === 'APPROVED' ? (
-          /* 수정 모드 + 인증 완료: 컴팩트 배너 */
-          <View style={styles.approvedBanner}>
-            <Text style={styles.approvedBannerIcon}>✅</Text>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.approvedBannerTitle}>
-                인증 완료된 학교입니다
-              </Text>
-              <Text style={styles.approvedBannerDesc}>
-                학교를 변경하면 재인증이 필요할 수 있어요
-              </Text>
-            </View>
-          </View>
-        ) : (
-          /* 일반 모드 또는 미인증 */
-          <View style={styles.card}>
-            <Text style={styles.cardLabelBold}>학교 인증</Text>
+        <View style={styles.card}>
+          <Text style={styles.cardLabelBold}>학교 인증</Text>
 
-            {/* 프로모 배너 */}
-            <View style={styles.promoBanner}>
-              <Text style={styles.promoBannerTitle}>
-                학교를 인증하고 뱃지를 받아보세요 🏫
-              </Text>
-              <Text style={styles.promoBannerDesc}>
-                인증하면 프로필에 뱃지가 표시되고 매칭 시 신뢰도가 올라가요
-              </Text>
-            </View>
-
-            {/* 상태별 인증 카드 */}
-            <CertStatusCard
-              verificationStatus={verificationStatus}
-              verificationFileName={profile?.education?.verificationFileName}
-              verificationRejectReason={
-                profile?.education?.verificationRejectReason
-              }
-              schoolName={schoolName}
-              verificationSubmittedAt={
-                profile?.education?.verificationSubmittedAt
-              }
-            />
+          {/* 프로모 배너 */}
+          <View style={styles.promoBanner}>
+            <Text style={styles.promoBannerTitle}>
+              학교를 인증하고 뱃지를 받아보세요 🏫
+            </Text>
+            <Text style={styles.promoBannerDesc}>
+              인증하면 프로필에 뱃지가 표시되고 매칭 시 신뢰도가 올라가요
+            </Text>
           </View>
-        )}
+
+          {/* 서류 업로드 */}
+          <View style={styles.uploadSection}>
+            <Text style={styles.uploadSectionTitle}>학생증 · 재학증명서 인증</Text>
+            <Text style={styles.uploadSectionDesc}>
+              서류 이미지를 업로드하면 운영팀이 검토해요 (1~2일)
+            </Text>
+            <TouchableOpacity
+              style={styles.uploadBtn}
+              onPress={handleUploadPress}
+              activeOpacity={0.7}
+            >
+              <Text style={styles.uploadBtnText}>📎 파일 업로드</Text>
+            </TouchableOpacity>
+          </View>
+
+          {/* 상태별 인증 카드 — 인증된 학교명은 폼에서 편집 중인 schoolName이 아니라
+              서버에 저장된 profile.education.schoolName을 그대로 보여줘야 한다.
+              안 그러면 학교를 바꾸자마자(저장 전에도) 아직 인증받지 않은 새 학교가
+              "인증 완료"로 표시된다. */}
+          <CertStatusCard
+            verificationStatus={verificationStatus}
+            verificationFileName={profile?.education?.verificationFileName}
+            verificationRejectReason={
+              profile?.education?.verificationRejectReason
+            }
+            schoolName={profile?.education?.schoolName ?? schoolName}
+            verificationSubmittedAt={
+              profile?.education?.verificationSubmittedAt
+            }
+            onCancelSubmission={handleCancelSubmission}
+          />
+        </View>
       </ScrollView>
 
-      {/* ── 확인 버튼 ── */}
+      {/* ── 확인 버튼: 인증 상태와 무관하게 학교/학과 정보 저장 ── */}
+      {/* 서류 제출은 위쪽 "파일 업로드" 버튼으로 별도 진입 (학력 수정과 인증 제출은 별개의 동작) */}
       <View style={[styles.footer, { paddingBottom: insets.bottom + 16 }]}>
         <TouchableOpacity
           style={[styles.confirmBtn, loading && styles.confirmBtnDisabled]}
@@ -556,31 +625,6 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
   },
 
-  // ── 수정 모드 인증 완료 배너 ──
-  approvedBanner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    margin: 16,
-    backgroundColor: Colors.ogTint,
-    borderRadius: 12,
-    padding: 16,
-  },
-  approvedBannerIcon: {
-    fontSize: 22,
-  },
-  approvedBannerTitle: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: Colors.dark,
-    marginBottom: 4,
-  },
-  approvedBannerDesc: {
-    fontSize: 13,
-    color: Colors.gray,
-    lineHeight: 18,
-  },
-
   // ── 프로모 배너 ──
   promoBanner: {
     backgroundColor: Colors.ogTint,
@@ -600,6 +644,40 @@ const styles = StyleSheet.create({
     lineHeight: 17,
   },
 
+  // ── 학생증·재학증명서 인증 (파일 업로드) ──
+  uploadSection: {
+    borderWidth: 1,
+    borderColor: Colors.lightGray,
+    borderRadius: 12,
+    padding: 14,
+    marginBottom: 12,
+  },
+  uploadSectionTitle: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: Colors.dark,
+    marginBottom: 4,
+  },
+  uploadSectionDesc: {
+    fontSize: 12,
+    color: Colors.gray,
+    lineHeight: 17,
+    marginBottom: 10,
+  },
+  uploadBtn: {
+    height: 40,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: Colors.lightGray,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  uploadBtnText: {
+    fontSize: 13,
+    color: Colors.gray,
+    fontWeight: '600',
+  },
+
   // ── 상태 카드 공통 ──
   certStatusCard: {
     borderWidth: 1,
@@ -610,21 +688,6 @@ const styles = StyleSheet.create({
   },
 
   // NONE
-  uploadOutlineBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: Colors.lightGray,
-    borderRadius: 10,
-    paddingVertical: 12,
-    marginBottom: 12,
-  },
-  uploadOutlineBtnText: {
-    fontSize: 14,
-    color: Colors.gray,
-    fontWeight: '500',
-  },
   statusChipRow: {
     flexDirection: 'row',
     marginBottom: 12,
@@ -642,7 +705,7 @@ const styles = StyleSheet.create({
     color: Colors.gray,
   },
   warningBox: {
-    backgroundColor: Colors.ogTint,
+    backgroundColor: Colors.pageBg,
     borderRadius: 8,
     padding: 12,
   },
@@ -656,38 +719,6 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: Colors.gray,
     lineHeight: 17,
-    marginBottom: 12,
-  },
-  warningBtnRow: {
-    flexDirection: 'row',
-    gap: 8,
-  },
-  warningOutlineBtn: {
-    flex: 1,
-    height: 36,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: Colors.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  warningOutlineBtnText: {
-    fontSize: 13,
-    color: Colors.primary,
-    fontWeight: '600',
-  },
-  warningFillBtn: {
-    flex: 2,
-    height: 36,
-    borderRadius: 8,
-    backgroundColor: Colors.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  warningFillBtnText: {
-    fontSize: 13,
-    color: Colors.white,
-    fontWeight: '700',
   },
 
   // PENDING
@@ -729,22 +760,24 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '600',
     color: Colors.dark,
+    marginBottom: 4,
+  },
+  submittedFileDate: {
+    fontSize: 12,
+    color: Colors.grayMedium,
     marginBottom: 8,
   },
-  submittedFileBtnRow: {
-    flexDirection: 'row',
-    gap: 8,
-  },
-  submittedFileBtn: {
+  cancelSubmitBtn: {
+    alignSelf: 'flex-start',
     paddingVertical: 4,
     paddingHorizontal: 10,
     borderRadius: 6,
     borderWidth: 1,
     borderColor: Colors.lightGray,
   },
-  submittedFileBtnText: {
+  cancelSubmitBtnText: {
     fontSize: 12,
-    color: Colors.gray,
+    color: Colors.error,
   },
 
   // APPROVED
@@ -763,22 +796,23 @@ const styles = StyleSheet.create({
     color: '#C62828',
     marginBottom: 6,
   },
+  rejectReasonBox: {
+    backgroundColor: Colors.white,
+    borderRadius: 8,
+    padding: 10,
+    marginTop: 4,
+  },
+  rejectReasonTitle: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: Colors.dark,
+    marginBottom: 4,
+  },
   rejectReason: {
     fontSize: 12,
     color: Colors.gray,
     lineHeight: 17,
     marginTop: 4,
-  },
-  resubmitBtn: {
-    backgroundColor: Colors.primary,
-    borderRadius: 10,
-    paddingVertical: 12,
-    alignItems: 'center',
-  },
-  resubmitBtnText: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: Colors.white,
   },
 
   // ── 푸터 ──

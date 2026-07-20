@@ -13,7 +13,7 @@ import { Colors } from '../../../../src/constants/colors';
 
 export default function MatchingLoadingScreen() {
   const insets = useSafeAreaInsets();
-  const { contestId } = useLocalSearchParams<{ contestId: string }>();
+  const { contestId, postId } = useLocalSearchParams<{ contestId: string; postId?: string }>();
 
   const scale = useRef(new Animated.Value(1)).current;
   const dot1 = useRef(new Animated.Value(0.35)).current;
@@ -65,7 +65,7 @@ export default function MatchingLoadingScreen() {
 
     // 3초 후 자동 이동
     const timer = setTimeout(() => {
-      router.replace(`/explore/build-team/candidates?contestId=${contestId}` as never);
+      router.replace(`/explore/build-team/candidates?contestId=${contestId}&postId=${postId ?? ''}` as never);
     }, 3000);
     return () => clearTimeout(timer);
   }, []);

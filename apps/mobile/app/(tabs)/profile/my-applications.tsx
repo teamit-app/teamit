@@ -8,13 +8,17 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
+import { Alert } from '../../../src/utils/alert';
 import { Colors } from '../../../src/constants/colors';
 import { ScreenHeader } from '../../../src/components/common/ScreenHeader';
 import {
   getContestRegistrations,
   getPostApplications,
+  cancelContestRegistration,
+  cancelPostApplication,
 } from '../../../src/services/mypageService';
 import { ContestRegistration, PostApplication } from '../../../src/types/mypage';
+import { useExploreStore } from '../../../src/store/useExploreStore';
 
 type Tab = 'contest' | 'post';
 
@@ -72,6 +76,7 @@ export default function MyApplicationsScreen() {
   const [registrations, setRegistrations] = useState<ContestRegistration[]>([]);
   const [postApps, setPostApps] = useState<PostApplication[]>([]);
   const [loading, setLoading] = useState(true);
+  const unmarkContestParticipant = useExploreStore((s) => s.unmarkContestParticipant);
 
   useEffect(() => {
     Promise.all([getContestRegistrations(), getPostApplications()])
@@ -81,6 +86,47 @@ export default function MyApplicationsScreen() {
       })
       .finally(() => setLoading(false));
   }, []);
+
+  const handleCancelRegistration = (reg: ContestRegistration) => {
+    Alert.alert(
+      '후보 등록 취소',
+      '후보 등록을 취소하면 공모전 후보 목록에서 삭제돼요.\n이 공모전에 작성한 모집글이 있다면 함께 삭제돼요.\n취소하시겠어요?',
+      [
+        { text: '아니요', style: 'cancel' },
+        {
+          text: '취소하기',
+          style: 'destructive',
+          onPress: async () => {
+            await cancelContestRegistration(reg.contestId);
+            unmarkContestParticipant(reg.contestId);
+            setRegistrations((prev) =>
+              prev.filter((r) => r.registrationId !== reg.registrationId),
+            );
+          },
+        },
+      ],
+    );
+  };
+
+  const handleCancelApplication = (app: PostApplication) => {
+    Alert.alert(
+      '지원 취소',
+      '지원을 취소해도 공모전 후보 등록은 계속 유지돼요.\n지원을 취소하시겠어요?',
+      [
+        { text: '아니요', style: 'cancel' },
+        {
+          text: '취소하기',
+          style: 'destructive',
+          onPress: async () => {
+            await cancelPostApplication(app.applicationId);
+            setPostApps((prev) =>
+              prev.filter((a) => a.applicationId !== app.applicationId),
+            );
+          },
+        },
+      ],
+    );
+  };
 
   const renderContestTab = () => {
     if (registrations.length === 0) return <EmptyState />;
@@ -104,7 +150,13 @@ export default function MyApplicationsScreen() {
             </View>
             <Text style={styles.cardOrg}>주최: {reg.organizer}</Text>
             <Text style={styles.cardDate}>참여카드 등록일: {reg.registeredAt}</Text>
-            <Text style={styles.cardArrow}>›</Text>
+            <TouchableOpacity
+              style={styles.cancelBtn}
+              onPress={() => handleCancelRegistration(reg)}
+              hitSlop={8}
+            >
+              <Text style={styles.cancelBtnText}>제출 취소</Text>
+            </TouchableOpacity>
           </TouchableOpacity>
         ))}
       </ScrollView>
@@ -123,7 +175,12 @@ export default function MyApplicationsScreen() {
             onPress={() =>
               router.push({
                 pathname: '/(tabs)/profile/post/[postId]',
-                params: { postId: app.postId, contestId: app.contestId, appliedStatus: 'applied' },
+                params: {
+                  postId: app.postId,
+                  contestId: app.contestId,
+                  appliedStatus: 'applied',
+                  applicationId: app.applicationId,
+                },
               })
             }
           >
@@ -133,7 +190,13 @@ export default function MyApplicationsScreen() {
             </View>
             <Text style={styles.cardOrg}>작성자: {app.authorNickname}</Text>
             <Text style={styles.cardDate}>지원일: {app.appliedAt}</Text>
-            <Text style={styles.cardArrow}>›</Text>
+            <TouchableOpacity
+              style={styles.cancelBtn}
+              onPress={() => handleCancelApplication(app)}
+              hitSlop={8}
+            >
+              <Text style={styles.cancelBtnText}>지원 취소</Text>
+            </TouchableOpacity>
           </TouchableOpacity>
         ))}
       </ScrollView>
@@ -222,12 +285,14 @@ const styles = StyleSheet.create({
   cardContest: { fontSize: 12, color: Colors.gray, marginBottom: 4 },
   cardTitle: { flex: 1, fontSize: 15, fontWeight: '700', color: Colors.dark, marginRight: 8 },
   cardOrg: { fontSize: 13, color: Colors.gray, marginBottom: 2 },
-  cardDate: { fontSize: 13, color: Colors.grayMedium },
-  cardArrow: {
-    position: 'absolute',
-    right: 16,
-    bottom: 16,
-    fontSize: 20,
-    color: Colors.grayMedium,
+  cardDate: { fontSize: 13, color: Colors.grayMedium, marginBottom: 10 },
+  cancelBtn: {
+    alignSelf: 'flex-end',
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: Colors.grayMedium,
   },
+  cancelBtnText: { fontSize: 12, fontWeight: '600', color: Colors.grayMedium },
 });

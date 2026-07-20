@@ -1,15 +1,24 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
   ScrollView,
   TouchableOpacity,
   StyleSheet,
+  ActivityIndicator,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
 import { Colors } from '../../../../../src/constants/colors';
-import { dummyCandidates } from '../../../../../src/data/candidates';
+import { EDUCATION_STATUS_LABEL } from '../../../../../src/constants/education';
+import { getUserDetail } from '../../../../../src/services/talentService';
+import { useAuthStore } from '../../../../../src/store/useAuthStore';
+import { useExploreStore } from '../../../../../src/store/useExploreStore';
+import { TalentDetail } from '../../../../../src/types/talent';
+import { ReviewStatsCard } from '../../../../../src/components/profile/ReviewStatsCard';
+
+const IS_MOCK = process.env.EXPO_PUBLIC_API_MODE === 'mock';
+const GENDER_LABEL: Record<string, string> = { MALE: '남성', FEMALE: '여성' };
 
 /* ─── 섹션 타이틀 ─── */
 function SectionTitle({ title }: { title: string }) {
@@ -34,46 +43,59 @@ function InfoRow({
   );
 }
 
-/* ─── 온도 진행 바 ─── */
-function TempBar({ value, max = 40 }: { value: number; max?: number }) {
-  return (
-    <View style={s.barWrap}>
-      <View style={s.barTrack}>
-        <View style={[s.barFill, { width: `${(value / max) * 100}%` as any }]} />
-      </View>
-      <View style={s.barScale}>
-        <Text style={s.barScaleText}>0</Text>
-        <Text style={s.barScaleText}>{max}</Text>
-      </View>
-    </View>
-  );
-}
-
-/* ─── 통계 행 ─── */
-function StatRow({ label, value }: { label: string; value: string }) {
-  return (
-    <View style={s.statRow}>
-      <Text style={s.statLabel}>{label}</Text>
-      <Text style={s.statValue}>{value}</Text>
-    </View>
-  );
-}
-
 /* ─── 메인 화면 ─── */
 export default function CandidateDetailScreen() {
   const insets = useSafeAreaInsets();
   const { id } = useLocalSearchParams<{ id: string }>();
   const [hearted, setHearted] = useState(false);
+  const [detail, setDetail] = useState<TalentDetail | null>(null);
+  const currentUserId = useAuthStore((s) => s.currentUserId);
+  const toggleTalentHeartInStore = useExploreStore((s) => s.toggleTalentHeart);
 
-  const c = dummyCandidates.find((x) => x.id === Number(id)) ?? dummyCandidates[0];
+  useEffect(() => {
+    if (IS_MOCK) {
+      // mock 모드: 인재풀 상세정보와 동일한 더미 데이터 사용
+      import('../../../../../src/data/talents').then(({ dummyTalentDetails }) => {
+        const found = dummyTalentDetails.find((d) => d.userId === Number(id)) ?? dummyTalentDetails[0];
+        setDetail(found);
+        setHearted(found.isHearted);
+      });
+    } else {
+      // 서버 모드: 후보자 목록에서 넘어온 id는 실제 userId — 인재풀 상세정보와 동일한 API 사용
+      getUserDetail(Number(id))
+        .then((d) => {
+          setDetail(d);
+          setHearted(d.isHearted);
+        })
+        .catch(console.error);
+    }
+  }, [id]);
 
-  const KEYWORD_SHOW = 4;
-  const extraKeywords = c.reviewKeywords.length - KEYWORD_SHOW;
+  // 인재풀 하트와 동일한 대상 — 여기서 좋아요를 눌러도 탐색 > 인재풀 상세정보에 그대로 반영된다
+  const handleToggleHeart = async () => {
+    if (!detail) return;
+    const prev = hearted;
+    setHearted(!prev);
+    try {
+      await toggleTalentHeartInStore(detail.userId, prev);
+    } catch (e) {
+      console.error('[CandidateDetail] 하트 처리 실패:', e);
+      setHearted(prev);
+    }
+  };
+
+  if (!detail) {
+    return (
+      <View style={[s.container, { paddingTop: insets.top, alignItems: 'center', justifyContent: 'center' }]}>
+        <ActivityIndicator size="large" color={Colors.primary} />
+      </View>
+    );
+  }
 
   return (
     <View style={[s.container, { paddingTop: insets.top }]}>
 
-      {/* ── 헤더 (하트 없음, 프로필 카드로 이동) ── */}
+      {/* ── 헤더 ── */}
       <View style={s.header}>
         <TouchableOpacity onPress={() => router.back()} hitSlop={8} style={s.headerSide}>
           <Text style={s.backIcon}>‹</Text>
@@ -87,31 +109,34 @@ export default function CandidateDetailScreen() {
         {/* ── 프로필 카드 (하트 우측) ── */}
         <View style={s.profileCard}>
           <View style={s.avatar}>
-            <Text style={s.avatarEmoji}>🐱</Text>
+            <Text style={s.avatarEmoji}>🧑‍💻</Text>
           </View>
 
           <View style={s.profileInfo}>
             <View style={s.nameRow}>
-              <Text style={s.name}>{c.name}</Text>
-              <Text style={s.gender}> {c.gender}</Text>
+              <Text style={s.name}>{detail.nickname}</Text>
+              <Text style={s.gender}> {GENDER_LABEL[detail.gender]}</Text>
               <View style={s.tempPill}>
-                <Text style={s.tempPillText}>{c.temperature}°C</Text>
+                <Text style={s.tempPillText}>★ {detail.averageRating.toFixed(1)}</Text>
               </View>
             </View>
             <View style={s.schoolRow}>
-              <Text style={s.school}>{c.school}</Text>
-              {c.isVerified && (
+              <Text style={s.school}>
+                {detail.schoolName} {detail.major}
+                {detail.status ? ` · ${EDUCATION_STATUS_LABEL[detail.status]}` : ''}
+              </Text>
+              {detail.verified && (
                 <View style={s.verifiedDot}>
                   <Text style={s.verifiedCheck}>✓</Text>
                 </View>
               )}
             </View>
-            <Text style={s.location}>📍 {c.location}</Text>
+            <Text style={s.location}>📍 {detail.location}</Text>
           </View>
 
           {/* 하트: 프로필 카드 우측 상단 */}
           <TouchableOpacity
-            onPress={() => setHearted((p) => !p)}
+            onPress={handleToggleHeart}
             hitSlop={8}
             style={s.heartBtn}
           >
@@ -124,8 +149,8 @@ export default function CandidateDetailScreen() {
         {/* ── 어필글 카드 ── */}
         <View style={s.appealCard}>
           <Text style={s.appealLabel}>어필글</Text>
-          <Text style={s.appealTitle}>{c.intro}</Text>
-          <Text style={s.appealBody}>{c.introContent}</Text>
+          <Text style={s.appealTitle}>{detail.appealTitle}</Text>
+          <Text style={s.appealBody}>{detail.appealContent}</Text>
         </View>
 
         {/* ── 참여 정보 ── */}
@@ -133,38 +158,38 @@ export default function CandidateDetailScreen() {
         <View style={s.card}>
           <InfoRow label="보유 기술" isFirst>
             <View style={s.pillRow}>
-              {c.skills.map((sk) => (
+              {detail.skillsDisplay.map((sk) => (
                 <View key={sk} style={s.skillPill}>
                   <Text style={s.skillPillText}>{sk}</Text>
                 </View>
               ))}
             </View>
           </InfoRow>
-          <InfoRow label="공모전 참여 경험">
-            <Text style={s.infoValue}>{c.contestExperienceDetail}</Text>
+          <InfoRow label="공모전 참여 경험 및 목적">
+            <Text style={s.infoValue}>{detail.contestExperienceDetail}</Text>
           </InfoRow>
           <InfoRow label="참여 강도">
-            <Text style={s.infoValue}>{c.intensity}</Text>
+            <Text style={s.infoValue}>{detail.intensityDetail}</Text>
           </InfoRow>
           <InfoRow label="온오프라인선호">
-            <Text style={s.infoValue}>{c.meetingType} · {c.location}</Text>
+            <Text style={s.infoValue}>{detail.meetingPreference}</Text>
           </InfoRow>
           <InfoRow label="팀 분위기">
-            <Text style={s.infoValue}>{c.teamVibe}</Text>
+            <Text style={s.infoValue}>{detail.teamVibeDetail}</Text>
           </InfoRow>
           <InfoRow label="피드백 방식">
-            <Text style={s.infoValue}>{c.feedbackStyle}</Text>
+            <Text style={s.infoValue}>{detail.feedbackStyleDetail}</Text>
           </InfoRow>
           <InfoRow label="리더십">
-            <Text style={s.infoValue}>{c.leadershipStyle}</Text>
+            <Text style={s.infoValue}>{detail.leadershipDetail}</Text>
           </InfoRow>
         </View>
 
         {/* ── 경험 ── */}
-        {(c.contestHistory.length > 0 || c.certifications.length > 0) && (
+        {(detail.contestHistory.length > 0 || detail.certifications.length > 0) && (
           <>
             <SectionTitle title="경험" />
-            {c.contestHistory.map((item, i) => (
+            {detail.contestHistory.map((item, i) => (
               <View key={i} style={[s.card, s.expCard]}>
                 <Text style={s.expTypeLabel}>공모전</Text>
                 <View style={s.expTitleRow}>
@@ -178,7 +203,7 @@ export default function CandidateDetailScreen() {
                 <Text style={s.expRole}>역할 : {item.role}</Text>
               </View>
             ))}
-            {c.certifications.map((cert, i) => (
+            {detail.certifications.map((cert, i) => (
               <View key={i} style={[s.card, s.expCard]}>
                 <Text style={s.expTypeLabel}>자격증</Text>
                 <Text style={s.expTitle}>{cert.name}</Text>
@@ -190,61 +215,24 @@ export default function CandidateDetailScreen() {
 
         {/* ── 리뷰 ── */}
         <SectionTitle title="리뷰" />
-
-        {/* 리뷰 통합 카드 */}
-        <View style={s.card}>
-          {/* 티밋 온도 */}
-          <Text style={s.tempCardLabel}>티밋 온도</Text>
-          <View style={s.tempScoreRow}>
-            <Text style={s.tempScore}>{c.temperature}</Text>
-            <Text style={s.tempScoreMax}> / 40</Text>
-          </View>
-          <TempBar value={c.temperature} />
-          <View style={s.statDivider} />
-          <StatRow label="총평" value={c.reviewStats.totalRating} />
-          <StatRow label="응답 속도" value={c.reviewStats.responseSpeed} />
-          <StatRow label="마감 완수" value={c.reviewStats.deadlineCompletion} />
-          <StatRow label="참여 강도" value={c.reviewStats.participationIntensity} />
-
-          {/* 키워드 pills */}
-          {c.reviewKeywords.length > 0 && (
-            <>
-              <View style={s.reviewInnerDivider} />
-              <View style={s.keywordRow}>
-                {c.reviewKeywords.slice(0, KEYWORD_SHOW).map((kw) => (
-                  <View key={kw.text} style={s.keywordPill}>
-                    <Text style={s.keywordText}>{kw.text}</Text>
-                    <View style={s.kwCountBadge}>
-                      <Text style={s.kwCountText}>{kw.count}</Text>
-                    </View>
-                  </View>
-                ))}
-                {extraKeywords > 0 && (
-                  <View style={s.keywordPill}>
-                    <Text style={s.keywordText}>+{extraKeywords}</Text>
-                  </View>
-                )}
-              </View>
-            </>
-          )}
-
-          {/* 팀원 리뷰 */}
-          {c.teamReviews.length > 0 && (
-            <>
-              <View style={s.reviewInnerDivider} />
-              <View style={s.reviewHeader}>
-                <Text style={s.reviewHeaderTitle}>💬 팀원 리뷰</Text>
-                <Text style={s.reviewCount}>{c.teamReviews.length}개</Text>
-              </View>
-              {c.teamReviews.map((r, i) => (
-                <View key={i} style={[s.reviewItem, i > 0 && s.reviewItemBorder]}>
-                  <Text style={s.reviewContent}>"{r.content}"</Text>
-                  <Text style={s.reviewReviewer}>{r.reviewer}</Text>
-                </View>
-              ))}
-            </>
-          )}
-        </View>
+        <ReviewStatsCard
+          averageRating={detail.averageRating}
+          stats={[
+            { label: '총평', value: detail.reviewStats.totalRating },
+            { label: '응답 속도', value: detail.reviewStats.responseSpeed },
+            { label: '마감 완수', value: detail.reviewStats.deadlineCompletion },
+            { label: '참여 강도', value: detail.reviewStats.participationIntensity },
+          ].filter((row) => row.value !== '')}
+          keywords={detail.reviewKeywords}
+          reviewCount={detail.teamReviews.length}
+          comments={detail.teamReviews.slice(0, 3)}
+          onPressReviews={() =>
+            router.push({
+              pathname: '/explore/all-reviews' as never,
+              params: { userId: detail.userId.toString() },
+            })
+          }
+        />
 
         <View style={{ height: 24 }} />
       </ScrollView>
@@ -396,93 +384,4 @@ const s = StyleSheet.create({
   },
   awardPillText: { fontSize: 12, color: Colors.primary, fontWeight: '600' },
   expRole: { fontSize: 13, color: Colors.gray },
-
-  /* 티밋 온도 카드 */
-  tempCardLabel: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: Colors.dark,
-    paddingHorizontal: 16,
-    paddingTop: 16,
-    marginBottom: 4,
-  },
-  tempScoreRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-end',
-    paddingHorizontal: 16,
-    marginBottom: 10,
-  },
-  tempScore: { fontSize: 52, fontWeight: '700', color: Colors.primary, lineHeight: 56 },
-  tempScoreMax: { fontSize: 18, color: Colors.grayMedium, marginBottom: 6 },
-
-  barWrap: { marginHorizontal: 16, marginBottom: 8 },
-  barTrack: {
-    height: 10,
-    backgroundColor: Colors.lightGray,
-    borderRadius: 5,
-    overflow: 'hidden',
-  },
-  barFill: { height: '100%', backgroundColor: Colors.primary, borderRadius: 5 },
-  barScale: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginTop: 4,
-  },
-  barScaleText: { fontSize: 11, color: Colors.grayLight },
-
-  statDivider: { height: 1, backgroundColor: '#F0F0F0', marginTop: 4 },
-  statRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F7F7F7',
-  },
-  statLabel: { fontSize: 13, color: Colors.grayMedium, width: 72 },
-  statValue: { fontSize: 13, color: Colors.dark, flex: 1, textAlign: 'right' },
-
-  reviewInnerDivider: { height: 1, backgroundColor: '#F0F0F0' },
-
-  /* 키워드 pills */
-  keywordRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-    padding: 16,
-  },
-  keywordPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    borderWidth: 1.5,
-    borderColor: Colors.primary,
-    borderRadius: 999,
-    paddingHorizontal: 12,
-    paddingVertical: 7,
-    backgroundColor: Colors.white,
-  },
-  keywordText: { fontSize: 12, color: Colors.primary, fontWeight: '600' },
-  kwCountBadge: {
-    width: 18, height: 18, borderRadius: 9,
-    backgroundColor: Colors.primary,
-    alignItems: 'center', justifyContent: 'center',
-  },
-  kwCountText: { fontSize: 10, color: Colors.white, fontWeight: '700' },
-
-  /* 팀원 리뷰 */
-  reviewHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: 16,
-  },
-  reviewHeaderTitle: { fontSize: 14, fontWeight: '700', color: Colors.dark },
-  reviewCount: { fontSize: 13, color: Colors.grayMedium },
-  reviewItem: { paddingHorizontal: 16, paddingVertical: 14 },
-  reviewItemBorder: { borderTopWidth: 1, borderTopColor: '#F5F5F5' },
-  reviewContent: { fontSize: 14, color: Colors.dark, lineHeight: 22, marginBottom: 5 },
-  reviewReviewer: { fontSize: 12, color: Colors.grayMedium },
-
 });

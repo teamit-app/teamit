@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -6,17 +6,18 @@ import {
   TouchableOpacity,
   ScrollView,
   StyleSheet,
-  Alert,
+  Modal,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
+import { Alert } from '../../../src/utils/alert';
 import { Colors } from '../../../src/constants/colors';
 import { ScreenHeader } from '../../../src/components/common/ScreenHeader';
-import { DrumRollPicker, SingleDrumPicker } from '../../../src/components/common/DrumRollPicker';
-import { RegionPickerModal } from '../../../src/components/common/RegionPickerModal';
+import { DrumRollPicker } from '../../../src/components/common/DrumRollPicker';
 import { useMypageStore } from '../../../src/store/useMypageStore';
 import { updateMyProfile } from '../../../src/services/mypageService';
 import { Gender, VerificationStatus } from '../../../src/types/mypage';
+import { EDUCATION_STATUS_LABEL } from '../../../src/constants/education';
 
 // ──────────────────────────────────────────────────
 // FormField: label 위, 입력/선택 아래
@@ -111,28 +112,28 @@ function CertSection({ certStatus }: { certStatus: VerificationStatus }) {
 export default function EditBasicScreen() {
   const insets = useSafeAreaInsets();
   const { profile, reloadProfile } = useMypageStore();
+  const { returnTo, contestId } = useLocalSearchParams<{ returnTo?: string; contestId?: string }>();
 
   const [nickname, setNickname] = useState('');
   const [name, setName] = useState('');
   const [gender, setGender] = useState<Gender>('MALE');
   const [birthDate, setBirthDate] = useState('');
-  const [selectedRegions, setSelectedRegions] = useState<
-    { sido: string; sigungu: string | null }[]
-  >([]);
   const [loading, setLoading] = useState(false);
 
   const [showDatePicker, setShowDatePicker] = useState(false);
-  const [showRegionPicker, setShowRegionPicker] = useState(false);
+  const [showGenderPicker, setShowGenderPicker] = useState(false);
 
+  // profile이 최초로 로드될 때 한 번만 폼을 채운다.
+  // 이후 다른 화면(학력 수정 등)에서 store의 profile이 갱신되어도
+  // 이 화면에서 입력 중인(아직 저장 전인) 값은 덮어쓰지 않는다.
+  const initializedRef = useRef(false);
   useEffect(() => {
-    if (profile) {
+    if (profile && !initializedRef.current) {
       setNickname(profile.nickname);
       setName(profile.name);
       setGender(profile.gender);
-      setBirthDate(profile.birthDate);
-      if (profile.regions?.length) {
-        setSelectedRegions(profile.regions);
-      }
+      setBirthDate(profile.birthDate ?? '');
+      initializedRef.current = true;
     }
   }, [profile]);
 
@@ -142,23 +143,9 @@ export default function EditBasicScreen() {
   const birthMonth = parseInt(birthParts[1] ?? '1', 10);
   const birthDay = parseInt(birthParts[2] ?? '1', 10);
 
-  // 지역 표시 레이블
-  const regionLabel =
-    selectedRegions.length === 0
-      ? '선택해주세요'
-      : selectedRegions.length === 1
-      ? selectedRegions[0].sigungu
-        ? `${selectedRegions[0].sido} ${selectedRegions[0].sigungu}`
-        : `${selectedRegions[0].sido} 전체`
-      : `${
-          selectedRegions[0].sigungu
-            ? `${selectedRegions[0].sido} ${selectedRegions[0].sigungu}`
-            : `${selectedRegions[0].sido} 전체`
-        } 외 ${selectedRegions.length - 1}곳`;
-
   // 학력 표시 레이블
   const educationLabel = profile?.education
-    ? `${profile.education.schoolName} ${profile.education.major}`
+    ? `${profile.education.schoolName} ${profile.education.major} · ${EDUCATION_STATUS_LABEL[profile.education.status]}`
     : '';
 
   // 인증 상태
@@ -185,10 +172,15 @@ export default function EditBasicScreen() {
         name: name.trim(),
         gender,
         birthDate,
-        regions: selectedRegions,
       });
       await reloadProfile();
-      router.back();
+      if (returnTo === 'participate') {
+        router.replace(`/explore/participate?contestId=${contestId}` as never);
+      } else if (returnTo === 'build-team') {
+        router.replace(`/explore/build-team/${contestId}` as never);
+      } else {
+        router.back();
+      }
     } catch {
       Alert.alert('오류', '저장에 실패했어요. 다시 시도해주세요.');
     } finally {
@@ -233,20 +225,14 @@ export default function EditBasicScreen() {
 
         {/* ── 성별 ── */}
         <FormField label="성별" required>
-          <View style={styles.genderRow}>
-            {(['MALE', 'FEMALE'] as const).map((g) => (
-              <TouchableOpacity
-                key={g}
-                style={[styles.genderOption, gender === g && styles.genderOptionActive]}
-                onPress={() => setGender(g)}
-                activeOpacity={0.8}
-              >
-                <Text style={[styles.genderOptionText, gender === g && styles.genderOptionTextActive]}>
-                  {g === 'MALE' ? '남성' : '여성'}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
+          <TouchableOpacity
+            style={styles.selectBox}
+            onPress={() => setShowGenderPicker(true)}
+            activeOpacity={0.7}
+          >
+            <Text style={styles.selectText}>{gender === 'MALE' ? '남성' : '여성'}</Text>
+            <Text style={styles.chevron}>›</Text>
+          </TouchableOpacity>
         </FormField>
 
         {/* ── 생년월일 ── */}
@@ -263,25 +249,6 @@ export default function EditBasicScreen() {
               ]}
             >
               {birthDate ? birthDate.replace(/-/g, '.') : '선택해주세요'}
-            </Text>
-            <Text style={styles.chevron}>›</Text>
-          </TouchableOpacity>
-        </FormField>
-
-        {/* ── 활동 가능 지역 ── */}
-        <FormField label="활동 가능 지역">
-          <TouchableOpacity
-            style={styles.selectBox}
-            onPress={() => setShowRegionPicker(true)}
-            activeOpacity={0.7}
-          >
-            <Text
-              style={[
-                styles.selectText,
-                selectedRegions.length === 0 && styles.placeholderText,
-              ]}
-            >
-              📍 {regionLabel}
             </Text>
             <Text style={styles.chevron}>›</Text>
           </TouchableOpacity>
@@ -349,16 +316,35 @@ export default function EditBasicScreen() {
         onCancel={() => setShowDatePicker(false)}
       />
 
-      {/* ── 지역 피커 ── */}
-      <RegionPickerModal
-        visible={showRegionPicker}
-        initialRegions={selectedRegions}
-        onConfirm={(regions) => {
-          setSelectedRegions(regions);
-          setShowRegionPicker(false);
-        }}
-        onCancel={() => setShowRegionPicker(false)}
-      />
+
+      {/* ── 성별 선택 모달 ── */}
+      <Modal visible={showGenderPicker} transparent animationType="fade">
+        <View style={styles.genderModalBackdrop}>
+          <View style={styles.genderModalSheet}>
+            <Text style={styles.genderModalTitle}>성별 선택</Text>
+            {(['MALE', 'FEMALE'] as const).map((g) => (
+              <TouchableOpacity
+                key={g}
+                style={styles.genderModalRow}
+                onPress={() => setGender(g)}
+                activeOpacity={0.7}
+              >
+                <View style={[styles.genderRadio, gender === g && styles.genderRadioActive]}>
+                  {gender === g && <View style={styles.genderRadioDot} />}
+                </View>
+                <Text style={styles.genderModalRowText}>{g === 'MALE' ? '남성' : '여성'}</Text>
+              </TouchableOpacity>
+            ))}
+            <TouchableOpacity
+              style={styles.genderModalSaveBtn}
+              onPress={() => setShowGenderPicker(false)}
+              activeOpacity={0.85}
+            >
+              <Text style={styles.genderModalSaveBtnText}>저장하기</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -427,26 +413,41 @@ const styles = StyleSheet.create({
     color: Colors.grayMedium,
   },
 
-  // ── 성별 선택 ──
-  genderRow: {
-    flexDirection: 'row',
-    gap: 10,
-  },
-  genderOption: {
+  // ── 성별 선택 모달 ──
+  genderModalBackdrop: {
     flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 24,
+  },
+  genderModalSheet: {
+    width: '100%',
+    backgroundColor: Colors.white,
+    borderRadius: 20,
+    paddingTop: 24,
+    paddingBottom: 20,
+    paddingHorizontal: 20,
+  },
+  genderModalTitle: {
+    fontSize: 17,
+    fontWeight: '700',
+    color: Colors.dark,
+    textAlign: 'center',
+    marginBottom: 16,
+  },
+  genderModalRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    height: 48,
-    borderRadius: 10,
-    borderWidth: 1.5,
-    borderColor: Colors.lightGray,
-    backgroundColor: Colors.white,
+    gap: 12,
+    paddingVertical: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.lightGray,
   },
-  genderOptionActive: {
-    borderColor: Colors.primary,
-    backgroundColor: Colors.ogTint,
+  genderModalRowText: {
+    fontSize: 15,
+    color: Colors.dark,
+    fontWeight: '500',
   },
   genderRadio: {
     width: 20,
@@ -467,13 +468,18 @@ const styles = StyleSheet.create({
     borderRadius: 5,
     backgroundColor: Colors.primary,
   },
-  genderOptionText: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: Colors.gray,
+  genderModalSaveBtn: {
+    height: 52,
+    borderRadius: 12,
+    backgroundColor: Colors.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 16,
   },
-  genderOptionTextActive: {
-    color: Colors.primary,
+  genderModalSaveBtnText: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: Colors.white,
   },
 
   // ── 학력 인증 섹션 ──

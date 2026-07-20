@@ -36,7 +36,7 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.white,
   },
   side: {
-    width: 40,
+    minWidth: 40,
     alignItems: 'flex-start',
   },
   rightSide: {

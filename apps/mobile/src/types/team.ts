@@ -14,9 +14,9 @@ export interface ReviewKeyword {
   count: number;
 }
 
+// 리뷰어 정보는 절대 포함하지 않는다(익명 정책)
 export interface TeamReviewItem {
   content: string;
-  reviewer: string;
 }
 
 export interface Candidate {
@@ -28,7 +28,7 @@ export interface Candidate {
   intro: string;
   introContent: string;
   skills: string[];
-  temperature: number;
+  averageRating: number;
   matchScore: number;
   intensity: string;
   meetingType: string;

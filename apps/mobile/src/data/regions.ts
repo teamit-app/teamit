@@ -28,6 +28,3 @@ export interface Region {
   sido: string;
   sigungu: string | null;
 }
-
-export const formatRegionLabel = (region: Region): string =>
-  region.sigungu ? `${region.sido} ${region.sigungu}` : `${region.sido} 전체`;

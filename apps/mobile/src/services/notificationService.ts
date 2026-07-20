@@ -1,7 +1,7 @@
 import { apiRequest } from './api';
 import { AppNotification } from '../types/notification';
 
-interface BackendNotification {
+export interface BackendNotification {
   notificationId: number;
   type: AppNotification['type'];
   title: string;
@@ -48,14 +48,23 @@ function adaptNotification(n: BackendNotification): AppNotification {
   };
 }
 
-export const getNotifications = async (): Promise<AppNotification[]> => {
+export interface NotificationsResult {
+  notifications: AppNotification[];
+  unreadCount: number;
+}
+
+export const getNotifications = async (): Promise<NotificationsResult> => {
   try {
     const data = await apiRequest<NotificationsPageResponse>(
       '/users/notifications?page=0&size=50',
     );
-    return data.content.map(adaptNotification);
+    return { notifications: data.content.map(adaptNotification), unreadCount: data.unreadCount };
   } catch {
     // 알림 API 미구현 시 빈 목록 반환
-    return [];
+    return { notifications: [], unreadCount: 0 };
   }
+};
+
+export const markAllNotificationsAsRead = async (): Promise<void> => {
+  await apiRequest<null>('/users/notifications/read-all', { method: 'PATCH' });
 };

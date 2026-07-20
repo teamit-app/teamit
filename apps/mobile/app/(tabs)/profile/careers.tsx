@@ -5,10 +5,10 @@ import {
   ScrollView,
   TouchableOpacity,
   StyleSheet,
-  Alert,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
+import { Alert } from '../../../src/utils/alert';
 import { Colors } from '../../../src/constants/colors';
 import { ScreenHeader } from '../../../src/components/common/ScreenHeader';
 import { useMypageStore } from '../../../src/store/useMypageStore';
@@ -61,13 +61,15 @@ const awardSt = StyleSheet.create({
 
 function ContestCareerCard({
   item,
+  onPress,
   onDelete,
 }: {
   item: ContestCareer;
+  onPress: () => void;
   onDelete: () => void;
 }) {
   return (
-    <View style={styles.card}>
+    <TouchableOpacity style={styles.card} onPress={onPress} activeOpacity={0.7}>
       <View style={styles.iconCircle}>
         <Text style={styles.iconEmoji}>🏆</Text>
       </View>
@@ -84,19 +86,21 @@ function ContestCareerCard({
       <TouchableOpacity style={styles.deleteBtn} onPress={onDelete}>
         <Text style={styles.deleteBtnText}>삭제</Text>
       </TouchableOpacity>
-    </View>
+    </TouchableOpacity>
   );
 }
 
 function CertificateCareerCard({
   item,
+  onPress,
   onDelete,
 }: {
   item: CertificateCareer;
+  onPress: () => void;
   onDelete: () => void;
 }) {
   return (
-    <View style={styles.card}>
+    <TouchableOpacity style={styles.card} onPress={onPress} activeOpacity={0.7}>
       <View style={styles.iconCircle}>
         <Text style={styles.iconEmoji}>📜</Text>
       </View>
@@ -110,7 +114,7 @@ function CertificateCareerCard({
       <TouchableOpacity style={styles.deleteBtn} onPress={onDelete}>
         <Text style={styles.deleteBtnText}>삭제</Text>
       </TouchableOpacity>
-    </View>
+    </TouchableOpacity>
   );
 }
 
@@ -221,6 +225,19 @@ export default function CareersScreen() {
                   <ContestCareerCard
                     key={item.careerItemId}
                     item={item}
+                    onPress={() =>
+                      router.push({
+                        pathname: '/(tabs)/profile/add-contest',
+                        params: {
+                          careerItemId: item.careerItemId,
+                          contestName: item.contestName,
+                          roles: item.roles.join(','),
+                          startDate: item.startDate,
+                          endDate: item.endDate,
+                          awardStatus: item.awardStatus,
+                        },
+                      } as never)
+                    }
                     onDelete={() => handleDelete(item.careerItemId)}
                   />
                 ))
@@ -228,6 +245,17 @@ export default function CareersScreen() {
                   <CertificateCareerCard
                     key={item.careerItemId}
                     item={item}
+                    onPress={() =>
+                      router.push({
+                        pathname: '/(tabs)/profile/add-certificate',
+                        params: {
+                          careerItemId: item.careerItemId,
+                          certName: item.certName,
+                          issuingOrg: item.issuingOrg,
+                          acquiredDate: item.acquiredDate,
+                        },
+                      } as never)
+                    }
                     onDelete={() => handleDelete(item.careerItemId)}
                   />
                 ))}
