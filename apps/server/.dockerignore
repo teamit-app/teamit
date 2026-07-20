@@ -1,0 +1,8 @@
+.gradle
+build/
+out/
+uploads/
+*.log
+.idea
+.vscode
+HELP.md
