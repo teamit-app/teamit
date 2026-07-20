@@ -43,6 +43,7 @@ jobs:
           DB_USERNAME: root
           DB_PASSWORD: test
           JWT_SECRET: test-secret-for-ci-must-be-at-least-256-bits-long
+          SPRING_JPA_HIBERNATE_DDL_AUTO: create-drop
         run: ./gradlew test --no-daemon
 
       - name: Log in to Docker Hub
