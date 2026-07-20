@@ -28,7 +28,7 @@ services:
       DB_URL: jdbc:mysql://mysql:3306/teamit?serverTimezone=Asia/Seoul&characterEncoding=UTF-8
       DB_USERNAME: root
       DB_PASSWORD: ${DB_ROOT_PASSWORD}
-      JPA_DDL_AUTO: validate
+      JPA_DDL_AUTO: ${JPA_DDL_AUTO:-validate}
       JWT_SECRET: ${JWT_SECRET}
       KAKAO_CLIENT_ID: ${KAKAO_CLIENT_ID}
       KAKAO_CLIENT_SECRET: ${KAKAO_CLIENT_SECRET}
