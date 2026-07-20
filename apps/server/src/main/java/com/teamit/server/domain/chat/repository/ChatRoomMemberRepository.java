@@ -3,6 +3,7 @@ package com.teamit.server.domain.chat.repository;
 import com.teamit.server.domain.chat.entity.ChatRoomMember;
 import com.teamit.server.domain.chat.entity.RoomType;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -18,6 +19,10 @@ public interface ChatRoomMemberRepository extends JpaRepository<ChatRoomMember, 
     Optional<ChatRoomMember> findByUserIdAndChatRoomId(Long userId, Long chatRoomId);
 
     long countByChatRoomId(Long chatRoomId);
+
+    @Modifying
+    @Query("DELETE FROM ChatRoomMember m WHERE m.chatRoom.id = :chatRoomId")
+    void deleteAllByChatRoomId(@Param("chatRoomId") Long chatRoomId);
 
     // 두 유저가 함께 속한 DIRECT 채팅방 ID 조회 (이미 채팅방이 있으면 재사용)
     @Query("""

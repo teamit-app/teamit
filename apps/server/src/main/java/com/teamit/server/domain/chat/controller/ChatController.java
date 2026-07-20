@@ -2,6 +2,7 @@ package com.teamit.server.domain.chat.controller;
 
 import com.teamit.server.domain.chat.dto.*;
 import com.teamit.server.domain.chat.service.ChatService;
+import com.teamit.server.domain.post.service.PostService;
 import com.teamit.server.global.annotation.LoginUser;
 import com.teamit.server.global.response.ApiResponse;
 import com.teamit.server.global.security.CustomUserDetails;
@@ -18,6 +19,7 @@ import org.springframework.web.bind.annotation.*;
 public class ChatController {
 
     private final ChatService chatService;
+    private final PostService postService;
 
     @Operation(summary = "채팅방 목록 조회", description = "GROUP(단체)과 DIRECT(1:1) 채팅방을 분리해서 반환합니다.")
     @GetMapping("/users/chat-rooms")
@@ -38,6 +40,15 @@ public class ChatController {
         return ApiResponse.success(response, "메시지 조회 성공");
     }
 
+    @Operation(summary = "채팅방 읽음 처리", description = "이 채팅방의 최신 메시지까지 읽음으로 표시합니다.")
+    @PatchMapping("/chat-rooms/{chatRoomId}/read")
+    public ApiResponse<Void> markAsRead(
+            @PathVariable Long chatRoomId,
+            @LoginUser CustomUserDetails userDetails) {
+        chatService.markAsRead(chatRoomId, userDetails.getUserId());
+        return ApiResponse.success(null, "읽음 처리되었습니다");
+    }
+
     @Operation(summary = "채팅방 나가기")
     @DeleteMapping("/chat-rooms/{chatRoomId}/leave")
     public ApiResponse<Void> leaveChatRoom(
@@ -45,6 +56,15 @@ public class ChatController {
             @LoginUser CustomUserDetails userDetails) {
         chatService.leaveChatRoom(chatRoomId, userDetails.getUserId());
         return ApiResponse.success(null, "채팅방에서 나갔습니다");
+    }
+
+    @Operation(summary = "채팅방 삭제(방장 전용)", description = "GROUP 채팅방과 연결된 모집글을 함께 삭제합니다. 지원자·팀원에게 알림이 발송됩니다.")
+    @DeleteMapping("/chat-rooms/{chatRoomId}")
+    public ApiResponse<Void> deleteChatRoom(
+            @PathVariable Long chatRoomId,
+            @LoginUser CustomUserDetails userDetails) {
+        postService.deletePostByChatRoom(chatRoomId, userDetails.getUserId());
+        return ApiResponse.success(null, "채팅방과 모집글이 삭제되었습니다");
     }
 
     @Operation(summary = "1:1 채팅방 조회 또는 생성", description = "상대방과의 DIRECT 채팅방이 이미 있으면 반환하고, 없으면 새로 만듭니다.")
