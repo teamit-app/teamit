@@ -1,7 +1,7 @@
 import { getMockResponse } from './mockRouter';
 import { tokenStorage } from './tokenStorage';
 
-const BASE_URL = process.env.EXPO_PUBLIC_API_URL ?? 'https://api.teamit.app/api/v1';
+const BASE_URL = process.env.EXPO_PUBLIC_API_URL ?? 'https://api.teamit.kr/api/v1';
 const IS_MOCK = process.env.EXPO_PUBLIC_API_MODE === 'mock';
 
 interface ApiResponse<T> {

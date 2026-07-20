@@ -17,7 +17,7 @@ export default function Index() {
         const token = await tokenStorage.getAccessToken();
         if (!token) { setTarget('/(tabs)/home'); return; }
 
-        const BASE_URL = process.env.EXPO_PUBLIC_API_URL ?? 'https://api.teamit.app/api/v1';
+        const BASE_URL = process.env.EXPO_PUBLIC_API_URL ?? 'https://api.teamit.kr/api/v1';
         const res = await fetch(`${BASE_URL}/users/me`, {
           headers: { Authorization: `Bearer ${token}` },
         });

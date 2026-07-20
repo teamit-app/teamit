@@ -23,7 +23,7 @@ import { devLogin } from '../../src/services/authService';
 
 const { height: SCREEN_H } = Dimensions.get('window');
 const IS_MOCK = process.env.EXPO_PUBLIC_API_MODE === 'mock';
-const SERVER_BASE = (process.env.EXPO_PUBLIC_API_URL ?? 'https://api.teamit.app/api/v1')
+const SERVER_BASE = (process.env.EXPO_PUBLIC_API_URL ?? 'https://api.teamit.kr/api/v1')
   .replace('/api/v1', '');
 
 export default function LoginScreen() {
@@ -123,7 +123,7 @@ export default function LoginScreen() {
 
       // isNewUser만으로는 온보딩 완료 여부를 판단할 수 없음 (재로그인 시 false)
       // index.tsx와 동일하게 /users/me의 needsOnboarding으로 판단
-      const BASE_URL = process.env.EXPO_PUBLIC_API_URL ?? 'https://api.teamit.app/api/v1';
+      const BASE_URL = process.env.EXPO_PUBLIC_API_URL ?? 'https://api.teamit.kr/api/v1';
       const meRes = await fetch(`${BASE_URL}/users/me`, {
         headers: { Authorization: `Bearer ${response.accessToken}` },
       });
