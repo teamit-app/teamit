@@ -11,11 +11,14 @@ import {
 
 const dummyParticipantCard = {
   skills: ['Figma', 'Photoshop'],
-  experienceCount: '0회',
-  intensity: '적당하게 (주 4~7시간)',
-  onlineOffline: '혼합형',
+  experienceLevel: 0,
+  intensityLevel: 2,
+  onlineOfflinePref: 'MIXED',
   region: '서울 강남구',
-  leadership: '필요하면 할 수 있어요',
+  teamVibe: 3,
+  feedbackStyle: 3,
+  leadershipPref: 'IF_NEEDED',
+  participationPurpose: 'EXPERIENCE',
   appealTitle: '금융권 데이터 분석가를 목표로 합니다.',
   appealContent:
     '저는 금융 도메인에 관심이 있고, 현재 금융권 데이터분석 직무 희망중입니다. 발표를 잘하고 좋아해서 발표는 부담없이 할 수 있습니다!',
@@ -29,8 +32,7 @@ export const dummyMyProfile: MyProfile = {
   birthDate: '2002-05-11',
   profileImageUrl: null,
   isMatchingActive: true,
-  temperature: 32,
-  maxTemperature: 40,
+  averageRating: 4.0,
   regions: [{ sido: '서울', sigungu: '강남구' }],
   education: {
     educationId: 1,
@@ -95,6 +97,7 @@ export const dummyMatchingProfile: MatchingProfileData = {
   teamVibe: 4,
   feedbackStyle: 2,
   leadershipPref: 'IF_NEEDED',
+  participationPurpose: 'EXPERIENCE',
   appealTitle: '금융권 데이터 분석가를 목표로 합니다.',
   appealContent:
     '저는 금융 도메인에 관심이 있고, 현재 금융권 데이터분석 직무 희망중입니다. 발표를 잘하고 좋아해서 발표는 부담없이 할 수 있습니다!',
@@ -235,7 +238,7 @@ export const dummyPostApplicants: PostApplicant[] = [
   {
     userId: 2,
     nickname: '박지우',
-    temperature: 38,
+    averageRating: 4.7,
     gender: 'FEMALE',
     school: '고려대학교 경영학과',
     isSchoolVerified: true,
@@ -252,7 +255,7 @@ export const dummyPostApplicants: PostApplicant[] = [
   {
     userId: 3,
     nickname: '이민호',
-    temperature: 32,
+    averageRating: 4.0,
     gender: 'MALE',
     school: '연세대학교 컴퓨터공학과',
     isSchoolVerified: true,
@@ -269,7 +272,7 @@ export const dummyPostApplicants: PostApplicant[] = [
   {
     userId: 4,
     nickname: '최예린',
-    temperature: 29,
+    averageRating: 3.6,
     gender: 'FEMALE',
     school: '서울대학교 디자인학부',
     isSchoolVerified: false,

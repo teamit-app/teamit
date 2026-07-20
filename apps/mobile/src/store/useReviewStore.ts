@@ -1,50 +1,46 @@
 import { create } from 'zustand';
-
-export interface ReviewDraft {
-  memberId: number;
-  memberName: string;
-  totalRating: number;       // 1~5 (별점)
-  responseSpeed: string;
-  deadlineCompletion: string;
-  participationIntensity: string;
-  keywords: string[];
-  comment: string;
-}
+import { getMySubmittedReviews } from '../services/reviewService';
 
 interface ReviewState {
-  // chatId별로 제출 완료된 리뷰 목록
-  submittedReviews: Record<number, ReviewDraft[]>;
+  // chatId별로 내가 이미 리뷰를 제출한 상대방 id 목록 (서버 기준)
+  submittedReceiverIds: Record<number, number[]>;
+  loadedChatIds: Set<number>;
 
-  // 현재 작성 중인 리뷰 초안
-  draft: Partial<ReviewDraft>;
+  // 서버에서 로드 (이미 로드했으면 재호출 안 함)
+  loadSubmitted: (chatId: number) => Promise<void>;
 
-  // 초안 필드 업데이트
-  setDraftField: <K extends keyof ReviewDraft>(key: K, value: ReviewDraft[K]) => void;
-  resetDraft: () => void;
+  // 제출 성공 직후 로컬에 낙관적으로 반영
+  markSubmitted: (chatId: number, receiverId: number) => void;
 
-  // 리뷰 제출
-  submitReview: (chatId: number, review: ReviewDraft) => void;
-
-  // chatId의 제출된 리뷰 조회
-  getSubmittedReviews: (chatId: number) => ReviewDraft[];
+  // chatId에서 내가 리뷰한 상대방 id 목록 조회
+  getSubmittedReceiverIds: (chatId: number) => number[];
 }
 
 export const useReviewStore = create<ReviewState>((set, get) => ({
-  submittedReviews: {},
-  draft: {},
+  submittedReceiverIds: {},
+  loadedChatIds: new Set(),
 
-  setDraftField: (key, value) =>
-    set((s) => ({ draft: { ...s.draft, [key]: value } })),
+  loadSubmitted: async (chatId) => {
+    if (get().loadedChatIds.has(chatId)) return;
+    try {
+      const receiverIds = await getMySubmittedReviews(chatId);
+      set((s) => ({
+        submittedReceiverIds: { ...s.submittedReceiverIds, [chatId]: receiverIds },
+        loadedChatIds: new Set(s.loadedChatIds).add(chatId),
+      }));
+    } catch (e) {
+      console.error('[ReviewStore] 제출한 리뷰 목록 로드 실패:', e);
+    }
+  },
 
-  resetDraft: () => set({ draft: {} }),
+  markSubmitted: (chatId, receiverId) =>
+    set((s) => {
+      const prev = s.submittedReceiverIds[chatId] ?? [];
+      if (prev.includes(receiverId)) return s;
+      return {
+        submittedReceiverIds: { ...s.submittedReceiverIds, [chatId]: [...prev, receiverId] },
+      };
+    }),
 
-  submitReview: (chatId, review) =>
-    set((s) => ({
-      submittedReviews: {
-        ...s.submittedReviews,
-        [chatId]: [...(s.submittedReviews[chatId] ?? []), review],
-      },
-    })),
-
-  getSubmittedReviews: (chatId) => get().submittedReviews[chatId] ?? [],
+  getSubmittedReceiverIds: (chatId) => get().submittedReceiverIds[chatId] ?? [],
 }));

@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -6,53 +6,26 @@ import {
   TouchableOpacity,
   Switch,
   StyleSheet,
+  Image,
+  ActivityIndicator,
 } from 'react-native';
+import * as ImagePicker from 'expo-image-picker';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
+import { Alert } from '../../../src/utils/alert';
 import { Colors } from '../../../src/constants/colors';
 import { useMypageStore } from '../../../src/store/useMypageStore';
-
-function TemperatureBar({ value, max }: { value: number; max: number }) {
-  const pct = Math.min(value / max, 1);
-  return (
-    <View>
-      <View style={temp.valueRow}>
-        <Text style={temp.valueBig}>{value}</Text>
-        <Text style={temp.valueMax}> / {max}</Text>
-      </View>
-      <View style={temp.track}>
-        <View style={[temp.fill, { width: `${pct * 100}%` as any }]} />
-      </View>
-      <View style={temp.scaleRow}>
-        <Text style={temp.scaleText}>0</Text>
-        <Text style={temp.scaleText}>{max}</Text>
-      </View>
-    </View>
-  );
-}
-
-const temp = StyleSheet.create({
-  valueRow: { flexDirection: 'row', alignItems: 'flex-end', marginBottom: 10 },
-  valueBig: { fontSize: 36, fontWeight: '800', color: Colors.primary, lineHeight: 40 },
-  valueMax: { fontSize: 16, color: Colors.grayMedium, marginBottom: 4 },
-  track: {
-    height: 10,
-    backgroundColor: '#EEEEEE',
-    borderRadius: 5,
-    overflow: 'hidden',
-  },
-  fill: {
-    height: 10,
-    backgroundColor: Colors.primary,
-    borderRadius: 5,
-  },
-  scaleRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginTop: 5,
-  },
-  scaleText: { fontSize: 11, color: Colors.grayMedium },
-});
+import { useAuthStore } from '../../../src/store/useAuthStore';
+import { useExploreStore } from '../../../src/store/useExploreStore';
+import { logout as logoutApi, withdraw as withdrawApi } from '../../../src/services/authService';
+import { uploadProfileImage } from '../../../src/services/mypageService';
+import { formatRegionsLabel } from '../../../src/utils/region';
+import { resolveImageUrl } from '../../../src/utils/imageUrl';
+import { EDUCATION_STATUS_LABEL } from '../../../src/constants/education';
+import { ReviewStatsCard } from '../../../src/components/profile/ReviewStatsCard';
+import { buildReviewStats, buildReviewKeywords } from '../../../src/utils/reviewStats';
+import { useMyReceivedReviews } from '../../../src/hooks/useMyReceivedReviews';
+import { GuestPrompt } from '../../../src/components/common/GuestPrompt';
 
 function GridMenuItem({
   icon,
@@ -88,11 +61,68 @@ const grid = StyleSheet.create({
 
 export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
-  const { profile, isLoading, hasLoaded, loadProfile, setMatchingActive } = useMypageStore();
+  const { profile, isLoading, hasLoaded, loadProfile, reloadProfile, setMatchingActive } = useMypageStore();
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
+
+  // ── 지금까지 받은 모든 리뷰의 항목별 평균 ──
+  const MY_USER_ID = useAuthStore((s) => s.currentUserId);
+  const currentUserIdReady = useAuthStore((s) => s.currentUserIdReady);
+  const { reviews: receivedReviews, isLoading: reviewStatsLoading } = useMyReceivedReviews(MY_USER_ID);
 
   useEffect(() => {
-    loadProfile();
-  }, []);
+    if (MY_USER_ID) loadProfile();
+  }, [MY_USER_ID]);
+
+  const handleChangePhoto = async () => {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert('권한 필요', '사진 라이브러리 접근 권한이 필요해요');
+      return;
+    }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      quality: 0.8,
+      allowsEditing: true,
+      aspect: [1, 1],
+    });
+    if (result.canceled || !result.assets[0]) return;
+
+    const asset = result.assets[0];
+    const fileName = asset.fileName ?? `profile.${asset.mimeType?.split('/')[1] ?? 'jpg'}`;
+    setUploadingPhoto(true);
+    try {
+      await uploadProfileImage(asset.uri, fileName);
+      await reloadProfile();
+    } catch {
+      Alert.alert('오류', '프로필 사진 등록에 실패했어요. 다시 시도해주세요.');
+    } finally {
+      setUploadingPhoto(false);
+    }
+  };
+
+  const reviewStats = buildReviewStats(receivedReviews);
+  const reviewKeywords = buildReviewKeywords(receivedReviews);
+
+  if (currentUserIdReady) {
+    return (
+      <View style={[styles.container, { paddingTop: insets.top }]}>
+        <View style={styles.header}>
+          <Text style={styles.headerTitle}>내 정보</Text>
+        </View>
+      </View>
+    );
+  }
+
+  if (!MY_USER_ID) {
+    return (
+      <View style={[styles.container, { paddingTop: insets.top }]}>
+        <View style={styles.header}>
+          <Text style={styles.headerTitle}>내 정보</Text>
+        </View>
+        <GuestPrompt returnPath="/(tabs)/profile" />
+      </View>
+    );
+  }
 
   if (isLoading && !hasLoaded) {
     return (
@@ -108,24 +138,69 @@ export default function ProfileScreen() {
   }
 
   const regionLabel = profile?.regions?.length
-    ? `${profile.regions[0].sido}${profile.regions[0].sigungu ? ' ' + profile.regions[0].sigungu : ' 전체'}`
+    ? formatRegionsLabel(profile.regions)
     : '-';
 
   const genderLabel = profile?.gender === 'MALE' ? '남성' : profile?.gender === 'FEMALE' ? '여성' : '';
 
   const educationLabel = profile?.education
-    ? `${profile.education.schoolName} ${profile.education.major}`
+    ? `${profile.education.schoolName} ${profile.education.major} · ${EDUCATION_STATUS_LABEL[profile.education.status]}`
     : '학력 미입력';
 
   const careerCount = profile?.careers?.length ?? 0;
   const careerSubtitle = careerCount > 0 ? `${careerCount}개 경험 등록됨` : '등록된 경험이 없어요';
 
   const hasMatchingProfile = (profile?.skills?.length ?? 0) > 0;
-  const matchingSubtitle = hasMatchingProfile ? '역할, 스킬, 협업 스타일' : '아직 작성하지 않았어요';
+  const matchingSubtitle = hasMatchingProfile
+    ? '인재풀에 보여줄 내 프로필이에요'
+    : '작성된 프로필이 없어요';
 
   const matchingToggleSubtitle = profile?.isMatchingActive
-    ? '팀 매칭 제안을 받는 중이에요'
-    : '팀 매칭 제안을 받으세요';
+    ? '인재풀에 등록되어 팀 초대를 받고 있어요'
+    : '켜면 인재풀에 등록되고 팀 초대를 받을 수 있어요';
+
+  const handleLogout = () => {
+    Alert.alert('로그아웃', '로그아웃하시겠어요?', [
+      { text: '취소', style: 'cancel' },
+      {
+        text: '로그아웃',
+        onPress: async () => {
+          try {
+            await logoutApi();
+          } finally {
+            useAuthStore.getState().logout();
+            // 로그인은 필요할 때만 요구하는 흐름이라, 로그아웃 후에도 로그인 화면으로 보내지
+            // 않고 게스트로 홈에 남겨둔다.
+            router.replace('/(tabs)/home');
+          }
+        },
+      },
+    ]);
+  };
+
+  const handleWithdraw = () => {
+    Alert.alert(
+      '회원 탈퇴',
+      '탈퇴하면 모든 정보가 삭제되며 복구할 수 없어요. 정말 탈퇴하시겠어요?',
+      [
+        { text: '취소', style: 'cancel' },
+        {
+          text: '탈퇴',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await withdrawApi();
+            } catch {
+              Alert.alert('오류', '탈퇴 처리 중 문제가 발생했어요. 다시 시도해주세요.');
+            } finally {
+              useAuthStore.getState().logout();
+              router.replace('/(tabs)/home');
+            }
+          },
+        },
+      ],
+    );
+  };
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
@@ -138,7 +213,28 @@ export default function ProfileScreen() {
         {/* 프로필 카드 */}
         <View style={styles.profileCard}>
           <View style={styles.profileRow}>
-            <View style={styles.avatarCircle} />
+            <TouchableOpacity
+              style={styles.avatarCircle}
+              onPress={handleChangePhoto}
+              activeOpacity={0.8}
+              disabled={uploadingPhoto}
+            >
+              {resolveImageUrl(profile?.profileImageUrl) ? (
+                <Image
+                  source={{ uri: resolveImageUrl(profile?.profileImageUrl)! }}
+                  style={styles.avatarImage}
+                />
+              ) : (
+                <Text style={styles.avatarPlaceholder}>🧑‍💻</Text>
+              )}
+              <View style={styles.avatarEditBadge}>
+                {uploadingPhoto ? (
+                  <ActivityIndicator size="small" color={Colors.white} />
+                ) : (
+                  <Text style={styles.avatarEditIcon}>📷</Text>
+                )}
+              </View>
+            </TouchableOpacity>
             <View style={styles.profileInfo}>
               <View style={styles.nameRow}>
                 <Text style={styles.nickname}>{profile?.nickname ?? '-'}</Text>
@@ -161,30 +257,15 @@ export default function ProfileScreen() {
           </View>
         </View>
 
-        {/* 티밋 온도 + 팀원 리뷰 */}
-        <View style={styles.tempReviewCard}>
-          <Text style={styles.tempTitle}>티밋 온도</Text>
-          <TemperatureBar
-            value={profile?.temperature ?? 0}
-            max={profile?.maxTemperature ?? 40}
-          />
-
-          {(profile?.reviews?.length ?? 0) > 0 && (
-            <>
-              <View style={styles.reviewDivider} />
-              <View style={styles.reviewHeader}>
-                <Text style={styles.reviewTitle}>💬 팀원 리뷰</Text>
-                <Text style={styles.reviewCount}>{profile!.reviews.length}개</Text>
-              </View>
-              {profile!.reviews.map((r) => (
-                <View key={r.reviewId} style={styles.reviewItem}>
-                  <Text style={styles.reviewContent}>"{r.content}"</Text>
-                  <Text style={styles.reviewMeta}>{r.contestName}</Text>
-                </View>
-              ))}
-            </>
-          )}
-        </View>
+        {/* 티밋 온도 + 받은 리뷰 (상세정보 화면과 동일한 카드 디자인) */}
+        <ReviewStatsCard
+          averageRating={profile?.averageRating ?? 0}
+          stats={reviewStats}
+          keywords={reviewKeywords}
+          reviewCount={receivedReviews.filter((r) => r.comment).length}
+          onPressReviews={() => router.push('/(tabs)/profile/all-reviews')}
+          emptyText={reviewStatsLoading ? '불러오는 중...' : '아직 받은 리뷰가 없어요'}
+        />
 
         {/* 2×2 메뉴 그리드 */}
         <View style={styles.gridSection}>
@@ -243,7 +324,12 @@ export default function ProfileScreen() {
             </View>
             <Switch
               value={profile?.isMatchingActive ?? false}
-              onValueChange={(v) => setMatchingActive(v)}
+              onValueChange={async (v) => {
+                await setMatchingActive(v);
+                // 인재풀 목록은 세션 내내 캐시되는 값이라, 여기서 껐다 켰다 해도
+                // 다시 로그인하기 전까지는 탐색 탭에 그대로 남아있던 문제를 고치기 위함
+                useExploreStore.getState().refreshTalents();
+              }}
               trackColor={{ false: Colors.lightGray, true: Colors.primary }}
               thumbColor={Colors.white}
             />
@@ -263,6 +349,30 @@ export default function ProfileScreen() {
               <Text style={styles.notifSubtitle}>매칭 제안, 마감 알림 관리</Text>
             </View>
             <Text style={styles.notifArrow}>›</Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* 계정 관리 */}
+        <View style={styles.notifSection}>
+          <TouchableOpacity
+            style={styles.notifRow}
+            onPress={handleLogout}
+            activeOpacity={0.7}
+          >
+            <Text style={styles.notifIcon}>🚪</Text>
+            <View style={styles.notifTexts}>
+              <Text style={styles.notifTitle}>로그아웃</Text>
+            </View>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.notifRow}
+            onPress={handleWithdraw}
+            activeOpacity={0.7}
+          >
+            <Text style={styles.notifIcon}>🚫</Text>
+            <View style={styles.notifTexts}>
+              <Text style={[styles.notifTitle, styles.withdrawText]}>회원 탈퇴</Text>
+            </View>
           </TouchableOpacity>
         </View>
 
@@ -300,6 +410,33 @@ const styles = StyleSheet.create({
     borderRadius: 32,
     backgroundColor: '#D9D9D9',
     marginRight: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'visible',
+  },
+  avatarImage: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+  },
+  avatarPlaceholder: {
+    fontSize: 26,
+  },
+  avatarEditBadge: {
+    position: 'absolute',
+    bottom: -2,
+    right: -2,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: Colors.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: Colors.white,
+  },
+  avatarEditIcon: {
+    fontSize: 11,
   },
   profileInfo: { flex: 1 },
   nameRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 },
@@ -318,35 +455,6 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.white,
   },
   editBtnText: { fontSize: 13, fontWeight: '600', color: Colors.primary },
-
-  // Temperature + review card (dashed orange border)
-  tempReviewCard: {
-    backgroundColor: Colors.white,
-    marginHorizontal: 16,
-    marginBottom: 8,
-    borderRadius: 14,
-    padding: 20,
-    borderWidth: 1.5,
-    borderColor: Colors.primary,
-    borderStyle: 'dashed',
-  },
-  tempTitle: { fontSize: 14, fontWeight: '700', color: Colors.dark, marginBottom: 12 },
-  reviewDivider: {
-    height: 1,
-    backgroundColor: Colors.lightGray,
-    marginVertical: 16,
-  },
-  reviewHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 12,
-  },
-  reviewTitle: { fontSize: 14, fontWeight: '700', color: Colors.dark },
-  reviewCount: { fontSize: 13, color: Colors.grayMedium },
-  reviewItem: { marginBottom: 10 },
-  reviewContent: { fontSize: 14, color: Colors.dark, lineHeight: 20, fontWeight: '500' },
-  reviewMeta: { fontSize: 12, color: Colors.grayMedium, marginTop: 2 },
 
   // 2x2 grid
   gridSection: {
@@ -392,4 +500,5 @@ const styles = StyleSheet.create({
   notifTitle: { fontSize: 15, fontWeight: '700', color: Colors.dark, marginBottom: 3 },
   notifSubtitle: { fontSize: 12, color: Colors.grayMedium },
   notifArrow: { fontSize: 22, color: Colors.lightGray },
+  withdrawText: { color: Colors.error },
 });

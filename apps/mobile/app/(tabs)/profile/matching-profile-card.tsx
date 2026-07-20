@@ -13,52 +13,12 @@ import { Colors } from '../../../src/constants/colors';
 import { ScreenHeader } from '../../../src/components/common/ScreenHeader';
 import { useMypageStore } from '../../../src/store/useMypageStore';
 import { MatchingProfileData } from '../../../src/types/mypage';
-
-// ── 표시용 변환 헬퍼 ──────────────────────────────────────────────────────────
-
-const EXPERIENCE_LABELS: Record<0 | 1 | 2, string> = {
-  0: '처음이에요, 함께 배우며 성장하고 싶어요',
-  1: '경험은 있지만 더 발전하고 싶어요',
-  2: '경험을 바탕으로 결과를 만들고 싶어요',
-};
-
-const INTENSITY_LABELS: Record<1 | 2 | 3 | 4, string> = {
-  1: '주 1~3시간',
-  2: '주 4~7시간',
-  3: '주 8~14시간',
-  4: '주 15시간 이상',
-};
-
-const ONLINE_OFFLINE_LABELS: Record<string, string> = {
-  ONLINE: '온라인 위주',
-  MIXED: '혼합형',
-  OFFLINE: '오프라인 위주',
-};
-
-const TEAM_VIBE_LABELS = ['팀 분위기 최우선', '팀 분위기 우선', '균형 중시', '결과 우선', '결과 최우선'];
-const FEEDBACK_LABELS = ['매우 부드럽게', '부드럽게', '상황에 따라요', '솔직하게', '매우 솔직하게'];
-
-const LEADERSHIP_LABELS: Record<string, string> = {
-  WANT: '리더 하고 싶어요',
-  IF_NEEDED: '필요하면 할 수 있어요',
-  DONT_WANT: '리더는 안 하고 싶어요',
-};
+import { formatRegionsLabel } from '../../../src/utils/region';
+import { formatMatchingCard } from '../../../src/constants/matchingLabels';
 
 function formatCard(p: MatchingProfileData) {
-  const regionStr =
-    p.regions.length > 0
-      ? ` · ${p.regions[0].sido}${p.regions[0].sigungu ? ' ' + p.regions[0].sigungu : ''}`
-      : '';
-  return {
-    skills: p.skills.join(', '),
-    purpose: EXPERIENCE_LABELS[p.experienceLevel],
-    intensity: INTENSITY_LABELS[p.intensityLevel],
-    meetingPreference: `${ONLINE_OFFLINE_LABELS[p.onlineOfflinePref]}${regionStr}`,
-    teamVibe: `${TEAM_VIBE_LABELS[p.teamVibe - 1]} / ${FEEDBACK_LABELS[p.feedbackStyle - 1]}`,
-    leadership: LEADERSHIP_LABELS[p.leadershipPref],
-    appealTitle: p.appealTitle,
-    appealContent: p.appealContent,
-  };
+  const region = p.regions.length > 0 ? formatRegionsLabel(p.regions) : '';
+  return formatMatchingCard({ ...p, region });
 }
 
 // ── CardRow ───────────────────────────────────────────────────────────────────
@@ -146,6 +106,7 @@ export default function MatchingProfileCardScreen() {
             <View style={styles.divider} />
 
             <CardRow label="스킬" value={card.skills} onPressEdit={() => editStep(1)} />
+            <CardRow label="참여 경험" value={card.experience} onPressEdit={() => editStep(2)} />
             <CardRow label="목적" value={card.purpose} onPressEdit={() => editStep(2)} />
             <CardRow label="강도" value={card.intensity} onPressEdit={() => editStep(3)} />
             <CardRow

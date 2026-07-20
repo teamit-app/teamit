@@ -6,15 +6,15 @@ import {
   TouchableOpacity,
   ScrollView,
   StyleSheet,
-  Alert,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
+import { Alert } from '../../../src/utils/alert';
 import { Colors } from '../../../src/constants/colors';
 import { ScreenHeader } from '../../../src/components/common/ScreenHeader';
 import { DrumRollPicker } from '../../../src/components/common/DrumRollPicker';
 import { useMypageStore } from '../../../src/store/useMypageStore';
-import { addCertificateCareer } from '../../../src/services/mypageService';
+import { addCertificateCareer, updateCertificateCareer } from '../../../src/services/mypageService';
 
 function formatDate(year: number, month: number, day: number): string {
   return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
@@ -30,11 +30,18 @@ function parseDate(dateStr: string): { year: number; month: number; day: number 
 
 export default function AddCertificateScreen() {
   const insets = useSafeAreaInsets();
-  const { addCareerLocal } = useMypageStore();
+  const { addCareerLocal, updateCareerLocal } = useMypageStore();
+  const params = useLocalSearchParams<{
+    careerItemId?: string;
+    certName?: string;
+    issuingOrg?: string;
+    acquiredDate?: string;
+  }>();
+  const isEditMode = !!params.careerItemId;
 
-  const [certName, setCertName] = useState('');
-  const [issuingOrg, setIssuingOrg] = useState('');
-  const [acquiredDate, setAcquiredDate] = useState('2024-01-01');
+  const [certName, setCertName] = useState(params.certName ?? '');
+  const [issuingOrg, setIssuingOrg] = useState(params.issuingOrg ?? '');
+  const [acquiredDate, setAcquiredDate] = useState(params.acquiredDate || '2024-01-01');
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [saving, setSaving] = useState(false);
 
@@ -48,17 +55,26 @@ export default function AddCertificateScreen() {
 
     setSaving(true);
     try {
-      const result = await addCertificateCareer({
+      const data = {
         certName: certName.trim(),
         issuingOrg: issuingOrg.trim(),
         acquiredDate,
-      });
-      addCareerLocal(result);
-      Alert.alert('등록 완료', '자격증이 등록되었어요.', [
-        { text: '확인', onPress: () => router.back() },
-      ]);
+      };
+      if (isEditMode) {
+        const result = await updateCertificateCareer(Number(params.careerItemId), data);
+        updateCareerLocal(result);
+        Alert.alert('수정 완료', '자격증이 수정되었어요.', [
+          { text: '확인', onPress: () => router.back() },
+        ]);
+      } else {
+        const result = await addCertificateCareer(data);
+        addCareerLocal(result);
+        Alert.alert('등록 완료', '자격증이 등록되었어요.', [
+          { text: '확인', onPress: () => router.back() },
+        ]);
+      }
     } catch {
-      Alert.alert('오류', '등록에 실패했어요. 다시 시도해주세요.');
+      Alert.alert('오류', `${isEditMode ? '수정' : '등록'}에 실패했어요. 다시 시도해주세요.`);
     } finally {
       setSaving(false);
     }
@@ -66,7 +82,7 @@ export default function AddCertificateScreen() {
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
-      <ScreenHeader title="자격증 추가" onBack={() => router.back()} />
+      <ScreenHeader title={isEditMode ? '자격증 수정' : '자격증 추가'} onBack={() => router.back()} />
 
       <ScrollView
         showsVerticalScrollIndicator={false}
@@ -121,7 +137,7 @@ export default function AddCertificateScreen() {
           disabled={saving}
         >
           <Text style={styles.saveBtnText}>
-            {saving ? '저장 중...' : '저장하기'}
+            {saving ? '저장 중...' : isEditMode ? '수정하기' : '저장하기'}
           </Text>
         </TouchableOpacity>
       </View>

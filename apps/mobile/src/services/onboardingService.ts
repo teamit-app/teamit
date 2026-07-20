@@ -7,14 +7,9 @@ export interface BasicInfoRequest {
   birthDate: string; // 'YYYY-MM-DD'
 }
 
-export interface RegionItem {
-  sido: string;
-  sigungu: string | null;
-}
-
 export interface EducationRequest {
   schoolName: string;
-  status: 'ATTENDING' | 'LEAVE' | 'COMPLETED' | 'GRADUATED';
+  status: 'ATTENDING' | 'LEAVE' | 'COMPLETED' | 'EXPECTED' | 'GRADUATED';
   majorType: 'SINGLE' | 'DOUBLE';
   major: string;
   subMajor: string | null;
@@ -26,10 +21,6 @@ interface BasicInfoResponseData {
   name: string;
   gender: string;
   birthDate: string;
-}
-
-interface RegionsResponseData {
-  regions: Array<{ id: number; sido: string; sigungu: string | null }>;
 }
 
 interface EducationResponseData {
@@ -47,14 +38,6 @@ export const submitBasicInfo = async (data: BasicInfoRequest): Promise<number> =
     body: JSON.stringify(data),
   });
   return result.userId;
-};
-
-// POST /users/regions
-export const submitRegions = async (_userId: number, regions: RegionItem[]): Promise<void> => {
-  await apiRequest<RegionsResponseData>(`/users/regions`, {
-    method: 'POST',
-    body: JSON.stringify({ regions }),
-  });
 };
 
 // POST /users/educations

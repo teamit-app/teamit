@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -7,11 +7,16 @@ import {
   StyleSheet,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { router, useLocalSearchParams } from 'expo-router';
+import { router, useLocalSearchParams, useFocusEffect } from 'expo-router';
+import { Alert } from '../../../src/utils/alert';
 import { Colors } from '../../../src/constants/colors';
 import { ScreenHeader } from '../../../src/components/common/ScreenHeader';
-import { getContestRegistrations } from '../../../src/services/mypageService';
-import { ContestRegistration, ParticipantCardData } from '../../../src/types/mypage';
+import { getContestRegistrations, cancelContestRegistration } from '../../../src/services/mypageService';
+import { registerAsParticipant } from '../../../src/services/contestService';
+import { getMyPosts } from '../../../src/services/postService';
+import { ContestRegistration } from '../../../src/types/mypage';
+import { formatMatchingCard } from '../../../src/constants/matchingLabels';
+import { useExploreStore } from '../../../src/store/useExploreStore';
 
 function DDayBadge({ dDay }: { dDay: number }) {
   if (dDay < 0) {
@@ -60,15 +65,60 @@ export default function ParticipantCardScreen() {
 
   const [registration, setRegistration] = useState<ContestRegistration | null>(null);
   const [loading, setLoading] = useState(true);
+  const [needsResubmit, setNeedsResubmit] = useState(false);
+  const [resubmitting, setResubmitting] = useState(false);
+  const isMounted = useRef(false);
+  const unmarkContestParticipant = useExploreStore((s) => s.unmarkContestParticipant);
 
-  useEffect(() => {
-    getContestRegistrations()
-      .then((list) => {
-        const found = list.find((r) => r.registrationId === Number(registrationId));
-        setRegistration(found ?? null);
-      })
-      .finally(() => setLoading(false));
-  }, [registrationId]);
+  useFocusEffect(
+    useCallback(() => {
+      // 첫 마운트 이후 다시 포커스 → 수정하고 돌아온 것으로 간주
+      if (isMounted.current) setNeedsResubmit(true);
+      isMounted.current = true;
+
+      setLoading(true);
+      getContestRegistrations()
+        .then((list) => {
+          const found = list.find((r) => r.registrationId === Number(registrationId));
+          setRegistration(found ?? null);
+        })
+        .finally(() => setLoading(false));
+    }, [registrationId]),
+  );
+
+  // 이 공모전에 내가 올린 모집글이 있고 이미 팀원이 합류했다면, 참여 카드를 바꾸면
+  // 그 모집글의 매칭 기준(모집자 스냅샷)이 어긋나므로 수정 자체를 막는다
+  // (서버 registerParticipant도 동일하게 막아주지만, 여기서 미리 막아 불필요한 입력을 방지)
+  const checkCardEditable = async (contestId: number): Promise<boolean> => {
+    try {
+      const myPosts = await getMyPosts();
+      const myPost = myPosts.find((p) => p.contestId === contestId);
+      if (myPost && (myPost.currentMembers ?? 1) > 1) {
+        Alert.alert(
+          '수정할 수 없어요',
+          '이 공모전에 올린 모집글에 이미 합류한 팀원이 있어서 참여 카드를 수정할 수 없어요.',
+        );
+        return false;
+      }
+      return true;
+    } catch {
+      return true;
+    }
+  };
+
+  const handleResubmit = async () => {
+    if (!registration) return;
+    if (!(await checkCardEditable(registration.contestId))) return;
+    setResubmitting(true);
+    try {
+      await registerAsParticipant(registration.contestId);
+      setNeedsResubmit(false);
+    } catch {
+      Alert.alert('제출 실패', '참여 카드를 제출하지 못했어요. 잠시 후 다시 시도해 주세요.');
+    } finally {
+      setResubmitting(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -92,12 +142,7 @@ export default function ParticipantCardScreen() {
     );
   }
 
-  const card: ParticipantCardData = registration.participantCard;
-
-  const onlineOfflineValue =
-    card.onlineOffline === '오프라인' || card.onlineOffline === '혼합'
-      ? `${card.onlineOffline} (${card.region})`
-      : card.onlineOffline;
+  const card = formatMatchingCard(registration.participantCard);
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
@@ -117,15 +162,24 @@ export default function ParticipantCardScreen() {
             <Text style={styles.previewCardHeaderText} numberOfLines={2}>
               {registration.contestTitle}
             </Text>
-            <TouchableOpacity onPress={() => router.push('/(tabs)/profile/matching-profile')}>
+            <TouchableOpacity
+              onPress={async () => {
+                if (!(await checkCardEditable(registration.contestId))) return;
+                router.push(
+                  `/(tabs)/profile/matching-profile?returnTo=participant-card&contestId=${registration.contestId}` as never,
+                );
+              }}
+            >
               <Text style={styles.headerEditBtn}>수정</Text>
             </TouchableOpacity>
           </View>
 
-          <CardField label="스킬" value={card.skills.join(', ')} />
-          <CardField label="경험" value={card.experienceCount} />
+          <CardField label="스킬" value={card.skills} />
+          <CardField label="참여 경험" value={card.experience} />
+          <CardField label="목적" value={card.purpose} />
           <CardField label="강도" value={card.intensity} />
-          <CardField label="온오프라인" value={onlineOfflineValue} />
+          <CardField label="온오프라인선호" value={card.meetingPreference} />
+          {card.teamVibe ? <CardField label="팀분위기" value={card.teamVibe} /> : null}
           <CardField label="리더십" value={card.leadership} />
 
           <View style={styles.appealSection}>
@@ -152,9 +206,44 @@ export default function ParticipantCardScreen() {
       </ScrollView>
 
       <View style={[styles.ctaBar, { paddingBottom: insets.bottom + 16 }]}>
-        <View style={styles.ctaBtnDone}>
-          <Text style={styles.ctaBtnDoneText}>제출 완료</Text>
-        </View>
+        {needsResubmit ? (
+          <TouchableOpacity
+            style={styles.ctaBtnResubmit}
+            onPress={handleResubmit}
+            disabled={resubmitting}
+          >
+            <Text style={styles.ctaBtnResubmitText}>
+              {resubmitting ? '제출 중...' : '제출 완료'}
+            </Text>
+          </TouchableOpacity>
+        ) : (
+          <View style={styles.ctaBtnDone}>
+            <Text style={styles.ctaBtnDoneText}>제출 완료</Text>
+          </View>
+        )}
+        <TouchableOpacity
+          style={styles.ctaBtnCancel}
+          onPress={() => {
+            Alert.alert(
+              '후보 등록 취소',
+              '후보 등록을 취소하면 공모전 후보 목록에서 삭제돼요.\n이 공모전에 작성한 모집글이 있다면 함께 삭제돼요.\n취소하시겠어요?',
+              [
+                { text: '아니요', style: 'cancel' },
+                {
+                  text: '취소하기',
+                  style: 'destructive',
+                  onPress: async () => {
+                    await cancelContestRegistration(registration.contestId);
+                    unmarkContestParticipant(registration.contestId);
+                    router.back();
+                  },
+                },
+              ],
+            );
+          }}
+        >
+          <Text style={styles.ctaBtnCancelText}>제출 취소</Text>
+        </TouchableOpacity>
       </View>
     </View>
   );
@@ -248,13 +337,31 @@ const styles = StyleSheet.create({
     paddingTop: 12,
     borderTopWidth: 1,
     borderTopColor: Colors.lightGray,
+    gap: 8,
   },
   ctaBtnDone: {
-    height: 52,
+    height: 48,
     borderRadius: 12,
     backgroundColor: Colors.lightGray,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  ctaBtnDoneText: { fontSize: 16, fontWeight: '700', color: Colors.grayMedium },
+  ctaBtnDoneText: { fontSize: 15, fontWeight: '700', color: Colors.grayMedium },
+  ctaBtnResubmit: {
+    height: 48,
+    borderRadius: 12,
+    backgroundColor: Colors.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  ctaBtnResubmitText: { fontSize: 15, fontWeight: '700', color: Colors.white },
+  ctaBtnCancel: {
+    height: 44,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#E57373',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  ctaBtnCancelText: { fontSize: 14, fontWeight: '600', color: '#E57373' },
 });

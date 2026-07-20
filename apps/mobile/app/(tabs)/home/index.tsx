@@ -7,8 +7,12 @@ import { ContestCard } from '../../../src/components/explore/ContestCard';
 import { FilterPills } from '../../../src/components/explore/FilterPills';
 import { getPopularContests } from '../../../src/services/contestService';
 import { getMatchingStatus } from '../../../src/services/matchingService';
+import { getNotifications } from '../../../src/services/notificationService';
+import { useNotificationStore } from '../../../src/store/useNotificationStore';
 import { Contest, ContestStatus } from '../../../src/types/contest';
 import { MatchingStatus } from '../../../src/types/matching';
+import { useAuthStore } from '../../../src/store/useAuthStore';
+import { withAuth } from '../../../src/utils/authGuard';
 
 type StatusFilter = 'ALL' | ContestStatus;
 
@@ -23,15 +27,23 @@ export default function HomeScreen() {
   const [contests, setContests] = useState<Contest[]>([]);
   const [matchingStatus, setMatchingStatus] = useState<MatchingStatus | null>(null);
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('ALL');
+  const unreadCount = useNotificationStore((s) => s.unreadCount);
+  const setUnreadCount = useNotificationStore((s) => s.setUnreadCount);
+  const currentUserId = useAuthStore((s) => s.currentUserId);
 
   useEffect(() => {
     getPopularContests()
       .then(setContests)
       .catch((e) => console.error('[Home] 인기 공모전 로드 실패:', e));
+    if (!currentUserId) return;
     getMatchingStatus()
       .then((data) => { if (data) setMatchingStatus(data); })
       .catch((e) => console.error('[Home] 매칭 현황 로드 실패:', e));
-  }, []);
+    // 웹소켓으로 실시간 반영되는 unreadCount의 최초 값 — 소켓 연결 전/중 놓친 알림까지 포함해서 시드한다
+    getNotifications()
+      .then(({ unreadCount: count }) => setUnreadCount(count))
+      .catch((e) => console.error('[Home] 알림 로드 실패:', e));
+  }, [currentUserId]);
 
   const filteredContests = contests.filter(
     (contest) => statusFilter === 'ALL' || contest.status === statusFilter,
@@ -41,8 +53,9 @@ export default function HomeScreen() {
     <View style={[styles.container, { paddingTop: insets.top }]}>
       <View style={styles.header}>
         <Text style={styles.logo}>티밋</Text>
-        <TouchableOpacity onPress={() => router.push('/home/notifications')} hitSlop={8}>
+        <TouchableOpacity onPress={() => router.push('/home/notifications')} hitSlop={8} style={styles.bellWrap}>
           <Text style={styles.bellIcon}>🔔</Text>
+          {unreadCount > 0 && <View style={styles.bellBadge} />}
         </TouchableOpacity>
       </View>
 
@@ -68,28 +81,40 @@ export default function HomeScreen() {
               style={styles.matchingColLeft}
               activeOpacity={0.75}
               onPress={() =>
-                router.push({
-                  pathname: '/(tabs)/messages',
-                  params: { initialTab: 'invitations' },
-                })
+                currentUserId
+                  ? router.push('/(tabs)/profile/received-applications')
+                  : withAuth('/(tabs)/profile/received-applications')
               }
             >
-              <Text style={styles.matchingLabel}>나에게 온 제안</Text>
+              <Text style={styles.matchingLabel}>내 모집글에 지원한 사람</Text>
               <View style={styles.matchingValueRow}>
-                <Text style={styles.matchingValue}>{matchingStatus?.receivedProposalCount ?? '-'}</Text>
+                <Text style={styles.matchingValue}>{matchingStatus?.myPostApplicantCount ?? '-'}</Text>
                 <Text style={styles.matchingLinkPrimary}>보기 ›</Text>
               </View>
+              {!currentUserId && (
+                <Text style={styles.matchingGuestHint}>로그인 후 확인 가능해요</Text>
+              )}
             </TouchableOpacity>
             <TouchableOpacity
               style={styles.matchingColRight}
               activeOpacity={0.75}
-              onPress={() => router.push('/(tabs)/profile/my-applications')}
+              onPress={() =>
+                currentUserId
+                  ? router.push({
+                      pathname: '/(tabs)/messages',
+                      params: { initialTab: 'invitations' },
+                    })
+                  : withAuth('/(tabs)/messages')
+              }
             >
-              <Text style={styles.matchingLabel}>내가 지원한 팀</Text>
+              <Text style={styles.matchingLabel}>나에게 온 팀 초대</Text>
               <View style={styles.matchingValueRow}>
-                <Text style={styles.matchingValue}>{matchingStatus?.appliedTeamCount ?? '-'}</Text>
+                <Text style={styles.matchingValue}>{matchingStatus?.receivedInvitationCount ?? '-'}</Text>
                 <Text style={styles.matchingLinkGray}>기록 ›</Text>
               </View>
+              {!currentUserId && (
+                <Text style={styles.matchingGuestHint}>로그인 후 확인 가능해요</Text>
+              )}
             </TouchableOpacity>
           </View>
 
@@ -123,7 +148,7 @@ export default function HomeScreen() {
                 key={contest.contestId}
                 contest={contest}
                 variant="compact"
-                onPress={() => router.push(`/explore/contest/${contest.contestId}` as never)}
+                onPress={() => router.push(`/home/contest/${contest.contestId}` as never)}
               />
             ))}
           </View>
@@ -152,8 +177,20 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     color: Colors.primary,
   },
+  bellWrap: {
+    position: 'relative',
+  },
   bellIcon: {
     fontSize: 22,
+  },
+  bellBadge: {
+    position: 'absolute',
+    top: -2,
+    right: -2,
+    width: 9,
+    height: 9,
+    borderRadius: 5,
+    backgroundColor: Colors.error,
   },
   content: {
     paddingHorizontal: 20,
@@ -234,6 +271,11 @@ const styles = StyleSheet.create({
     fontSize: 26,
     fontWeight: '800',
     color: Colors.primary,
+  },
+  matchingGuestHint: {
+    fontSize: 11,
+    color: Colors.grayMedium,
+    marginTop: 4,
   },
   matchingLinkPrimary: {
     fontSize: 13,

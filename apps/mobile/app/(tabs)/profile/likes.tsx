@@ -12,9 +12,15 @@ import { Colors } from '../../../src/constants/colors';
 import { ScreenHeader } from '../../../src/components/common/ScreenHeader';
 import { TalentCard } from '../../../src/components/explore/TalentCard';
 import { ContestCard } from '../../../src/components/explore/ContestCard';
-import { useExploreStore } from '../../../src/store/useExploreStore';
+import { getHeartedTalents } from '../../../src/services/talentService';
+import { getHeartedContests } from '../../../src/services/contestService';
 import { getLikedPosts } from '../../../src/services/mypageService';
+import { getOrCreateDirectChatRoom } from '../../../src/services/messageService';
+import { requireAuthForChat } from '../../../src/utils/authGuard';
+import { useExploreStore } from '../../../src/store/useExploreStore';
 import { LikedPost } from '../../../src/types/mypage';
+import { PoolUser } from '../../../src/types/talent';
+import { Contest } from '../../../src/types/contest';
 
 type Tab = 'TALENT' | 'CONTEST' | 'POST';
 type PostFilter = 'ALL' | 'OPEN' | 'CLOSED';
@@ -25,9 +31,9 @@ const POST_FILTER_OPTIONS: { key: PostFilter; label: string }[] = [
   { key: 'CLOSED', label: '마감' },
 ];
 
-function LikedPostCard({ post }: { post: LikedPost }) {
+function LikedPostCard({ post, onPress }: { post: LikedPost; onPress: () => void }) {
   return (
-    <View style={postCard.container}>
+    <TouchableOpacity style={postCard.container} onPress={onPress} activeOpacity={0.85}>
       <View style={postCard.topRow}>
         <View style={[postCard.statusChip, post.isOpen ? postCard.statusOpen : postCard.statusClosed]}>
           <Text style={[postCard.statusText, post.isOpen ? postCard.statusTextOpen : postCard.statusTextClosed]}>
@@ -56,7 +62,7 @@ function LikedPostCard({ post }: { post: LikedPost }) {
         <Text style={postCard.meta}>팀원 {post.teamSize}명 · 마감 {post.deadline}</Text>
         <Text style={postCard.heart}>♥</Text>
       </View>
-    </View>
+    </TouchableOpacity>
   );
 }
 
@@ -120,30 +126,62 @@ export default function LikesScreen() {
   const insets = useSafeAreaInsets();
   const [tab, setTab] = useState<Tab>('TALENT');
   const [postFilter, setPostFilter] = useState<PostFilter>('ALL');
-  const [likedPosts, setLikedPosts] = useState<LikedPost[]>([]);
-  const [loadingPosts, setLoadingPosts] = useState(false);
 
-  const talents = useExploreStore((s) => s.talents);
-  const contests = useExploreStore((s) => s.contests);
-  const loadData = useExploreStore((s) => s.loadData);
-  const toggleTalentHeart = useExploreStore((s) => s.toggleTalentHeart);
-  const toggleContestHeart = useExploreStore((s) => s.toggleContestHeart);
+  const toggleTalentHeartInStore = useExploreStore((s) => s.toggleTalentHeart);
+  const toggleContestHeartInStore = useExploreStore((s) => s.toggleContestHeart);
+  const [likedTalents, setLikedTalents] = useState<PoolUser[]>([]);
+  const [likedContests, setLikedContests] = useState<Contest[]>([]);
+  const [likedPosts, setLikedPosts] = useState<LikedPost[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    loadData();
+    Promise.all([
+      getHeartedTalents().catch(() => [] as PoolUser[]),
+      getHeartedContests().catch(() => [] as Contest[]),
+      getLikedPosts().catch(() => [] as LikedPost[]),
+    ])
+      .then(([t, c, p]) => {
+        setLikedTalents(t);
+        setLikedContests(c);
+        setLikedPosts(p);
+      })
+      .finally(() => setIsLoading(false));
   }, []);
 
-  useEffect(() => {
-    if (tab === 'POST') {
-      setLoadingPosts(true);
-      getLikedPosts()
-        .then(setLikedPosts)
-        .finally(() => setLoadingPosts(false));
+  // 좋아요 목록 화면에서는 항상 "취소"만 가능 — 목록에서 바로 제거
+  // useExploreStore를 거쳐야 탐색 탭 목록/상세정보에도 그대로 반영된다
+  const removeTalentLike = async (targetUserId: number) => {
+    const prev = likedTalents;
+    setLikedTalents((cur) => cur.filter((t) => t.userId !== targetUserId));
+    try {
+      await toggleTalentHeartInStore(targetUserId, true);
+    } catch (e) {
+      console.error('[Likes] 팀원 좋아요 취소 실패:', e);
+      setLikedTalents(prev);
     }
-  }, [tab]);
+  };
 
-  const likedTalents = talents.filter((t) => t.isHearted);
-  const likedContests = contests.filter((c) => c.isHearted);
+  const handlePropose = async (targetUserId: number) => {
+    if (!requireAuthForChat(`/explore/talent/${targetUserId}`)) return;
+    try {
+      const chatRoomId = await getOrCreateDirectChatRoom(targetUserId);
+      router.push(`/explore/chat/${chatRoomId}` as never);
+    } catch (e) {
+      console.error('[Likes] 채팅방 생성 실패:', e);
+    }
+  };
+
+  const removeContestLike = async (contestId: number) => {
+    const prev = likedContests;
+    setLikedContests((cur) => cur.filter((c) => c.contestId !== contestId));
+    try {
+      await toggleContestHeartInStore(contestId, true);
+    } catch (e) {
+      console.error('[Likes] 공모전 좋아요 취소 실패:', e);
+      setLikedContests(prev);
+    }
+  };
+
   const filteredPosts = likedPosts.filter((p) => {
     if (postFilter === 'OPEN') return p.isOpen;
     if (postFilter === 'CLOSED') return !p.isOpen;
@@ -196,51 +234,63 @@ export default function LikesScreen() {
       )}
 
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        {tab === 'TALENT' && (
-          likedTalents.length === 0 ? (
-            <View style={styles.empty}>
-              <Text style={styles.emptyIcon}>🤍</Text>
-              <Text style={styles.emptyText}>좋아요한 인재가 없어요</Text>
-            </View>
-          ) : likedTalents.map((talent) => (
-            <TalentCard
-              key={talent.userId}
-              talent={talent}
-              onPressHeart={() => toggleTalentHeart(talent.userId)}
-            />
-          ))
-        )}
+        {isLoading ? (
+          <View style={styles.empty}>
+            <Text style={styles.emptyText}>불러오는 중...</Text>
+          </View>
+        ) : (
+          <>
+            {tab === 'TALENT' && (
+              likedTalents.length === 0 ? (
+                <View style={styles.empty}>
+                  <Text style={styles.emptyIcon}>🤍</Text>
+                  <Text style={styles.emptyText}>좋아요한 인재가 없어요</Text>
+                </View>
+              ) : likedTalents.map((talent) => (
+                <TalentCard
+                  key={talent.userId}
+                  talent={talent}
+                  onPress={() => router.push(`/explore/talent/${talent.userId}` as never)}
+                  onPressHeart={() => removeTalentLike(talent.userId)}
+                  onPressPropose={() => handlePropose(talent.userId)}
+                />
+              ))
+            )}
 
-        {tab === 'CONTEST' && (
-          likedContests.length === 0 ? (
-            <View style={styles.empty}>
-              <Text style={styles.emptyIcon}>🤍</Text>
-              <Text style={styles.emptyText}>좋아요한 공모전이 없어요</Text>
-            </View>
-          ) : likedContests.map((contest) => (
-            <ContestCard
-              key={contest.contestId}
-              contest={contest}
-              variant="full"
-              onPress={() => router.push(`/explore/contest/${contest.contestId}` as never)}
-              onPressHeart={() => toggleContestHeart(contest.contestId)}
-            />
-          ))
-        )}
+            {tab === 'CONTEST' && (
+              likedContests.length === 0 ? (
+                <View style={styles.empty}>
+                  <Text style={styles.emptyIcon}>🤍</Text>
+                  <Text style={styles.emptyText}>좋아요한 공모전이 없어요</Text>
+                </View>
+              ) : likedContests.map((contest) => (
+                <ContestCard
+                  key={contest.contestId}
+                  contest={contest}
+                  variant="full"
+                  onPress={() => router.push(`/profile/contest/${contest.contestId}` as never)}
+                  onPressHeart={() => removeContestLike(contest.contestId)}
+                />
+              ))
+            )}
 
-        {tab === 'POST' && (
-          loadingPosts ? (
-            <View style={styles.empty}>
-              <Text style={styles.emptyText}>불러오는 중...</Text>
-            </View>
-          ) : filteredPosts.length === 0 ? (
-            <View style={styles.empty}>
-              <Text style={styles.emptyIcon}>🤍</Text>
-              <Text style={styles.emptyText}>좋아요한 모집글이 없어요</Text>
-            </View>
-          ) : filteredPosts.map((post) => (
-            <LikedPostCard key={post.postId} post={post} />
-          ))
+            {tab === 'POST' && (
+              filteredPosts.length === 0 ? (
+                <View style={styles.empty}>
+                  <Text style={styles.emptyIcon}>🤍</Text>
+                  <Text style={styles.emptyText}>좋아요한 모집글이 없어요</Text>
+                </View>
+              ) : filteredPosts.map((post) => (
+                <LikedPostCard
+                  key={post.postId}
+                  post={post}
+                  onPress={() =>
+                    router.push(`/profile/post/${post.postId}?contestId=${post.contestId}` as never)
+                  }
+                />
+              ))
+            )}
+          </>
         )}
       </ScrollView>
     </View>

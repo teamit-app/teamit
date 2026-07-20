@@ -6,10 +6,10 @@ import {
   TouchableOpacity,
   ScrollView,
   StyleSheet,
-  Alert,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
+import { Alert } from '../../../../src/utils/alert';
 import { Colors } from '../../../../src/constants/colors';
 import { useBuildTeamStore } from '../../../../src/store/useBuildTeamStore';
 
@@ -30,7 +30,16 @@ const CURRENT_STEP = 2;
 
 export default function RecruitSkillsScreen() {
   const insets = useSafeAreaInsets();
-  const { contestId, returnToConfirm } = useLocalSearchParams<{ contestId: string; returnToConfirm: string }>();
+  const { contestId, returnToConfirm, editPostId, sourceTab, fullEdit } = useLocalSearchParams<{
+    contestId: string;
+    returnToConfirm: string;
+    editPostId?: string;
+    sourceTab?: string;
+    fullEdit?: string;
+  }>();
+  const editSuffix = editPostId
+    ? `&editPostId=${editPostId}&sourceTab=${sourceTab ?? 'explore'}&fullEdit=${fullEdit ?? ''}`
+    : '';
   const selectedSkills = useBuildTeamStore((s) => s.requiredSkills);
   const toggleSkill = useBuildTeamStore((s) => s.toggleSkill);
 
@@ -53,9 +62,10 @@ export default function RecruitSkillsScreen() {
 
   const goNext = () => {
     if (returnToConfirm === 'true') {
-      router.push(`/explore/build-team/recruit-confirm?contestId=${contestId}` as never);
+      // confirm → push로 들어온 수정 화면이므로 되돌아갈 땐 replace (사유: recruit-count.tsx 참고)
+      router.replace(`/explore/build-team/recruit-confirm?contestId=${contestId}` as never);
     } else {
-      router.push(`/explore/build-team/recruit-conditions?contestId=${contestId}` as never);
+      router.push(`/explore/build-team/recruit-conditions?contestId=${contestId}${editSuffix}` as never);
     }
   };
 

@@ -2,6 +2,7 @@ import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { Colors } from '../../constants/colors';
 import { Contest } from '../../types/contest';
+import { formatDDay } from '../../utils/dday';
 
 interface ContestCardProps {
   contest: Contest;
@@ -42,12 +43,17 @@ export function ContestCard({ contest, variant, onPress, onPressHeart }: Contest
                 <Text style={styles.categoryTagText}>{contest.categoryLabel}</Text>
               </View>
               <View style={styles.dDayBadge}>
-                <Text style={styles.dDayText}>D-{contest.dDay}</Text>
+                <Text style={styles.dDayText}>{formatDDay(contest.dDay)}</Text>
               </View>
             </View>
 
             <View style={styles.bottomRow}>
               <Text style={styles.deadline}>마감: {formattedDeadline}</Text>
+              {contest.isRegisteredAsParticipant && (
+                <View style={styles.participantBadge}>
+                  <Text style={styles.participantBadgeText}>💌 후보 등록 완료</Text>
+                </View>
+              )}
             </View>
           </View>
         </View>
@@ -65,7 +71,7 @@ export function ContestCard({ contest, variant, onPress, onPressHeart }: Contest
               <Text style={styles.organizer} numberOfLines={1}>{contest.organizer}</Text>
             </View>
             <View style={styles.dDayBadge}>
-              <Text style={styles.dDayText}>D-{contest.dDay}</Text>
+              <Text style={styles.dDayText}>{formatDDay(contest.dDay)}</Text>
             </View>
           </View>
 
@@ -73,6 +79,11 @@ export function ContestCard({ contest, variant, onPress, onPressHeart }: Contest
 
           <View style={styles.bottomRow}>
             <Text style={styles.deadline}>마감: {formattedDeadline}</Text>
+            {contest.isRegisteredAsParticipant && (
+              <View style={styles.participantBadge}>
+                <Text style={styles.participantBadgeText}>💌 후보 등록 완료</Text>
+              </View>
+            )}
           </View>
         </>
       )}
@@ -181,5 +192,18 @@ const styles = StyleSheet.create({
   deadline: {
     fontSize: 12,
     color: Colors.grayMedium,
+  },
+  participantBadge: {
+    backgroundColor: Colors.ogTint,
+    borderRadius: 999,
+    paddingHorizontal: 9,
+    paddingVertical: 3,
+    borderWidth: 1,
+    borderColor: Colors.primary,
+  },
+  participantBadgeText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: Colors.primary,
   },
 });

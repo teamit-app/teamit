@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -8,11 +8,13 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
+import { Alert } from '../../../../src/utils/alert';
 import { Colors } from '../../../../src/constants/colors';
 import { useBuildTeamStore } from '../../../../src/store/useBuildTeamStore';
-import { useRecruitPostStore } from '../../../../src/store/useRecruitPostStore';
-import { dummyContestDetails, dummyParticipationCard } from '../../../../src/data/recruitmentPosts';
-import { createPost } from '../../../../src/services/contestService';
+import { useExploreStore } from '../../../../src/store/useExploreStore';
+import { useMypageStore } from '../../../../src/store/useMypageStore';
+import { getContestDetail, createPost, registerAsParticipant } from '../../../../src/services/contestService';
+import { formatRegionsLabel } from '../../../../src/utils/region';
 
 const TOTAL_STEPS = 5;
 const CURRENT_STEP = 5;
@@ -21,20 +23,25 @@ function ConfirmRow({
   label,
   value,
   onEdit,
+  caption,
 }: {
   label: string;
   value: string;
-  onEdit: () => void;
+  onEdit?: () => void;
+  caption?: string;
 }) {
   return (
     <View style={styles.row}>
       <View style={styles.rowLeft}>
         <Text style={styles.rowLabel}>{label}</Text>
         <Text style={styles.rowValue}>{value}</Text>
+        {caption ? <Text style={styles.rowCaption}>{caption}</Text> : null}
       </View>
-      <TouchableOpacity onPress={onEdit} hitSlop={8} activeOpacity={0.7}>
-        <Text style={styles.rowEdit}>수정</Text>
-      </TouchableOpacity>
+      {onEdit && (
+        <TouchableOpacity onPress={onEdit} hitSlop={8} activeOpacity={0.7}>
+          <Text style={styles.rowEdit}>수정</Text>
+        </TouchableOpacity>
+      )}
     </View>
   );
 }
@@ -50,19 +57,43 @@ export default function RecruitConfirmScreen() {
     genderCondition,
     schoolCondition,
     experienceCondition,
+    purposeCondition,
     postTitle,
     postContent,
   } = useBuildTeamStore();
 
-  const addPost = useRecruitPostStore((s) => s.addPost);
-  const detail = dummyContestDetails.find((d) => d.contestId === id) ?? dummyContestDetails[0];
+  const [contestTitle, setContestTitle] = useState('');
+
+  useEffect(() => {
+    getContestDetail(id).then((d) => {
+      setContestTitle(d.title);
+    }).catch(() => {});
+  }, [id]);
 
   const skillsText = requiredSkills.length > 0 ? requiredSkills.join('  ') : '없음';
   const postText = postContent
     ? `제목 : ${postTitle}\n\n본문 : ${postContent}`
     : `제목 : ${postTitle}`;
 
+  // 활동 방식은 모집글에서 따로 받지 않는다 — 모집자 본인이 참여 카드(후보 등록)에서
+  // 이미 밝힌 온오프라인 선호를 그대로 쓴다. 오프라인/혼합이면 그 카드에 적힌 활동
+  // 가능 지역 기준으로 후보를 매칭하니, 시작 전에 같이 보여준다.
+  const { matchingProfile, draftCard } = useMypageStore();
+  const ownerCard = draftCard ?? matchingProfile;
+  const ownerMeetingType = ownerCard?.onlineOfflinePref === 'ONLINE'
+    ? '온라인'
+    : ownerCard?.onlineOfflinePref === 'OFFLINE'
+      ? '오프라인'
+      : '혼합';
+  const ownerRegionLabel = ownerCard && ownerCard.regions.length > 0
+    ? formatRegionsLabel(ownerCard.regions)
+    : '';
+  const meetingTypeText = ownerMeetingType !== '온라인' && ownerRegionLabel
+    ? `${ownerMeetingType} · ${ownerRegionLabel}`
+    : ownerMeetingType;
+
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const markContestParticipant = useExploreStore((s) => s.markContestParticipant);
 
   const goBack = () => router.back();
 
@@ -71,72 +102,39 @@ export default function RecruitConfirmScreen() {
     setIsSubmitting(true);
     try {
       const today = new Date();
-      const createdAt = `${today.getFullYear()}.${String(today.getMonth() + 1).padStart(2, '0')}.${String(today.getDate()).padStart(2, '0')}`;
       const deadline = new Date(today.getTime() + 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
 
-      await createPost({
+      const result = await createPost({
         contestId: id,
         postType: 'CONTEST',
         recruitMode: 'BUILD',
         title: postTitle || '팀원을 모집합니다',
         description: postContent || '',
         recruitCount,
-        genderCondition: genderCondition === '성별 상관없음' ? 'ANY' : genderCondition === '동성만' ? 'SAME' : 'ANY',
+        genderCondition: genderCondition === '동성만' ? 'SAME' : 'ANY',
         schoolCondition: schoolCondition === '학교 상관없음' ? 'ANY' : 'SAME_SCHOOL',
-        onlineOffline: 'MIXED',
+        onlineOffline: ownerCard?.onlineOfflinePref ?? 'MIXED',
         deadline,
         requiredSkills: requiredSkills.map((name) => ({ skillId: null, skillNameCustom: name })),
-      });
-
-      const recruitingMembers = Array.from({ length: recruitCount }, (_, i) => ({
-        memberId: i + 2,
-        name: '모집중',
-        isHost: false,
-        isRecruiting: true,
-      }));
-
-      addPost({
-        contestId: id,
-        title: postTitle || '팀원 모집합니다',
-        teamName: `${postTitle || '팀원 모집'} 팀`,
-        createdAt,
-        views: 0,
-        chatCount: 0,
-        likeCount: 0,
-        skills: requiredSkills,
         experienceCondition,
-        genderCondition,
-        schoolCondition,
-        meetingType: '혼합',
-        location: '',
-        intensity: '적당하게 (주 4~7h)',
-        currentMembers: 1,
-        totalMembers: recruitCount + 1,
-        isHearted: false,
-        contestName: detail.title,
-        contestPeriod: detail.registrationPeriod,
-        content: postContent,
-        members: [
-          { memberId: 1, name: '나', isHost: true, isRecruiting: false },
-          ...recruitingMembers,
-        ],
-        recruiter: {
-          name: '나',
-          skills: requiredSkills.length > 0 ? requiredSkills : dummyParticipationCard.skills.split(', '),
-          experienceCount: dummyParticipationCard.contestExperience,
-          intensity: dummyParticipationCard.intensity,
-          meetingType: dummyParticipationCard.meetingPreference,
-          location: dummyParticipationCard.location,
-          teamVibe: dummyParticipationCard.teamVibe,
-          feedbackStyle: dummyParticipationCard.feedbackStyle,
-          leadershipStyle: dummyParticipationCard.leadership,
-        },
-        comments: [],
+        purposeCondition,
       });
 
-      router.push(`/explore/build-team/matching-loading?contestId=${contestId}&returnToConfirm=true` as never);
+      // 모집글 작성 = 팀 매칭 후보 자동 등록. 서버가 자동 등록할 때는 라이브 매칭
+      // 프로필을 읽어서 스냅샷을 만드는데, 이 화면에서 "수정"으로 고친 내용은
+      // draftCard에만 있고 라이브 프로필엔 없으므로, draft가 있으면 곧바로 그 값으로
+      // 스냅샷을 덮어써준다(라이브 프로필 자체는 여전히 안 건드림).
+      const draftCard = useMypageStore.getState().draftCard;
+      if (draftCard) {
+        await registerAsParticipant(id, draftCard).catch(() => {});
+        useMypageStore.getState().clearDraftCard();
+      }
+      markContestParticipant(id); // 스토어 낙관적 업데이트
+
+      router.push(`/explore/build-team/matching-loading?contestId=${contestId}&postId=${result?.postId ?? ''}` as never);
     } catch (e) {
       console.error('[RecruitConfirm] 모집글 생성 실패:', e);
+      Alert.alert('모집글 작성 실패', '이미 이 공모전에 모집글을 작성했어요. 공모전당 모집글은 하나만 작성할 수 있어요.');
     } finally {
       setIsSubmitting(false);
     }
@@ -166,7 +164,7 @@ export default function RecruitConfirmScreen() {
           <View style={styles.cardAccentBar} />
           <View style={styles.cardInner}>
             <Text style={styles.previewLabel}>모집 공고 미리보기</Text>
-            <Text style={styles.contestTitle}>{detail.title}</Text>
+            <Text style={styles.contestTitle}>{contestTitle}</Text>
           </View>
 
           <ConfirmRow
@@ -185,8 +183,18 @@ export default function RecruitConfirmScreen() {
             onEdit={() => router.push(`/explore/build-team/recruit-conditions?contestId=${contestId}&returnToConfirm=true` as never)}
           />
           <ConfirmRow
+            label="활동 방식"
+            value={meetingTypeText}
+            caption="참여 카드에 등록한 활동 방식이에요"
+          />
+          <ConfirmRow
             label="공모전 경험"
             value={experienceCondition}
+            onEdit={() => router.push(`/explore/build-team/recruit-conditions?contestId=${contestId}&returnToConfirm=true` as never)}
+          />
+          <ConfirmRow
+            label="참여 목적 우대"
+            value={purposeCondition}
             onEdit={() => router.push(`/explore/build-team/recruit-conditions?contestId=${contestId}&returnToConfirm=true` as never)}
           />
           <ConfirmRow
@@ -288,6 +296,11 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: Colors.dark,
     lineHeight: 20,
+  },
+  rowCaption: {
+    fontSize: 12,
+    color: Colors.grayMedium,
+    marginTop: 3,
   },
   rowEdit: {
     fontSize: 14,

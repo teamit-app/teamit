@@ -1,6 +1,6 @@
 export interface MatchingStatus {
-  receivedProposalCount: number;
-  appliedTeamCount: number;
+  receivedInvitationCount: number;
+  myPostApplicantCount: number;
   recentActivity?: {
     message: string;
     relativeTime: string;

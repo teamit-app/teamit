@@ -4,7 +4,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { Colors } from '../../../src/constants/colors';
 import { ScreenHeader } from '../../../src/components/common/ScreenHeader';
-import { getNotifications } from '../../../src/services/notificationService';
+import { getNotifications, markAllNotificationsAsRead } from '../../../src/services/notificationService';
+import { useNotificationStore } from '../../../src/store/useNotificationStore';
 import { AppNotification, NotificationType } from '../../../src/types/notification';
 
 const TYPE_ICON: Record<NotificationType, string> = {
@@ -22,9 +23,25 @@ export default function NotificationsScreen() {
 
   useEffect(() => {
     getNotifications()
-      .then(setNotifications)
+      .then(({ notifications }) => setNotifications(notifications))
       .catch((e) => console.error('[Notifications] 알림 로드 실패:', e));
+
+    markAllNotificationsAsRead()
+      .then(() => useNotificationStore.getState().reset())
+      .catch((e) => console.error('[Notifications] 읽음 처리 실패:', e));
   }, []);
+
+  const handlePress = (notification: AppNotification) => {
+    if (notification.type === 'MATCH_PROPOSAL' && notification.referenceType === 'INVITATION') {
+      router.push(`/messages/invitation-detail/${notification.referenceId}` as never);
+    } else if (notification.type === 'MATCH_PROPOSAL' && notification.referenceType === 'APPLICATION') {
+      router.push('/profile/received-applications' as never);
+    } else if (notification.type === 'PROPOSAL_RESPONSE') {
+      router.push('/profile/my-applications' as never);
+    } else if (notification.type === 'MATCH_SUCCESS') {
+      router.push(`/messages/${notification.referenceId}` as never);
+    }
+  };
 
   const groups = Array.from(new Set(notifications.map((n) => n.group)));
 
@@ -46,6 +63,7 @@ export default function NotificationsScreen() {
                   key={notification.notificationId}
                   style={[styles.row, !notification.isRead && styles.rowUnread]}
                   activeOpacity={0.7}
+                  onPress={() => handlePress(notification)}
                 >
                   <View style={styles.dotColumn}>
                     {!notification.isRead && <View style={styles.unreadDot} />}

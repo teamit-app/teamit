@@ -10,10 +10,11 @@ import {
   Platform,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { Colors } from '../../../src/constants/colors';
 import { DrumRollPicker } from '../../../src/components/common/DrumRollPicker';
 import { submitBasicInfo } from '../../../src/services/onboardingService';
+import { withdraw } from '../../../src/services/authService';
 import { useOnboardingStore } from '../../../src/store/useOnboardingStore';
 
 type Gender = 'MALE' | 'FEMALE' | null;
@@ -21,6 +22,9 @@ type Gender = 'MALE' | 'FEMALE' | null;
 export default function BasicInfoScreen() {
   const insets = useSafeAreaInsets();
   const setUserId = useOnboardingStore((s) => s.setUserId);
+  // 로그인이 필요한 액션에서 여기까지 이어져 온 경우, 완료 후 원래 가려던 화면으로 복귀 (authGuard.ts 참고)
+  const { returnTo } = useLocalSearchParams<{ returnTo?: string }>();
+  const resumeHref = returnTo ? decodeURIComponent(returnTo) : '/(tabs)/home';
 
   const [nickname, setNickname] = useState('');
   const [name, setName] = useState('');
@@ -28,8 +32,23 @@ export default function BasicInfoScreen() {
   const [birthDate, setBirthDate] = useState<{ year: number; month: number; day: number } | null>(null);
   const [showPicker, setShowPicker] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [exiting, setExiting] = useState(false);
 
   const isValid = nickname.trim().length > 0 && name.trim().length > 0 && gender !== null && birthDate !== null;
+
+  // 온보딩(기본 정보 입력)을 완료하지 않고 나가면 방금 로그인으로 생성된 미완성 계정을
+  // 그대로 남겨두지 않고 삭제한다 — 그래야 다음에 다시 로그인할 때 새로 가입하게 된다.
+  const handleExit = async () => {
+    if (exiting) return;
+    setExiting(true);
+    try {
+      await withdraw();
+    } catch {
+      // 네트워크 오류 등으로 삭제에 실패해도 로그인 화면 이동은 막지 않음
+    } finally {
+      router.replace(`/(auth)/login${returnTo ? `?returnTo=${encodeURIComponent(returnTo)}` : ''}` as never);
+    }
+  };
 
   const formatBirthDate = () => {
     if (!birthDate) return '';
@@ -54,7 +73,7 @@ export default function BasicInfoScreen() {
         birthDate: toBirthDateString(),
       });
       setUserId(userId);
-      router.push('/(auth)/onboarding/region');
+      router.replace(resumeHref as never);
     } finally {
       setLoading(false);
     }
@@ -66,16 +85,9 @@ export default function BasicInfoScreen() {
         style={{ flex: 1 }}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
-        {/* 상단 진행바 */}
-        <View style={styles.progressBar}>
-          <View style={[styles.progressStep, styles.progressActive]} />
-          <View style={styles.progressStep} />
-          <View style={styles.progressStep} />
-        </View>
-
-        {/* 헤더 — education.tsx / region.tsx 와 동일한 구조 */}
+        {/* 헤더 */}
         <View style={styles.header}>
-          <TouchableOpacity onPress={() => router.replace('/(auth)/login')} style={styles.backBtn}>
+          <TouchableOpacity onPress={handleExit} style={styles.backBtn} disabled={exiting}>
             <Text style={styles.backArrow}>‹</Text>
           </TouchableOpacity>
           <Text style={styles.headerTitle}>기본 정보</Text>
@@ -151,7 +163,7 @@ export default function BasicInfoScreen() {
           </View>
         </ScrollView>
 
-        {/* 다음으로 버튼 — education.tsx 와 동일한 위치/패턴 */}
+        {/* 시작하기 버튼 */}
         <View style={[
           styles.bottomArea,
           { paddingBottom: Math.max(insets.bottom, Platform.OS === 'android' ? 24 : 16) },
@@ -162,7 +174,7 @@ export default function BasicInfoScreen() {
             disabled={!isValid || loading}
             activeOpacity={0.85}
           >
-            <Text style={[styles.nextText, !isValid && styles.nextTextDisabled]}>다음으로</Text>
+            <Text style={[styles.nextText, !isValid && styles.nextTextDisabled]}>시작하기</Text>
           </TouchableOpacity>
         </View>
       </KeyboardAvoidingView>
@@ -188,18 +200,6 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: Colors.white,
   },
-  progressBar: {
-    flexDirection: 'row',
-    height: 3,
-  },
-  progressStep: {
-    flex: 1,
-    backgroundColor: Colors.lightGray,
-  },
-  progressActive: {
-    backgroundColor: Colors.primary,
-  },
-  // education.tsx / region.tsx 와 완전히 동일한 헤더 스타일
   header: {
     height: 52,
     flexDirection: 'row',

@@ -60,8 +60,18 @@ export function RegionPickerModal({
       setSelectedRegions((prev) =>
         prev.filter((r) => !(r.sido === viewingSido && r.sigungu === sigungu)),
       );
+    } else if (sigungu === null) {
+      // '전체' 선택 시 같은 시도의 개별 시군구 선택은 모두 무의미해지므로 정리한다
+      setSelectedRegions((prev) => [
+        ...prev.filter((r) => r.sido !== viewingSido),
+        { sido: viewingSido, sigungu: null },
+      ]);
     } else {
-      setSelectedRegions((prev) => [...prev, { sido: viewingSido, sigungu }]);
+      // 개별 시군구 선택 시 같은 시도의 '전체' 선택은 더 이상 맞지 않으므로 해제한다
+      setSelectedRegions((prev) => [
+        ...prev.filter((r) => !(r.sido === viewingSido && r.sigungu === null)),
+        { sido: viewingSido, sigungu },
+      ]);
     }
   };
 

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -10,42 +10,17 @@ import {
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Colors } from '../../../src/constants/colors';
-import { dummyChatRooms } from '../../../src/data/chatRooms';
 import { useReviewStore } from '../../../src/store/useReviewStore';
 import { postReview } from '../../../src/services/reviewService';
 import { TeamMemberStatus } from '../../../src/types/message';
-
-// ── 리뷰 옵션 데이터 ──────────────────────────────────────────────────────────
-const TOTAL_RATING_OPTIONS = [
-  { value: 5, label: '★★★★★', desc: '다음에도 꼭 함께하고 싶어요' },
-  { value: 4, label: '★★★★☆', desc: '좋은 팀원이었어요' },
-  { value: 3, label: '★★★☆☆', desc: '보통이었어요. 무난하게 함께할 수 있었어요' },
-  { value: 2, label: '★★☆☆☆', desc: '아쉬운 점이 많았어요' },
-  { value: 1, label: '★☆☆☆☆', desc: '다음에는 함께하기 어려울 것 같아요' },
-];
-
-const RESPONSE_SPEED_OPTIONS = [
-  { value: '1시간 이내',  desc: '매우 빠름 · 거의 항상 즉각 답했어요' },
-  { value: '반나절 이내', desc: '빠름 · 몇 시간 내로 답했어요' },
-  { value: '하루 이내',   desc: '보통 · 하루 안에 답했어요' },
-  { value: '이틀 이상',   desc: '느림 · 답장에 하루 넘게 걸렸어요' },
-  { value: '잠수',        desc: '프로젝트 도중에 연락이 끊겼어요' },
-];
-
-const DEADLINE_OPTIONS = [
-  { value: '항상 제때',   desc: '마감을 단 한번도 어기지 않았어요' },
-  { value: '대부분 제때', desc: '대부분 기한 내에 완료했어요 (1회 지연)' },
-  { value: '가끔 늦음',   desc: '몇 번(2~3회) 늦은 적이 있었어요' },
-  { value: '자주 늦음',   desc: '자주(4회 이상) 마감을 지키지 못했어요' },
-  { value: '항상 늦음',   desc: '한번도 마감을 지키지 않았어요' },
-];
-
-const INTENSITY_OPTIONS = [
-  { value: '적극적 참여',   desc: '기대보다 훨씬 열정적으로 참여했어요' },
-  { value: '보통 참여',     desc: '맡은 역할을 성실하게 다해줬어요' },
-  { value: '소극적 참여',   desc: '참여도가 조금 아쉬웠어요' },
-  { value: '참여하지 않음', desc: '전혀 참여하지 않았어요' },
-];
+import { getChat } from '../../../src/services/messageService';
+import { useAuthStore } from '../../../src/store/useAuthStore';
+import {
+  TOTAL_RATING_OPTIONS,
+  RESPONSE_SPEED_OPTIONS,
+  DEADLINE_OPTIONS,
+  INTENSITY_OPTIONS,
+} from '../../../src/constants/reviewOptions';
 
 const KEYWORD_OPTIONS = [
   '책임감 있어요',  '리더십이 있어요',      '소통이 빨라요',
@@ -54,6 +29,10 @@ const KEYWORD_OPTIONS = [
   '분위기 메이커예요', '피드백을 잘 수용해요',
 ];
 const MAX_KEYWORDS = 3;
+
+// 리뷰 작성 중엔 누구인지 명확히 알 수 있도록 "닉네임(본명)"으로 표기
+const formatMemberName = (name: string, realName?: string) =>
+  realName ? `${name}(${realName})` : name;
 
 // ── 진행 바 (steps 1–5만 표시) ────────────────────────────────────────────────
 function ProgressBar({ step }: { step: number }) {
@@ -134,23 +113,24 @@ export default function ReviewWriteScreen() {
   const { chatId } = useLocalSearchParams<{ chatId: string }>();
   const chatIdNum  = parseInt(chatId ?? '0');
 
-  const chat = dummyChatRooms.find((c) => c.id === chatIdNum);
-  const MY_USER_ID = 1;
-  const reviewableMembers: TeamMemberStatus[] =
-    (chat?.teamInfo?.members ?? []).filter((m) => m.id !== MY_USER_ID);
+  const MY_USER_ID = useAuthStore((state) => state.currentUserId) ?? 0;
+  const [reviewableMembers, setReviewableMembers] = useState<TeamMemberStatus[]>([]);
 
-  const { submitReview, getSubmittedReviews } = useReviewStore();
-  const submitted = getSubmittedReviews(chatIdNum);
-  const unreviewedMembers = reviewableMembers.filter(
-    (m) => !submitted.find((r) => r.memberId === m.id)
-  );
+  useEffect(() => {
+    getChat(chatIdNum).then((chat) => {
+      const members = (chat?.teamInfo?.members ?? []).filter((m) => m.filled && m.id !== MY_USER_ID);
+      setReviewableMembers(members);
+    }).catch(() => {});
+  }, [chatIdNum, MY_USER_ID]);
 
-  // step 0 = 팀원 선택, steps 1-5 = 리뷰 질문
-  // 미리뷰 팀원이 1명이면 바로 step 1 (자동 선택)
-  const [step, setStep] = useState(unreviewedMembers.length === 1 ? 1 : 0);
-  const [selectedMember, setSelectedMember] = useState<TeamMemberStatus | null>(
-    unreviewedMembers.length === 1 ? unreviewedMembers[0] : null
-  );
+  const { loadSubmitted, markSubmitted, getSubmittedReceiverIds } = useReviewStore();
+  useEffect(() => { loadSubmitted(chatIdNum); }, [chatIdNum]);
+  const submitted = getSubmittedReceiverIds(chatIdNum);
+  const unreviewedMembers = reviewableMembers.filter((m) => !submitted.includes(m.id));
+  const allDone = reviewableMembers.length > 0 && unreviewedMembers.length === 0;
+
+  const [step, setStep] = useState(0);
+  const [selectedMember, setSelectedMember] = useState<TeamMemberStatus | null>(null);
 
   const [totalRating,            setTotalRating]            = useState(0);
   const [responseSpeed,          setResponseSpeed]          = useState('');
@@ -184,7 +164,7 @@ export default function ReviewWriteScreen() {
       case 2: return responseSpeed !== '';
       case 3: return deadlineCompletion !== '';
       case 4: return participationIntensity !== '';
-      case 5: return selectedKeywords.length > 0;
+      case 5: return true; // 장점 키워드·한 줄 리뷰 모두 선택 입력
       default: return false;
     }
   };
@@ -210,19 +190,10 @@ export default function ReviewWriteScreen() {
         keywords: selectedKeywords,
         comment,
       });
-      submitReview(chatIdNum, {
-        memberId: selectedMember.id,
-        memberName: selectedMember.name,
-        totalRating,
-        responseSpeed,
-        deadlineCompletion,
-        participationIntensity,
-        keywords: selectedKeywords,
-        comment,
-      });
+      markSubmitted(chatIdNum, selectedMember.id);
       router.replace({
         pathname: '/(tabs)/messages/review-complete' as never,
-        params: { chatId, memberName: selectedMember.name },
+        params: { chatId, memberName: formatMemberName(selectedMember.name, selectedMember.realName) },
       });
     } catch (e) {
       console.error('[ReviewWrite] 리뷰 제출 실패:', e);
@@ -231,8 +202,7 @@ export default function ReviewWriteScreen() {
     }
   };
 
-  const alreadyReviewed = (memberId: number) =>
-    submitted.some((r) => r.memberId === memberId);
+  const alreadyReviewed = (memberId: number) => submitted.includes(memberId);
 
   // ── 헤더 타이틀 ──
   const headerTitle = step === 0 ? '팀원 리뷰' : '팀원 리뷰 작성';
@@ -240,7 +210,7 @@ export default function ReviewWriteScreen() {
   // ── 단계별 메타 ──
   const STEP_META = [
     null,
-    { stepLabel: '1단계 · 전체 평점',     title: `${selectedMember?.name ?? '팀원'}님과 함께한 경험, 총평은 어떤가요?`, showMemberSub: false, selectionLabel: '단일 선택' },
+    { stepLabel: '1단계 · 전체 평점',     title: `${selectedMember ? formatMemberName(selectedMember.name, selectedMember.realName) : '팀원'}님과 함께한 경험, 총평은 어떤가요?`, showMemberSub: false, selectionLabel: '단일 선택' },
     { stepLabel: '2단계 · 연락 응답 속도', title: '평균 응답 속도는 어땠나요?',  showMemberSub: true, selectionLabel: '단일 선택' },
     { stepLabel: '3단계 · 마감 기한 완수', title: '마감 기한을 얼마나 잘 지켰나요?', showMemberSub: true, selectionLabel: '단일 선택' },
     { stepLabel: '4단계 · 참여 강도',      title: '전반적인 참여도는 어땠나요?', showMemberSub: true, selectionLabel: '단일 선택' },
@@ -285,7 +255,7 @@ export default function ReviewWriteScreen() {
                   >
                     <Text style={s.memberAvatar}>{m.avatar}</Text>
                     <View style={{ flex: 1 }}>
-                      <Text style={[s.memberName, done && s.memberNameDone]}>{m.name}</Text>
+                      <Text style={[s.memberName, done && s.memberNameDone]}>{formatMemberName(m.name, m.realName)}</Text>
                       <Text style={s.memberRole}>{m.role}</Text>
                     </View>
                     {done ? (
@@ -308,7 +278,7 @@ export default function ReviewWriteScreen() {
             <Text style={s.stepLabel}>{meta.stepLabel}</Text>
             <Text style={s.stepTitle}>{meta.title}</Text>
             {meta.showMemberSub && selectedMember && (
-              <Text style={s.stepSub}>{selectedMember.name}님에게 리뷰를 남기는 중이에요</Text>
+              <Text style={s.stepSub}>{formatMemberName(selectedMember.name, selectedMember.realName)}님에게 리뷰를 남기는 중이에요</Text>
             )}
             <Text style={s.selectionLabel}>{meta.selectionLabel}</Text>
           </>
@@ -429,7 +399,24 @@ export default function ReviewWriteScreen() {
 
       {/* 하단 버튼 */}
       <View style={[s.footer, { paddingBottom: insets.bottom + 12 }]}>
-        {step <= 1 ? (
+        {step === 0 && allDone ? (
+          // 모든 팀원 리뷰 완료 → 다음으로 대신 내 리뷰 확인하기
+          <View style={s.allDoneWrap}>
+            <Text style={s.allDoneText}>🎉 모든 팀원 리뷰를 완료했어요!</Text>
+            <TouchableOpacity
+              style={s.nextBtn}
+              onPress={() =>
+                router.push({
+                  pathname: '/(tabs)/messages/my-reviews' as never,
+                  params: { chatId },
+                })
+              }
+              activeOpacity={0.85}
+            >
+              <Text style={s.nextBtnText}>내 리뷰 확인하기</Text>
+            </TouchableOpacity>
+          </View>
+        ) : step <= 1 ? (
           // Step 0, 1: 다음으로만
           <TouchableOpacity
             style={[s.nextBtn, !canNext() && s.nextBtnDisabled]}
@@ -579,6 +566,9 @@ const s = StyleSheet.create({
   nextBtnDisabled:  { backgroundColor: '#E0E0E0' },
   nextBtnText:      { fontSize: 16, fontWeight: '700', color: Colors.white },
   nextBtnTextDisabled: { color: '#AAAAAA' },
+
+  allDoneWrap:  { gap: 10 },
+  allDoneText:  { fontSize: 14, fontWeight: '700', color: Colors.primary, textAlign: 'center' },
 
   btnRow: { flexDirection: 'row', gap: 10 },
   prevBtn: {

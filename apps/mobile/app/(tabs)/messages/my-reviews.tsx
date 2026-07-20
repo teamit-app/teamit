@@ -5,35 +5,13 @@ import {
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Colors } from '../../../src/constants/colors';
-import { dummyChatRooms } from '../../../src/data/chatRooms';
 import { useReviewStore } from '../../../src/store/useReviewStore';
-import { getReceivedReviews, ReceivedReview } from '../../../src/services/reviewService';
-
-// 온도 계산: 25 + (평균 별점 * 3)
-function calcTemp(reviews: ReceivedReview[]) {
-  if (!reviews.length) return 36.5;
-  const avg = reviews.reduce((s, r) => s + r.totalRating, 0) / reviews.length;
-  return Math.round((25 + avg * 3) * 10) / 10;
-}
-
-// 통계 – 가장 많이 선택된 항목과 비율
-function topStat(arr: string[], options: string[]) {
-  const top = options.find((v) => arr.includes(v)) ?? arr[0] ?? '—';
-  const pct  = arr.length ? Math.round((arr.filter((v) => v === top).length / arr.length) * 100) : 0;
-  return { top, pct };
-}
-
-// 키워드 빈도 집계
-function buildKeywords(reviews: ReceivedReview[]) {
-  const map: Record<string, number> = {};
-  reviews.forEach((r) => r.keywords.forEach((k) => { map[k] = (map[k] ?? 0) + 1; }));
-  return Object.entries(map).sort((a, b) => b[1] - a[1]).map(([text, count]) => ({ text, count }));
-}
-
-// 별점 텍스트 렌더
-function starLabel(n: number) {
-  return '★'.repeat(n) + '☆'.repeat(5 - n);
-}
+import { getMyReceivedReviews, AnonymousReview } from '../../../src/services/reviewService';
+import { TeamMemberStatus } from '../../../src/types/message';
+import { getChat } from '../../../src/services/messageService';
+import { useAuthStore } from '../../../src/store/useAuthStore';
+import { buildReviewStats, buildReviewKeywords } from '../../../src/utils/reviewStats';
+import { StarRating } from '../../../src/components/common/StarRating';
 
 export default function MyReviewsScreen() {
   const insets   = useSafeAreaInsets();
@@ -41,37 +19,39 @@ export default function MyReviewsScreen() {
   const { chatId } = useLocalSearchParams<{ chatId: string }>();
   const chatIdNum  = parseInt(chatId ?? '0');
 
-  const MY_USER_ID = 1;
-  const chat = dummyChatRooms.find((c) => c.id === chatIdNum);
-  const reviewableMembers = (chat?.teamInfo?.members ?? []).filter((m) => m.id !== MY_USER_ID);
+  const MY_USER_ID = useAuthStore((state) => state.currentUserId) ?? 0;
+  const [reviewableMembers, setReviewableMembers] = useState<TeamMemberStatus[]>([]);
 
-  const { getSubmittedReviews } = useReviewStore();
-  const submitted = getSubmittedReviews(chatIdNum);
-  const allDone   = submitted.length >= reviewableMembers.length;
+  useEffect(() => {
+    getChat(chatIdNum).then((chat) => {
+      setReviewableMembers((chat?.teamInfo?.members ?? []).filter((m) => m.filled && m.id !== MY_USER_ID));
+    }).catch(() => {});
+  }, [chatIdNum, MY_USER_ID]);
 
-  const [receivedReviews, setReceivedReviews] = useState<ReceivedReview[]>([]);
+  const { loadSubmitted, getSubmittedReceiverIds } = useReviewStore();
+  useEffect(() => { loadSubmitted(chatIdNum); }, [chatIdNum]);
+  const submitted = getSubmittedReceiverIds(chatIdNum);
+  const allDone   = reviewableMembers.length > 0 && submitted.length >= reviewableMembers.length;
+
+  // 여기서 보여주는 내용은 이 채팅방 한정이 아니라 내가 받은 리뷰 전체 집계다(마이페이지
+  // "리뷰 확인"과 동일한 데이터). 잠금 해제 조건만 이 채팅방 팀원 전원 리뷰 완료 여부로 판단한다
+  const [averageRating, setAverageRating] = useState(0);
+  const [receivedReviews, setReceivedReviews] = useState<AnonymousReview[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     if (!allDone) { setIsLoading(false); return; }
-    getReceivedReviews(chatIdNum)
-      .then(setReceivedReviews)
+    getMyReceivedReviews()
+      .then((data) => {
+        setAverageRating(data.averageRating);
+        setReceivedReviews(data.reviews);
+      })
       .catch((e) => console.error('[MyReviews] 리뷰 로드 실패:', e))
       .finally(() => setIsLoading(false));
-  }, [chatIdNum, allDone]);
+  }, [allDone]);
 
-  const temperature = calcTemp(receivedReviews);
-  const barWidth    = Math.min((temperature / 40) * 100, 100);
-
-  const speedOptions     = ['1시간 이내', '반나절 이내', '하루 이내', '이틀 이상', '잠수'];
-  const deadlineOptions  = ['항상 제때', '대부분 제때', '가끔 늦음', '자주 늦음', '항상 늦음'];
-  const intensityOptions = ['적극적 참여', '보통 참여', '소극적 참여', '참여하지 않음'];
-
-  const speedStat     = topStat(receivedReviews.map((r) => r.responseSpeed), speedOptions);
-  const deadlineStat  = topStat(receivedReviews.map((r) => r.deadlineCompletion), deadlineOptions);
-  const intensityStat = topStat(receivedReviews.map((r) => r.participationIntensity), intensityOptions);
-
-  const keywords = buildKeywords(receivedReviews);
+  const reviewStats = buildReviewStats(receivedReviews);
+  const keywords = buildReviewKeywords(receivedReviews);
 
   return (
     <SafeAreaView style={s.container} edges={['top']}>
@@ -116,32 +96,37 @@ export default function MyReviewsScreen() {
             <Text style={s.lockBtnText}>리뷰 작성하러 가기</Text>
           </TouchableOpacity>
         </View>
+      ) : receivedReviews.length === 0 ? (
+        <View style={s.lockedWrap}>
+          <Text style={s.lockIcon}>📭</Text>
+          <Text style={s.lockTitle}>아직 받은 리뷰가 없어요</Text>
+          <Text style={s.lockDesc}>
+            팀원들이 리뷰를 작성하면{'\n'}
+            여기에서 확인할 수 있어요.
+          </Text>
+        </View>
       ) : (
         <ScrollView
           contentContainerStyle={[s.scroll, { paddingBottom: insets.bottom + 28 }]}
           showsVerticalScrollIndicator={false}
         >
-          {/* ── 카드 1: 티밋 온도 ── */}
+          {/* ── 카드 1: 받은 별점 평균 ── */}
           <View style={s.card}>
             <View style={s.tempRow}>
-              <Text style={s.cardTitle}>티밋 온도</Text>
+              <Text style={s.cardTitle}>받은 별점 평균</Text>
               <View style={s.tempPill}>
-                <Text style={s.tempPillText}>{temperature}°C</Text>
+                <Text style={s.tempPillText}>{averageRating.toFixed(1)} / 5</Text>
               </View>
             </View>
-            <View style={s.barWrap}>
-              <View style={s.barTrack}>
-                <View style={[s.barFill, { width: `${barWidth}%` as any }]} />
-              </View>
-              <View style={s.barScale}>
-                <Text style={s.barScaleText}>0</Text>
-                <Text style={s.barScaleText}>40</Text>
-              </View>
+            <View style={s.starRow}>
+              <StarRating value={averageRating} size={20} />
             </View>
             <View style={s.divider} />
-            <StatRow label="응답 속도" value={`${speedStat.top} (${speedStat.pct}%)`} />
-            <StatRow label="마감 완수" value={`${deadlineStat.top} (${deadlineStat.pct}%)`} />
-            <StatRow label="참여 강도" value={`${intensityStat.top} (${intensityStat.pct}%)`} />
+            {reviewStats
+              .filter((row) => row.label !== '총평')
+              .map((row) => (
+                <StatRow key={row.label} label={row.label} value={row.value} />
+              ))}
           </View>
 
           {/* ── 카드 2: 키워드 ── */}
@@ -159,19 +144,15 @@ export default function MyReviewsScreen() {
             </View>
           </View>
 
-          {/* ── 카드 3: 팀원 리뷰 ── */}
+          {/* ── 카드 3: 팀원 리뷰 (익명) ── */}
           <View style={s.card}>
             <Text style={s.cardTitle}>팀원 리뷰</Text>
             {receivedReviews.map((r, i) => (
-              <View key={r.reviewerId}>
+              <View key={i}>
                 {i > 0 && <View style={s.divider} />}
                 <View style={[s.reviewItem, i > 0 && s.reviewItemAfterDivider]}>
                   <View style={s.reviewHeader}>
-                    <View style={s.avatarCircle}>
-                      <Text style={s.avatarText}>{r.reviewerAvatar ?? '👤'}</Text>
-                    </View>
-                    <Text style={s.reviewerName}>{r.reviewerName}</Text>
-                    <Text style={s.reviewStars}>{starLabel(r.totalRating)}</Text>
+                    <StarRating value={r.totalRating} size={13} />
                   </View>
                   {r.comment ? (
                     <Text style={s.reviewComment}>"{r.comment}"</Text>
@@ -255,7 +236,7 @@ const s = StyleSheet.create({
   },
   cardTitle: { fontSize: 15, fontWeight: '700', color: Colors.dark },
 
-  // 온도
+  // 평균 별점
   tempRow:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   tempPill: {
     backgroundColor: Colors.ogTint,
@@ -264,14 +245,7 @@ const s = StyleSheet.create({
     paddingVertical: 4,
   },
   tempPillText: { fontSize: 14, fontWeight: '700', color: Colors.primary },
-
-  barWrap: { gap: 6 },
-  barTrack: {
-    height: 10, backgroundColor: '#F0F0F0', borderRadius: 5, overflow: 'hidden',
-  },
-  barFill:  { height: '100%', backgroundColor: Colors.primary, borderRadius: 5 },
-  barScale: { flexDirection: 'row', justifyContent: 'space-between' },
-  barScaleText: { fontSize: 11, color: Colors.grayMedium },
+  starRow: {},
 
   divider: { height: 1, backgroundColor: '#F0F0F0' },
 
@@ -304,17 +278,8 @@ const s = StyleSheet.create({
   reviewItem:            { gap: 6 },
   reviewItemAfterDivider:{ marginTop: 14 },
   reviewHeader: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  avatarCircle: {
-    width: 32, height: 32, borderRadius: 16,
-    backgroundColor: '#F5F5F5',
-    alignItems: 'center', justifyContent: 'center',
-  },
-  avatarText:    { fontSize: 18 },
-  reviewerName:  { fontSize: 14, fontWeight: '700', color: Colors.dark },
-  reviewStars:   { fontSize: 13, color: Colors.primary, marginLeft: 2 },
   reviewComment: {
     fontSize: 14, color: Colors.dark, lineHeight: 22,
-    paddingLeft: 40,
   },
 
   ghostBtn: { alignItems: 'center', paddingVertical: 14 },

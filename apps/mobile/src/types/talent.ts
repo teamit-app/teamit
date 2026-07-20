@@ -1,3 +1,5 @@
+import { EducationStatus } from './mypage';
+
 export type Gender = 'MALE' | 'FEMALE';
 
 export interface TalentSkill {
@@ -8,9 +10,11 @@ export interface TalentSkill {
 export interface PoolUser {
   userId: number;
   nickname: string;
+  profileImageUrl?: string | null;
   gender: Gender;
   schoolName: string;
   major: string;
+  status: EducationStatus | null;
   verified: boolean;
   skills: TalentSkill[];
   certificates: string[];
@@ -30,14 +34,14 @@ export interface TalentRecruitPost {
   experienceCondition: string;
   meetingType: string;
   location: string;
-  intensity: string;
+  intensity?: string;
   currentMembers: number;
   totalMembers: number;
 }
 
 export interface TalentDetail extends PoolUser {
   location: string;
-  temperature: number;
+  averageRating: number;
   // 어필글 (매칭 프로필에서)
   appealTitle: string;
   appealContent: string;
@@ -60,7 +64,8 @@ export interface TalentDetail extends PoolUser {
     participationIntensity: string;
   };
   reviewKeywords: Array<{ text: string; count: number }>;
-  teamReviews: Array<{ content: string; reviewer: string }>;
+  // 리뷰어 정보는 절대 포함하지 않는다(익명 정책)
+  teamReviews: Array<{ content: string; rating: number }>;
   // 모집글 (없을 수 있음)
   recruitPosts?: TalentRecruitPost[];
 }

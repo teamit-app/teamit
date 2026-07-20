@@ -42,6 +42,22 @@ export const sendInvitation = async (postId: number, receiverId: number): Promis
   });
 };
 
+export interface SentInvitation {
+  invitationId: number;
+  receiverId: number;
+  receiverNickname: string;
+  status: 'PENDING' | 'ACCEPTED' | 'REJECTED';
+}
+
+export const getSentInvitations = async (postId: number): Promise<SentInvitation[]> => {
+  return apiRequest<SentInvitation[]>(`/posts/${postId}/invitations`);
+};
+
+// 모집자가 자신이 보낸 대기 중인 초대를 철회 — 철회하면 상대에게 다시 초대 가능해짐
+export const cancelInvitation = async (postId: number, invitationId: number): Promise<void> => {
+  await apiRequest<null>(`/posts/${postId}/invitations/${invitationId}`, { method: 'DELETE' });
+};
+
 export const declineInvitation = async (invitationId: number): Promise<void> => {
   await apiRequest<null>(`/users/invitations/${invitationId}/decline`, { method: 'POST' });
 };

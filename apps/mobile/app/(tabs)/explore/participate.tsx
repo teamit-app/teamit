@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -8,58 +8,19 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { router, useLocalSearchParams } from 'expo-router';
+import { router, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import { Colors } from '../../../src/constants/colors';
 import { ScreenHeader } from '../../../src/components/common/ScreenHeader';
-import { dummyContestDetails } from '../../../src/data/recruitmentPosts';
+import { getContestDetail, registerAsParticipant } from '../../../src/services/contestService';
 import { useMypageStore } from '../../../src/store/useMypageStore';
+import { useExploreStore } from '../../../src/store/useExploreStore';
 import { MatchingProfileData } from '../../../src/types/mypage';
-import { toggleMatchingStatus } from '../../../src/services/mypageService';
-
-// ── 표시용 변환 헬퍼 ──────────────────────────────────────────────────────────
-
-const EXPERIENCE_LABELS: Record<0 | 1 | 2, string> = {
-  0: '처음이에요, 함께 배우며 성장하고 싶어요',
-  1: '경험은 있지만 더 발전하고 싶어요',
-  2: '경험을 바탕으로 결과를 만들고 싶어요',
-};
-
-const INTENSITY_LABELS: Record<1 | 2 | 3 | 4, string> = {
-  1: '주 1~3시간',
-  2: '주 4~7시간',
-  3: '주 8~14시간',
-  4: '주 15시간 이상',
-};
-
-const ONLINE_OFFLINE_LABELS: Record<string, string> = {
-  ONLINE: '온라인 위주',
-  MIXED: '혼합형',
-  OFFLINE: '오프라인 위주',
-};
-
-const TEAM_VIBE_LABELS = ['팀 분위기 최우선', '팀 분위기 우선', '균형 중시', '결과 우선', '결과 최우선'];
-const FEEDBACK_LABELS = ['매우 부드럽게', '부드럽게', '상황에 따라요', '솔직하게', '매우 솔직하게'];
-
-const LEADERSHIP_LABELS: Record<string, string> = {
-  WANT: '리더 하고 싶어요',
-  IF_NEEDED: '필요하면 할 수 있어요',
-  DONT_WANT: '리더는 안 하고 싶어요',
-};
+import { formatRegionsLabel } from '../../../src/utils/region';
+import { formatMatchingCard } from '../../../src/constants/matchingLabels';
 
 function formatCard(p: MatchingProfileData) {
-  const regionStr = p.regions.length > 0
-    ? ` · ${p.regions[0].sido}${p.regions[0].sigungu ? ' ' + p.regions[0].sigungu : ''}`
-    : '';
-  return {
-    skills: p.skills.join(', '),
-    purpose: EXPERIENCE_LABELS[p.experienceLevel],
-    intensity: INTENSITY_LABELS[p.intensityLevel],
-    meetingPreference: `${ONLINE_OFFLINE_LABELS[p.onlineOfflinePref]}${regionStr}`,
-    teamVibe: `${TEAM_VIBE_LABELS[p.teamVibe - 1]} / ${FEEDBACK_LABELS[p.feedbackStyle - 1]}`,
-    leadership: LEADERSHIP_LABELS[p.leadershipPref],
-    appealTitle: p.appealTitle,
-    appealContent: p.appealContent,
-  };
+  const region = p.regions.length > 0 ? formatRegionsLabel(p.regions) : '';
+  return formatMatchingCard({ ...p, region });
 }
 
 // ── CardRow ───────────────────────────────────────────────────────────────────
@@ -91,25 +52,55 @@ export default function ParticipateScreen() {
   const insets = useSafeAreaInsets();
   const { contestId } = useLocalSearchParams<{ contestId: string }>();
   const id = Number(contestId);
+  const [contestTitle, setContestTitle] = useState('');
 
-  const { matchingProfile, loadMatchingProfile } = useMypageStore();
+  const { matchingProfile, draftCard, loadMatchingProfile, loadProfile } = useMypageStore();
+  const markContestParticipant = useExploreStore((s) => s.markContestParticipant);
   const [isLoading, setIsLoading] = useState(true);
 
-  const detail = dummyContestDetails.find((d) => d.contestId === id) ?? dummyContestDetails[0];
+  // 이 화면에서 "수정"으로 고친 내용은 draftCard에만 담기고 라이브 매칭 프로필은
+  // 안 바뀌므로, 미리보기·제출 모두 draftCard를 우선하고 없으면 라이브 프로필을 보여준다.
+  const displayCard = draftCard ?? matchingProfile;
 
   useEffect(() => {
-    loadMatchingProfile().then(() => {
-      const profile = useMypageStore.getState().matchingProfile;
-      if (!profile) {
-        // 작성된 참여카드 없음 → 매칭 프로필 전체 질문지로 이동
-        router.replace(
-          `/profile/matching-profile?returnTo=participate&contestId=${id}` as never,
-        );
-      } else {
-        setIsLoading(false);
-      }
-    });
-  }, []);
+    getContestDetail(id).then((d) => setContestTitle(d.title)).catch(() => {});
+  }, [id]);
+
+  // useEffect(마운트 1회)가 아니라 useFocusEffect를 쓰는 이유:
+  // matching-profile 저장 후 router.replace로 이 화면에 돌아왔을 때도 다시 실행되어야
+  // isLoading이 true에 갇히지 않음 (explore/post/[postId].tsx와 동일 패턴)
+  useFocusEffect(
+    useCallback(() => {
+      let cancelled = false;
+      loadProfile().then(() => {
+        if (cancelled) return;
+        const profile = useMypageStore.getState().profile;
+        if (!profile || !profile.education) {
+          // 활동 가능 지역은 이제 매칭 프로필(4단계)에서만 받으므로 여기서 체크하지 않는다.
+          // 학력 미입력 → 마이페이지 기본정보 화면으로 이동
+          router.replace(
+            `/profile/edit-basic?returnTo=participate&contestId=${id}` as never,
+          );
+          return;
+        }
+
+        loadMatchingProfile().then(() => {
+          if (cancelled) return;
+          const matching = useMypageStore.getState().matchingProfile;
+          const draft = useMypageStore.getState().draftCard;
+          if (!matching && !draft) {
+            // 작성된 참여카드 없음 → 매칭 프로필 전체 질문지로 이동
+            router.replace(
+              `/profile/matching-profile?returnTo=participate&contestId=${id}` as never,
+            );
+          } else {
+            setIsLoading(false);
+          }
+        });
+      });
+      return () => { cancelled = true; };
+    }, [id]),
+  );
 
   const editStep = (step: number) => {
     router.push(
@@ -119,14 +110,16 @@ export default function ParticipateScreen() {
 
   const handleSubmit = async () => {
     try {
-      await toggleMatchingStatus(true);
+      await registerAsParticipant(id, draftCard ?? undefined);
+      markContestParticipant(id); // 스토어 낙관적 업데이트
+      useMypageStore.getState().clearDraftCard();
     } catch (e) {
-      console.error('[Participate] 매칭 활성화 실패:', e);
+      console.error('[Participate] 후보 등록 실패:', e);
     }
     router.push(`/explore/participate-complete?contestId=${id}` as never);
   };
 
-  if (isLoading || !matchingProfile) {
+  if (isLoading || !displayCard) {
     return (
       <View style={[styles.container, { paddingTop: insets.top, justifyContent: 'center', alignItems: 'center' }]}>
         <ActivityIndicator size="large" color={Colors.primary} />
@@ -134,7 +127,7 @@ export default function ParticipateScreen() {
     );
   }
 
-  const card = formatCard(matchingProfile);
+  const card = formatCard(displayCard);
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
@@ -151,11 +144,12 @@ export default function ParticipateScreen() {
           <View style={styles.cardAccentBar} />
           <View style={styles.cardInner}>
             <Text style={styles.cardPreviewLabel}>참여 카드 미리보기</Text>
-            <Text style={styles.cardContestTitle}>{detail.title}</Text>
+            <Text style={styles.cardContestTitle}>{contestTitle}</Text>
 
             <View style={styles.divider} />
 
             <CardRow label="스킬" value={card.skills} onPressEdit={() => editStep(1)} />
+            <CardRow label="참여 경험" value={card.experience} onPressEdit={() => editStep(2)} />
             <CardRow label="목적" value={card.purpose} onPressEdit={() => editStep(2)} />
             <CardRow label="강도" value={card.intensity} onPressEdit={() => editStep(3)} />
             <CardRow

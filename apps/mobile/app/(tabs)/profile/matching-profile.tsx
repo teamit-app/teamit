@@ -6,21 +6,26 @@ import {
   TouchableOpacity,
   ScrollView,
   StyleSheet,
-  Alert,
   PanResponder,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
+import { Alert } from '../../../src/utils/alert';
 import { Colors } from '../../../src/constants/colors';
 import { ScreenHeader } from '../../../src/components/common/ScreenHeader';
 import { RegionPickerModal } from '../../../src/components/common/RegionPickerModal';
 import { useMypageStore } from '../../../src/store/useMypageStore';
+import { useExploreStore } from '../../../src/store/useExploreStore';
+import { useAuthStore } from '../../../src/store/useAuthStore';
 import {
   LeadershipPref,
   MatchingProfileData,
   OnlineOfflinePref,
   UserRegion,
 } from '../../../src/types/mypage';
+import { formatRegionsLabel } from '../../../src/utils/region';
+import { TEAM_VIBE_LABELS, FEEDBACK_LABELS } from '../../../src/constants/matchingLabels';
+import { registerAsParticipant } from '../../../src/services/contestService';
 
 // ─── Constants ──────────────────────────────────────────────────────────────
 
@@ -49,9 +54,18 @@ const EXPERIENCE_OPTIONS: {
   title: string;
   desc: string;
 }[] = [
-  { value: 0, title: '처음이에요, 함께 배우며 성장하고 싶어요', desc: '0회' },
-  { value: 1, title: '경험은 있지만 더 발전하고 싶어요', desc: '1~3회' },
-  { value: 2, title: '경험을 바탕으로 결과를 만들고 싶어요', desc: '4회 이상' },
+  { value: 0, title: '0회', desc: '' },
+  { value: 1, title: '1~3회', desc: '' },
+  { value: 2, title: '4회 이상', desc: '' },
+];
+
+const PURPOSE_OPTIONS: {
+  value: 'EXPERIENCE' | 'AWARD';
+  title: string;
+  desc: string;
+}[] = [
+  { value: 'EXPERIENCE', title: '경험', desc: '새로운 경험을 쌓고 싶어요' },
+  { value: 'AWARD', title: '수상', desc: '결과로 이어지는 성과를 내고 싶어요' },
 ];
 
 const INTENSITY_OPTIONS: {
@@ -85,9 +99,6 @@ const LEADERSHIP_OPTIONS: {
   { value: 'IF_NEEDED', title: '필요하면 할 수 있어요', desc: '상황에 따라 유연하게 맡을게요' },
   { value: 'DONT_WANT', title: '리더는 안 하고 싶어요', desc: '팀원으로서 최선을 다할게요' },
 ];
-
-const TEAM_VIBE_LABELS = ['팀 분위기 최우선', '팀 분위기 우선', '균형 중시', '결과 우선', '결과 최우선'];
-const FEEDBACK_LABELS = ['매우 부드럽게', '부드럽게', '상황에 따라요', '솔직하게', '매우 솔직하게'];
 
 // ─── Radio Card ──────────────────────────────────────────────────────────────
 
@@ -420,13 +431,7 @@ const sth = StyleSheet.create({
 // ─── Region label helper ──────────────────────────────────────────────────────
 
 function regionLabel(regions: UserRegion[]): string {
-  if (regions.length === 0) return '지역 선택';
-  const first = regions[0];
-  const firstStr = first.sigungu
-    ? `${first.sido} ${first.sigungu}`
-    : `${first.sido} 전체`;
-  if (regions.length === 1) return firstStr;
-  return `${firstStr} 외 ${regions.length - 1}곳`;
+  return formatRegionsLabel(regions, '지역 선택');
 }
 
 // ─── Main Screen ──────────────────────────────────────────────────────────────
@@ -441,6 +446,11 @@ export default function MatchingProfileScreen() {
     useLocalSearchParams<{ mode?: string; startStep?: string; returnTo?: string; contestId?: string }>();
 
   const isEditMode = mode === 'edit';
+  // 공모전 후보 등록/팀 직접 꾸리기/등록된 참여카드 수정 플로우 — 이 세 경로에서는
+  // 절대 라이브 매칭 프로필(마이페이지)을 건드리지 않고, 이 플로우 전용 draftCard에만 저장한다.
+  // 매칭 프로필은 오직 마이페이지에 직접 들어가서 편집할 때만 바뀌어야 하기 때문.
+  const isContestFlow =
+    returnTo === 'participate' || returnTo === 'build-team' || returnTo === 'participant-card';
   const totalSteps = returnTo === 'build-team' ? 6 : TOTAL_STEPS;
   const initialStep = isEditMode
     ? Math.min(Math.max(Number(startStep) || 1, 1), totalSteps)
@@ -456,6 +466,8 @@ export default function MatchingProfileScreen() {
 
   // Step 2
   const [experienceLevel, setExperienceLevel] = useState<0 | 1 | 2>(0);
+  const [participationPurpose, setParticipationPurpose] =
+    useState<'EXPERIENCE' | 'AWARD'>('EXPERIENCE');
 
   // Step 3
   const [intensityLevel, setIntensityLevel] = useState<1 | 2 | 3 | 4>(2);
@@ -478,22 +490,39 @@ export default function MatchingProfileScreen() {
   const [appealTitle, setAppealTitle] = useState('');
   const [appealContent, setAppealContent] = useState('');
 
+  const applyCardToForm = (mp: MatchingProfileData) => {
+    setSkills(mp.skills);
+    setExperienceLevel(mp.experienceLevel);
+    setParticipationPurpose(mp.participationPurpose ?? 'EXPERIENCE');
+    setIntensityLevel(mp.intensityLevel);
+    setOnlineOfflinePref(mp.onlineOfflinePref);
+    setRegions(mp.regions ?? []);
+    setTeamVibe(mp.teamVibe);
+    setFeedbackStyle(mp.feedbackStyle);
+    setLeadershipPref(mp.leadershipPref);
+    setAppealTitle(mp.appealTitle);
+    setAppealContent(mp.appealContent);
+  };
+
   // Load existing profile
   useEffect(() => {
+    if (isContestFlow) {
+      // 이 플로우에서 이전에 편집해둔 draft가 있으면 그걸 우선 쓰고, 없으면 라이브
+      // 프로필을 "시작 템플릿"으로 한 번 복사해온다(이후 저장해도 라이브엔 안 반영됨).
+      const draft = useMypageStore.getState().draftCard;
+      if (draft) {
+        applyCardToForm(draft);
+        return;
+      }
+      loadMatchingProfile().then(() => {
+        const mp = useMypageStore.getState().matchingProfile;
+        if (mp) applyCardToForm(mp);
+      });
+      return;
+    }
     loadMatchingProfile().then(() => {
       const mp = useMypageStore.getState().matchingProfile;
-      if (mp) {
-        setSkills(mp.skills);
-        setExperienceLevel(mp.experienceLevel);
-        setIntensityLevel(mp.intensityLevel);
-        setOnlineOfflinePref(mp.onlineOfflinePref);
-        setRegions(mp.regions ?? []);
-        setTeamVibe(mp.teamVibe);
-        setFeedbackStyle(mp.feedbackStyle);
-        setLeadershipPref(mp.leadershipPref);
-        setAppealTitle(mp.appealTitle);
-        setAppealContent(mp.appealContent);
-      }
+      if (mp) applyCardToForm(mp);
     });
   }, []);
 
@@ -511,6 +540,16 @@ export default function MatchingProfileScreen() {
     );
   };
 
+  const handleAddCustomSkill = () => {
+    const trimmed = skillSearch.trim();
+    if (!trimmed) {
+      Alert.alert('직접 추가', '검색창에 추가할 기술을 입력한 뒤 눌러주세요.');
+      return;
+    }
+    if (!skills.includes(trimmed)) toggleSkill(trimmed);
+    setSkillSearch('');
+  };
+
   const displayedSkills: string[] = skillSearch.trim()
     ? ALL_SKILLS.filter((s) =>
         s.toLowerCase().includes(skillSearch.toLowerCase()),
@@ -518,6 +557,12 @@ export default function MatchingProfileScreen() {
     : skillCategory === '전체'
     ? ALL_SKILLS
     : (SKILL_CATEGORIES[skillCategory] ?? []);
+
+  // 오프라인/혼합을 골랐으면 활동 지역은 필수 — 실제로 이 지역 기준으로 후보/모집자를
+  // 매칭하기 때문에 지역 없이 넘어가게 두면 안 된다.
+  const regionRequiredButMissing =
+    onlineOfflinePref !== 'ONLINE' && regions.length === 0;
+  const step4Invalid = step === 4 && regionRequiredButMissing;
 
   const goNext = () => setStep((s) => Math.min(s + 1, totalSteps));
   const goPrev = () => {
@@ -551,6 +596,7 @@ export default function MatchingProfileScreen() {
     const data: MatchingProfileData = {
       skills,
       experienceLevel,
+      participationPurpose,
       intensityLevel,
       onlineOfflinePref,
       regions,
@@ -561,7 +607,23 @@ export default function MatchingProfileScreen() {
       appealContent: appealContent.trim(),
     };
     try {
-      await updateMatchingProfile(data);
+      if (isContestFlow) {
+        // 라이브 매칭 프로필은 절대 안 건드리고, 이 플로우 전용 draft에만 담아둔다.
+        useMypageStore.getState().setDraftCard(data);
+        // 이미 등록된 참여카드를 수정하는 경우엔 그 공모전 스냅샷만 즉시 갱신
+        if (returnTo === 'participant-card' && contestParam) {
+          await registerAsParticipant(Number(contestParam), data).catch(() => {});
+        }
+      } else {
+        await updateMatchingProfile(data);
+        // 탐색 탭 인재풀 목록·마이페이지는 세션 내내 캐시되는 값이라, 여기서 저장만 하고
+        // 끝내면 상세정보 화면(매번 새로 조회)과 다르게 스킬이 수정 전 상태로 계속 보인다.
+        const currentUserId = useAuthStore.getState().currentUserId;
+        if (currentUserId) {
+          useExploreStore.getState().updateMyTalentSkills(currentUserId, skills);
+        }
+        useMypageStore.getState().reloadProfile();
+      }
       navigateAfterAction();
     } catch {
       Alert.alert('오류', '저장에 실패했어요. 다시 시도해주세요.');
@@ -659,6 +721,15 @@ export default function MatchingProfileScreen() {
                   </TouchableOpacity>
                 );
               })}
+
+              {/* 직접 추가하기 */}
+              <TouchableOpacity
+                style={styles.skillChipAdd}
+                onPress={handleAddCustomSkill}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.skillChipAddText}>직접 추가하기</Text>
+              </TouchableOpacity>
             </View>
 
             {/* 선택한 스킬 프리뷰 */}
@@ -690,12 +761,12 @@ export default function MatchingProfileScreen() {
           </View>
         )}
 
-        {/* ── STEP 2: 참여 경험 ─────────────────────────── */}
+        {/* ── STEP 2: 참여 경험 및 목적 ─────────────────────────── */}
         {step === 2 && (
           <View>
             <StepHeader
               title="공모전 참여 경험은 어느 정도인가요?"
-              sub="비슷한 경험대의 팀원을 찾는 데 활용돼요"
+              sub="선호하는 경험대의 팀원을 찾는 데 활용돼요"
             />
             <View style={styles.cardSection}>
               {EXPERIENCE_OPTIONS.map((opt) => (
@@ -705,6 +776,22 @@ export default function MatchingProfileScreen() {
                   title={opt.title}
                   desc={opt.desc}
                   onPress={() => setExperienceLevel(opt.value)}
+                />
+              ))}
+            </View>
+
+            <StepHeader
+              title="이번 공모전 참여 목적은 무엇인가요?"
+              sub="비슷한 목적의 팀원을 찾는 데 활용돼요"
+            />
+            <View style={styles.cardSection}>
+              {PURPOSE_OPTIONS.map((opt) => (
+                <RadioCard
+                  key={opt.value}
+                  selected={participationPurpose === opt.value}
+                  title={opt.title}
+                  desc={opt.desc}
+                  onPress={() => setParticipationPurpose(opt.value)}
                 />
               ))}
             </View>
@@ -771,15 +858,21 @@ export default function MatchingProfileScreen() {
               onlineOfflinePref === 'OFFLINE') && (
               <View style={styles.regionSection}>
                 <TouchableOpacity
-                  style={styles.regionRow}
+                  style={[styles.regionRow, regionRequiredButMissing && styles.regionRowRequired]}
                   onPress={() => setShowRegionPicker(true)}
                   activeOpacity={0.7}
                 >
                   <Text style={styles.regionText}>
                     📍 {regionLabel(regions)}
+                    {regions.length === 0 ? ' *' : ''}
                   </Text>
                   <Text style={styles.regionEdit}>수정</Text>
                 </TouchableOpacity>
+                {regionRequiredButMissing && (
+                  <Text style={styles.regionRequiredHint}>
+                    오프라인·혼합은 이 지역을 기준으로 매칭돼요. 활동 지역을 선택해 주세요.
+                  </Text>
+                )}
               </View>
             )}
           </View>
@@ -913,9 +1006,9 @@ export default function MatchingProfileScreen() {
                 <Text style={styles.prevBtnText}>취소</Text>
               </TouchableOpacity>
               <TouchableOpacity
-                style={[styles.nextBtn, saving && styles.btnDisabled]}
+                style={[styles.nextBtn, (saving || step4Invalid) && styles.btnDisabled]}
                 onPress={handleSave}
-                disabled={saving}
+                disabled={saving || step4Invalid}
               >
                 <Text style={styles.nextBtnText}>{saving ? '저장 중...' : '저장'}</Text>
               </TouchableOpacity>
@@ -932,7 +1025,11 @@ export default function MatchingProfileScreen() {
                   <TouchableOpacity style={styles.prevBtn} onPress={goPrev}>
                     <Text style={styles.prevBtnText}>이전</Text>
                   </TouchableOpacity>
-                  <TouchableOpacity style={styles.nextBtn} onPress={goNext}>
+                  <TouchableOpacity
+                    style={[styles.nextBtn, step4Invalid && styles.btnDisabled]}
+                    onPress={goNext}
+                    disabled={step4Invalid}
+                  >
                     <Text style={styles.nextBtnText}>다음으로</Text>
                   </TouchableOpacity>
                 </View>
@@ -1034,6 +1131,15 @@ const styles = StyleSheet.create({
   },
   skillChipText: { fontSize: 13, color: Colors.dark },
   skillChipTextSelected: { color: Colors.primary, fontWeight: '600' },
+  skillChipAdd: {
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 20,
+    borderWidth: 1.5,
+    borderColor: Colors.lightGray,
+    borderStyle: 'dashed',
+  },
+  skillChipAddText: { fontSize: 13, color: Colors.grayMedium },
 
   // Selected skills preview
   selectedSkillsWrap: {
@@ -1115,8 +1221,19 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 14,
   },
+  regionRowRequired: {
+    borderWidth: 1.5,
+    borderColor: Colors.primary,
+    borderRadius: 10,
+  },
   regionText: { fontSize: 14, color: Colors.dark },
   regionEdit: { fontSize: 13, color: Colors.primary, fontWeight: '600' },
+  regionRequiredHint: {
+    fontSize: 12,
+    color: Colors.primary,
+    paddingHorizontal: 14,
+    paddingBottom: 12,
+  },
 
   // Appeal cards (step 7)
   appealCard: {

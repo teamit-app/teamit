@@ -11,10 +11,14 @@ interface ApiResponse<T> {
 }
 
 async function fetchWithAuth(url: string, token: string | null, options?: RequestInit) {
+  // FormData(멀티파트 업로드)일 땐 Content-Type을 직접 지정하면 안 된다 —
+  // fetch/브라우저가 boundary까지 포함해서 자동으로 설정해야 정상 파싱된다.
+  const isFormData = typeof FormData !== 'undefined' && options?.body instanceof FormData;
+
   return fetch(url, {
     ...options,
     headers: {
-      'Content-Type': 'application/json',
+      ...(isFormData ? {} : { 'Content-Type': 'application/json' }),
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
       ...(options?.headers as Record<string, string> | undefined),
     },
@@ -26,7 +30,7 @@ export async function apiRequest<T>(
   options?: RequestInit,
 ): Promise<T> {
   if (IS_MOCK) {
-    return getMockResponse<T>(endpoint);
+    return getMockResponse<T>(endpoint, options?.method ?? 'GET', options?.body);
   }
 
   const accessToken = await tokenStorage.getAccessToken();

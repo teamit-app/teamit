@@ -1,7 +1,20 @@
+import { useEffect } from 'react';
 import { Tabs } from 'expo-router';
 import { TabBar } from '../../src/components/common/TabBar';
+import { useAuthStore } from '../../src/store/useAuthStore';
+import { connectSocket, disconnectSocket } from '../../src/services/socket';
 
 export default function TabLayout() {
+  const fetchCurrentUserId = useAuthStore((s) => s.fetchCurrentUserId);
+
+  useEffect(() => {
+    fetchCurrentUserId();
+    connectSocket();
+    return () => {
+      disconnectSocket();
+    };
+  }, []);
+
   return (
     <Tabs
       tabBar={(props) => <TabBar {...props} />}

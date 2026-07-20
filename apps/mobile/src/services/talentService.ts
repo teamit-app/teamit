@@ -1,14 +1,17 @@
 import { apiRequest } from './api';
-import { PoolUser } from '../types/talent';
+import { PoolUser, TalentDetail } from '../types/talent';
+import { EducationStatus } from '../types/mypage';
 
 // ─── 백엔드 응답 타입 ─────────────────────────────────────────────────────────
 
 interface BackendPoolUser {
   userId: number;
   nickname: string;
+  profileImageUrl?: string | null;
   gender: 'MALE' | 'FEMALE';
   schoolName: string | null;
   major: string | null;
+  status: EducationStatus | null;
   verified: boolean | null;
   skills: { skillName: string; level: number }[];
   certificates: string[];
@@ -23,7 +26,7 @@ interface UserPoolPageResponse {
 }
 
 interface HeartedUsersResponse {
-  content: { userId: number }[];
+  content: BackendPoolUser[];
 }
 
 // ─── 어댑터 ──────────────────────────────────────────────────────────────────
@@ -62,9 +65,9 @@ export const getTalentPool = async (params?: TalentPoolParams): Promise<PoolUser
 
 // ─── 관심 팀원 조회 ──────────────────────────────────────────────────────────
 
-export const getHeartedTalents = async (_userId: number): Promise<number[]> => {
+export const getHeartedTalents = async (_userId?: number): Promise<PoolUser[]> => {
   const data = await apiRequest<HeartedUsersResponse>(`/users/hearts`);
-  return data.content.map((u) => u.userId);
+  return data.content.map((u) => ({ ...adaptPoolUser(u), isHearted: true }));
 };
 
 // ─── 하트 추가 / 취소 ─────────────────────────────────────────────────────────
@@ -74,3 +77,8 @@ export const addTalentHeart = (_userId: number, targetUserId: number): Promise<n
 
 export const removeTalentHeart = (_userId: number, targetUserId: number): Promise<null> =>
   apiRequest<null>(`/users/hearts/${targetUserId}`, { method: 'DELETE' });
+
+// ─── 유저 상세 프로필 조회 ────────────────────────────────────────────────────
+
+export const getUserDetail = (userId: number): Promise<TalentDetail> =>
+  apiRequest<TalentDetail>(`/users/${userId}`);

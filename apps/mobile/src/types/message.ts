@@ -40,11 +40,14 @@ export interface ChatRoom {
   detailType?: 'member-invite' | 'leader-request' | 'group-status' | 'normal';
   matchStatus?: 'pending' | 'accepted' | 'requested' | 'waiting' | 'completed' | 'none';
   teamInfo?: TeamInfo;
+  postId?: number; // 이 채팅방과 연결된 모집글 ID (GROUP 채팅방만)
+  opponentUserId?: number; // 상대방 userId (DIRECT 채팅방만)
 }
 
 export interface TeamMemberStatus {
   id: number;
   name: string;
+  realName?: string; // 리뷰 작성 시 "닉네임(본명)"으로 표기하기 위한 실명
   role: string;
   avatar: string;
   filled: boolean;
@@ -59,6 +62,10 @@ export interface TeamInfo {
   members: TeamMemberStatus[];
   dDay?: number;
   isExpired?: boolean; // 공모전 기한이 지나 리뷰 작성 가능한 상태
+  teamConfirmed?: boolean; // 모집자가 팀원을 확정했는지 (팀 현황 UI용, isExpired와 별개)
+  postTitle?: string;
+  contestId?: number;
+  contestTitle?: string;
 }
 
 export interface Chat {
@@ -72,4 +79,5 @@ export interface Chat {
   detailType?: 'member-invite' | 'leader-request' | 'group-status' | 'normal';
   matchStatus?: 'pending' | 'accepted' | 'requested' | 'waiting' | 'completed' | 'none';
   teamInfo?: TeamInfo;
+  postId?: number; // 이 채팅방과 연결된 모집글 ID (GROUP 채팅방만)
 }

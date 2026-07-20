@@ -1,11 +1,13 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Dimensions } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, useWindowDimensions } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Colors } from '../../constants/colors';
 import { Message } from '../../types/message';
 
-// 카드 너비: 화면 너비 - 아바타(44) - 양쪽 패딩(32) - 시간텍스트(30) - 여백(14)
-const CARD_WIDTH = Dimensions.get('window').width - 120;
+// 웹 데스크톱에서는 브라우저 창 폭이 그대로 window width가 되어버려서
+// WebCenteredFrame이 만드는 480px 모바일 프레임 폭 기준으로 clamp해야 함
+// (안 하면 카드가 모니터 폭 기준으로 렌더링되어 프레임 밖으로 잘려 보임)
+const MOBILE_FRAME_WIDTH = 480;
 
 interface MessageBubbleProps {
   message: Message;
@@ -15,6 +17,9 @@ interface MessageBubbleProps {
 
 export const MessageBubble: React.FC<MessageBubbleProps> = ({ message, showSenderName = false, onPressAvatar }) => {
   const router = useRouter();
+  const { width } = useWindowDimensions();
+  // 카드 너비: (프레임 폭) - 아바타(44) - 양쪽 패딩(32) - 시간텍스트(30) - 여백(14)
+  const cardWidth = Math.min(width, MOBILE_FRAME_WIDTH) - 120;
 
   if (message.isSystem) {
     return (
@@ -50,7 +55,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message, showSende
             {isOwn && (
               <Text style={styles.time}>{formatTime(message.createdAt)}</Text>
             )}
-            <View style={cardStyles.card}>
+            <View style={[cardStyles.card, { width: cardWidth }]}>
               <View style={cardStyles.topRow}>
                 <View style={cardStyles.iconCircle}>
                   <Text style={cardStyles.iconText}>🏆</Text>
@@ -226,7 +231,6 @@ const cardStyles = StyleSheet.create({
     borderRadius: 14,
     padding: 14,
     backgroundColor: Colors.white,
-    width: CARD_WIDTH,
   },
   topRow: {
     flexDirection: 'row',

@@ -14,6 +14,7 @@ const SETTINGS_CONFIG: {
   key: keyof NotificationSettings;
   title: string;
   desc: string;
+  disabled?: boolean;
 }[] = [
   {
     key: 'matchProposal',
@@ -28,12 +29,14 @@ const SETTINGS_CONFIG: {
   {
     key: 'deadlineAlert',
     title: '마감 알림',
-    desc: '관심 공모전 마감 3일 전 알림',
+    desc: '베타테스트 기간에는 제공하지 않아요',
+    disabled: true,
   },
   {
     key: 'messageAlert',
     title: '메시지 알림',
-    desc: '새 메시지가 도착했을 때',
+    desc: '베타테스트 기간에는 제공하지 않아요',
+    disabled: true,
   },
   {
     key: 'matchSuccess',
@@ -77,15 +80,16 @@ export default function NotificationSettingsScreen() {
       <ScreenHeader title="알림 설정" onBack={() => router.back()} />
 
       <ScrollView showsVerticalScrollIndicator={false}>
-        {SETTINGS_CONFIG.map(({ key, title, desc }, idx) => (
+        {SETTINGS_CONFIG.map(({ key, title, desc, disabled }, idx) => (
           <View key={key} style={[styles.row, idx === 0 && styles.rowFirst]}>
             <View style={styles.textCol}>
-              <Text style={styles.rowTitle}>{title}</Text>
-              <Text style={styles.rowDesc}>{desc}</Text>
+              <Text style={[styles.rowTitle, disabled && styles.rowTitleDisabled]}>{title}</Text>
+              <Text style={[styles.rowDesc, disabled && styles.rowDescDisabled]}>{desc}</Text>
             </View>
             <Switch
-              value={settings[key]}
+              value={disabled ? false : settings[key]}
               onValueChange={(v) => handleToggle(key, v)}
+              disabled={disabled}
               trackColor={{ false: Colors.lightGray, true: Colors.primary }}
               thumbColor={Colors.white}
             />
@@ -109,5 +113,7 @@ const styles = StyleSheet.create({
   rowFirst: { borderTopWidth: 0 },
   textCol: { flex: 1, marginRight: 12 },
   rowTitle: { fontSize: 15, fontWeight: '600', color: Colors.dark, marginBottom: 3 },
+  rowTitleDisabled: { color: Colors.grayMedium },
   rowDesc: { fontSize: 13, color: Colors.gray },
+  rowDescDisabled: { color: Colors.lightGray },
 });

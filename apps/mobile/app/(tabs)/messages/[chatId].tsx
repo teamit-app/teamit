@@ -10,19 +10,23 @@ import {
   KeyboardAvoidingView,
   Platform,
   Modal,
-  Alert,
   ScrollView,
 } from 'react-native';
+import { Alert } from '../../../src/utils/alert';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Colors } from '../../../src/constants/colors';
 import { MessageBubble } from '../../../src/components/messages/MessageBubble';
 import { MessageInput } from '../../../src/components/messages/MessageInput';
-import { getChat, sendMessage, leaveChatRoom } from '../../../src/services/messageService';
+import { getChat, sendMessage, leaveChatRoom, deleteChatRoom, getChatRooms, adaptMessage, markChatRoomAsRead } from '../../../src/services/messageService';
+import { subscribeToChatRoom } from '../../../src/services/socket';
 import { Chat, Message } from '../../../src/types/message';
 import { useReviewStore } from '../../../src/store/useReviewStore';
 import { useInvitationStore } from '../../../src/store/useInvitationStore';
-import { useReadStore } from '../../../src/store/useReadStore';
+import { useAuthStore } from '../../../src/store/useAuthStore';
+import { confirmTeam } from '../../../src/services/postService';
+import { sendInvitation, getSentInvitations, cancelInvitation } from '../../../src/services/invitationService';
+import { formatDDay } from '../../../src/utils/dday';
 
 const IS_MOCK = process.env.EXPO_PUBLIC_API_MODE === 'mock';
 
@@ -33,6 +37,7 @@ interface InvitedUser {
   role: string;
   status: 'pending' | 'rejected';
   directChatId?: number;
+  invitationId?: number;
 }
 
 interface DirectContact {
@@ -59,14 +64,14 @@ const MOCK_CONTACTS: DirectContact[] = [
 
 // ── 메인 화면 ─────────────────────────────────────────────────────────────────
 // [모집자 vs 팀원 분기 로직]
-// MY_USER_ID: mock 모드에서 "나"를 식별하는 ID. 실제 API 연동 시 auth 토큰에서 추출.
+// MY_USER_ID: 로그인된 사용자 ID (authStore에서 가져옴 — 탭 레이아웃 마운트 시 서버에서 재조회되어 새로고침에도 안전)
 // amIRecruiter: teamInfo.members 중 내 ID(MY_USER_ID)가 isHost=true인지 여부.
 //   - true  → 모집자 화면: 팀원 확정하기 버튼, 초대하기, 초대 대기 배너 표시
 //   - false → 팀원 화면: 위 요소 모두 숨김
 // 모집자 아바타 주황 테두리: isHost=true인 멤버에게 항상 적용 (모집자·팀원 화면 공통)
-const MY_USER_ID = 1; // mock: 현재 로그인한 사용자 ID
 
 export default function ChatDetailScreen() {
+  const MY_USER_ID = useAuthStore((state) => state.currentUserId) ?? 0;
   const router = useRouter();
   const { chatId } = useLocalSearchParams();
   const flatListRef = useRef<FlatList>(null);
@@ -77,11 +82,14 @@ export default function ChatDetailScreen() {
   const [isSending, setIsSending] = useState(false);
 
   // 리뷰 완료 여부: 만료 채팅방에서 모든 팀원 리뷰를 제출했는지 확인
-  const { getSubmittedReviews } = useReviewStore();
+  const { loadSubmitted, getSubmittedReceiverIds } = useReviewStore();
   const { addInvitationMessages, getExtraMessages } = useInvitationStore();
-  const { markChatAsRead } = useReadStore();
-  const reviewableCount = (chat?.teamInfo?.members ?? []).filter((m) => m.id !== MY_USER_ID).length;
-  const allReviewsDone  = getSubmittedReviews(parseInt(chatId as string)).length >= reviewableCount;
+  const reviewableCount = (chat?.teamInfo?.members ?? []).filter((m) => m.filled && m.id !== MY_USER_ID).length;
+  const allReviewsDone  = getSubmittedReceiverIds(parseInt(chatId as string)).length >= reviewableCount;
+
+  useEffect(() => {
+    if (chatId) loadSubmitted(parseInt(chatId as string));
+  }, [chatId]);
 
   // 내가 이 채팅방의 모집자인지 여부 (팀 현황 UI 분기에 사용)
   const amIRecruiter =
@@ -91,20 +99,92 @@ export default function ChatDetailScreen() {
   const [isTeamConfirmed, setIsTeamConfirmed] = useState(false);
   const [isInviteSheetVisible, setIsInviteSheetVisible] = useState(false);
   const [isConfirmTeamModalVisible, setIsConfirmTeamModalVisible] = useState(false);
-  const [invitedUsers, setInvitedUsers] = useState<InvitedUser[]>(MOCK_INVITED);
-  const [invitedIds, setInvitedIds] = useState<Set<number>>(new Set([101, 102]));
+  const [invitedUsers, setInvitedUsers] = useState<InvitedUser[]>(IS_MOCK ? MOCK_INVITED : []);
+  const [invitedIds, setInvitedIds] = useState<Set<number>>(new Set(IS_MOCK ? [101, 102] : []));
+  const [rejectedIds, setRejectedIds] = useState<Set<number>>(new Set());
+  const [contacts, setContacts] = useState<DirectContact[]>(IS_MOCK ? MOCK_CONTACTS : []);
   const [contactSearch, setContactSearch] = useState('');
 
   // 더보기 / 차단 / 나가기 / 이름 수정 모달
   const [isMoreSheetVisible, setIsMoreSheetVisible] = useState(false);
   const [isBlockConfirmVisible, setIsBlockConfirmVisible] = useState(false);
   const [isLeaveConfirmVisible, setIsLeaveConfirmVisible] = useState(false);
+  const [isDeleteRoomConfirmVisible, setIsDeleteRoomConfirmVisible] = useState(false);
   const [isRenameModalVisible, setIsRenameModalVisible] = useState(false);
   const [renameText, setRenameText] = useState('');
 
   useEffect(() => {
     loadChat();
   }, [chatId]);
+
+  // 이 채팅방을 열어둔 동안 실시간으로 새 메시지를 받는다. 내가 보낸 메시지는
+  // handleSendMessage에서 이미 로컬에 append했는데 이 구독으로도 다시 돌아오므로,
+  // 같은 messageId가 이미 있으면 무시해서 중복 표시를 막는다.
+  useEffect(() => {
+    if (IS_MOCK || !chatId) return;
+    const cid = parseInt(chatId as string);
+    const unsubscribe = subscribeToChatRoom(cid, (backendMessage) => {
+      const adapted = adaptMessage(backendMessage, MY_USER_ID);
+      setMessages((prev) => (prev.some((m) => m.id === adapted.id) ? prev : [...prev, adapted]));
+      setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 100);
+      // 방을 열어둔 채로 새 메시지를 받는 것도 "읽은" 것으로 친다 — 안 그러면
+      // 화면엔 이미 보이는데 채팅 목록에선 계속 안읽음으로 남는다
+      markChatRoomAsRead(cid).catch((e) => console.error('[Chat] 읽음 처리 실패:', e));
+    });
+    return unsubscribe;
+  }, [chatId, MY_USER_ID]);
+
+  // 초대하기 시트용 데이터: 1:1 채팅 나눠본 상대 목록 + 이미 보낸 초대장 상태
+  // (mock 모드는 MOCK_CONTACTS/MOCK_INVITED를 그대로 씀)
+  useEffect(() => {
+    if (IS_MOCK || !amIRecruiter || !chat?.postId) return;
+    const postId = chat.postId;
+
+    Promise.all([getChatRooms(), getSentInvitations(postId)])
+      .then(([rooms, sent]) => {
+        const teamMemberIds = new Set(
+          (chat.teamInfo?.members ?? []).filter((m) => m.filled).map((m) => m.id),
+        );
+        const directChatIdByUserId = new Map(
+          rooms
+            .filter((r) => r.type === 'direct' && r.opponentUserId != null)
+            .map((r) => [r.opponentUserId as number, r.id]),
+        );
+
+        const list: DirectContact[] = rooms
+          .filter((r) => r.type === 'direct' && r.opponentUserId != null)
+          .map((r) => ({
+            id: r.opponentUserId as number,
+            chatId: r.id,
+            name: r.name,
+            avatar: r.avatar,
+            role: '',
+            isTeamMember: teamMemberIds.has(r.opponentUserId as number),
+          }));
+        setContacts(list);
+
+        setInvitedUsers(
+          sent
+            .filter((i) => i.status === 'PENDING' || i.status === 'REJECTED')
+            .map((i) => ({
+              id: i.receiverId,
+              name: i.receiverNickname,
+              role: '',
+              status: i.status === 'PENDING' ? 'pending' : 'rejected',
+              // 1:1 채팅을 나눠본 적 있어야 초대 가능하므로 항상 존재해야 하지만,
+              // 방어적으로 없으면 "채팅하기" 버튼을 숨김
+              directChatId: directChatIdByUserId.get(i.receiverId),
+              invitationId: i.invitationId,
+            })),
+        );
+        // 거절한 사용자에게는 재초대가 안 되므로(서버에서도 막힘), 대기 중 + 거절 둘 다 초대 버튼을 비활성화
+        setInvitedIds(
+          new Set(sent.filter((i) => i.status === 'PENDING' || i.status === 'REJECTED').map((i) => i.receiverId)),
+        );
+        setRejectedIds(new Set(sent.filter((i) => i.status === 'REJECTED').map((i) => i.receiverId)));
+      })
+      .catch(() => {});
+  }, [amIRecruiter, chat?.postId]);
 
   const loadChat = async () => {
     setIsLoading(true);
@@ -113,12 +193,12 @@ export default function ChatDetailScreen() {
       const data = await getChat(cid);
       if (data) {
         setChat(data);
-        markChatAsRead(cid);
+        markChatRoomAsRead(cid).catch((e) => console.error('[Chat] 읽음 처리 실패:', e));
         // store에 동적으로 추가된 초대 메시지를 병합
         const extra = getExtraMessages(cid);
         setMessages([...data.messages, ...extra]);
-        // 공모전 만료 상태이면 팀원이 이미 확정된 것으로 초기화
-        if (data.teamInfo?.isExpired) setIsTeamConfirmed(true);
+        // 모집자가 이미 팀원을 확정한 상태이면 복원 (isExpired는 공모전 마감 여부라 별개)
+        if (data.teamInfo?.teamConfirmed) setIsTeamConfirmed(true);
       }
     } catch (e) {
       console.error('Failed to load chat:', e);
@@ -141,8 +221,17 @@ export default function ChatDetailScreen() {
   };
 
   // 팀원 확정 처리
-  const handleConfirmTeam = () => {
+  const handleConfirmTeam = async () => {
     setIsConfirmTeamModalVisible(false);
+    try {
+      if (chat?.postId) {
+        await confirmTeam(chat.postId);
+      }
+    } catch (e) {
+      console.error('Failed to confirm team:', e);
+      Alert.alert('팀 확정 실패', '팀을 확정하지 못했어요. 잠시 후 다시 시도해주세요.');
+      return;
+    }
     setIsTeamConfirmed(true);
     const systemMsg: Message = {
       id: Date.now(),
@@ -159,7 +248,30 @@ export default function ChatDetailScreen() {
   };
 
   // 초대 전송
-  const handleInvite = (contact: DirectContact) => {
+  const handleInvite = async (contact: DirectContact) => {
+    if (!IS_MOCK) {
+      if (!chat?.postId) return;
+      try {
+        const res = await sendInvitation(chat.postId, contact.id);
+        setInvitedUsers((prev) => [
+          ...prev,
+          {
+            id: contact.id,
+            name: contact.name,
+            role: contact.role,
+            status: 'pending',
+            directChatId: contact.chatId,
+            invitationId: res.invitationId,
+          },
+        ]);
+        setInvitedIds((prev) => new Set([...prev, contact.id]));
+      } catch (e) {
+        console.error('[ChatDetail] 초대 실패:', e);
+        Alert.alert('오류', '초대에 실패했어요. 다시 시도해주세요.');
+      }
+      return;
+    }
+
     const newUser: InvitedUser = {
       id: contact.id,
       name: contact.name,
@@ -170,7 +282,7 @@ export default function ChatDetailScreen() {
     setInvitedUsers((prev) => [...prev, newUser]);
     setInvitedIds((prev) => new Set([...prev, contact.id]));
 
-    // 1:1 채팅방에 초대 자동 메시지 추가
+    // 1:1 채팅방에 초대 자동 메시지 추가 (mock 전용)
     const now = new Date().toISOString();
     const baseId = Date.now();
     addInvitationMessages(contact.chatId, [
@@ -204,10 +316,21 @@ export default function ChatDetailScreen() {
     ]);
   };
 
-  // 초대 취소(X 버튼)
-  const handleDismissInvite = (userId: number) => {
-    setInvitedUsers((prev) => prev.filter((u) => u.id !== userId));
-    setInvitedIds((prev) => { const s = new Set(prev); s.delete(userId); return s; });
+  // 초대 취소(X 버튼) — 서버에 실제로 취소 반영해야 재입장해도 원복되지 않고,
+  // 상대방도 "1:1 채팅 목록"에서 다시 초대 가능한 상태로 보임
+  const handleDismissInvite = async (user: InvitedUser) => {
+    if (!IS_MOCK) {
+      if (!chat?.postId || !user.invitationId) return;
+      try {
+        await cancelInvitation(chat.postId, user.invitationId);
+      } catch (e) {
+        console.error('[ChatDetail] 초대 취소 실패:', e);
+        Alert.alert('오류', '초대 취소에 실패했어요. 다시 시도해주세요.');
+        return;
+      }
+    }
+    setInvitedUsers((prev) => prev.filter((u) => u.id !== user.id));
+    setInvitedIds((prev) => { const s = new Set(prev); s.delete(user.id); return s; });
   };
 
   // ── 더보기 / 차단 / 나가기 모달 ───────────────────────────────────────────
@@ -218,7 +341,8 @@ export default function ChatDetailScreen() {
         <TouchableOpacity style={styles.sheetBackdrop} onPress={() => setIsMoreSheetVisible(false)} />
         <View style={styles.sheetContainer}>
           <View style={styles.sheetHandle} />
-          {chat?.type === 'group' && (
+          {/* 채팅방 이름 수정하기 — 모집자(방장)만 가능 */}
+          {chat?.type === 'group' && amIRecruiter && (
             <TouchableOpacity
               style={styles.sheetItem}
               onPress={() => {
@@ -261,13 +385,27 @@ export default function ChatDetailScreen() {
             <View style={styles.sheetItemIcon}><Text style={styles.sheetItemIconText}>⚠️</Text></View>
             <Text style={styles.sheetItemLabel}>신고하기</Text>
           </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.sheetItem}
-            onPress={() => { setIsMoreSheetVisible(false); setIsLeaveConfirmVisible(true); }}
-          >
-            <View style={styles.sheetItemIcon}><Text style={styles.sheetItemIconText}>🚪</Text></View>
-            <Text style={[styles.sheetItemLabel, styles.sheetItemDanger]}>채팅방 나가기</Text>
-          </TouchableOpacity>
+          {/* 채팅방 나가기 — 1:1은 아예 나갈 수 없고(상대 정보·메시지 보존을 위해),
+              그룹은 모집자(방장) 제외 팀원만 나갈 수 있다(방장은 나가기 대신 삭제하기만 사용) */}
+          {chat?.type === 'group' && !amIRecruiter && (
+            <TouchableOpacity
+              style={styles.sheetItem}
+              onPress={() => { setIsMoreSheetVisible(false); setIsLeaveConfirmVisible(true); }}
+            >
+              <View style={styles.sheetItemIcon}><Text style={styles.sheetItemIconText}>🚪</Text></View>
+              <Text style={[styles.sheetItemLabel, styles.sheetItemDanger]}>채팅방 나가기</Text>
+            </TouchableOpacity>
+          )}
+          {/* 채팅방 삭제하기 — 모집자(방장)만 가능, 모집글도 함께 삭제됨 */}
+          {amIRecruiter && chat?.type === 'group' && (
+            <TouchableOpacity
+              style={styles.sheetItem}
+              onPress={() => { setIsMoreSheetVisible(false); setIsDeleteRoomConfirmVisible(true); }}
+            >
+              <View style={styles.sheetItemIcon}><Text style={styles.sheetItemIconText}>🗑️</Text></View>
+              <Text style={[styles.sheetItemLabel, styles.sheetItemDanger]}>채팅방 삭제하기</Text>
+            </TouchableOpacity>
+          )}
           <TouchableOpacity style={styles.sheetCloseBtn} onPress={() => setIsMoreSheetVisible(false)}>
             <Text style={styles.sheetCloseBtnText}>닫기</Text>
           </TouchableOpacity>
@@ -321,6 +459,40 @@ export default function ChatDetailScreen() {
               }}
             >
               <Text style={styles.dialogBtnConfirmText}>나가기</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </View>
+    </Modal>
+  );
+
+  // 채팅방 삭제 확인 (모집자 전용) — 모집글도 함께 삭제되고 팀원·지원자에게 알림이 감
+  const renderDeleteRoomConfirm = () => (
+    <Modal visible={isDeleteRoomConfirmVisible} animationType="fade" transparent>
+      <View style={styles.dialogOverlay}>
+        <View style={styles.dialogBox}>
+          <Text style={styles.dialogTitle}>채팅방을 삭제할까요?</Text>
+          <Text style={styles.dialogDesc}>
+            {'채팅방을 삭제하면 연결된 모집글도 함께 삭제돼요.\n팀원과 지원자 전원에게 삭제 알림이 가고,\n이 작업은 되돌릴 수 없어요.\n삭제하시겠어요?'}
+          </Text>
+          <View style={styles.dialogBtns}>
+            <TouchableOpacity style={styles.dialogBtnCancel} onPress={() => setIsDeleteRoomConfirmVisible(false)}>
+              <Text style={styles.dialogBtnCancelText}>취소</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.dialogBtnConfirm}
+              onPress={async () => {
+                setIsDeleteRoomConfirmVisible(false);
+                try {
+                  await deleteChatRoom(parseInt(chatId as string));
+                  router.back();
+                } catch (e) {
+                  console.error('[ChatDetail] 채팅방 삭제 실패:', e);
+                  Alert.alert('오류', '삭제에 실패했어요. 다시 시도해주세요.');
+                }
+              }}
+            >
+              <Text style={styles.dialogBtnConfirmText}>삭제하기</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -398,7 +570,7 @@ export default function ChatDetailScreen() {
   const renderInviteSheet = () => {
     if (!chat?.teamInfo) return null;
     const remainingSlots = chat.teamInfo.totalCount - chat.teamInfo.currentCount;
-    const filteredContacts = MOCK_CONTACTS.filter((c) =>
+    const filteredContacts = contacts.filter((c) =>
       c.name.includes(contactSearch) || c.role.includes(contactSearch),
     );
 
@@ -455,7 +627,7 @@ export default function ChatDetailScreen() {
                           >
                             <Text style={inviteSheet.chatBtnText}>채팅하기</Text>
                           </TouchableOpacity>
-                          <TouchableOpacity onPress={() => handleDismissInvite(u.id)} hitSlop={8}>
+                          <TouchableOpacity onPress={() => handleDismissInvite(u)} hitSlop={8}>
                             <Text style={inviteSheet.dismissBtn}>✕</Text>
                           </TouchableOpacity>
                         </View>
@@ -491,6 +663,7 @@ export default function ChatDetailScreen() {
                 <View style={inviteSheet.contactList}>
                   {filteredContacts.map((c) => {
                     const alreadyInvited = invitedIds.has(c.id);
+                    const isRejected = rejectedIds.has(c.id);
                     const isDone = alreadyInvited || c.isTeamMember;
                     return (
                       <View key={c.id} style={[inviteSheet.contactRow, isDone && inviteSheet.contactRowDone]}>
@@ -505,8 +678,12 @@ export default function ChatDetailScreen() {
                           <View style={inviteSheet.teamMemberPill}>
                             <Text style={inviteSheet.teamMemberPillText}>팀원 추가 완료</Text>
                           </View>
+                        ) : isRejected ? (
+                          <Text style={inviteSheet.invitedLabel}>거절됨</Text>
                         ) : alreadyInvited ? (
                           <Text style={inviteSheet.invitedLabel}>초대 전송됨</Text>
+                        ) : isExpired ? (
+                          <Text style={inviteSheet.invitedLabel}>마감</Text>
                         ) : (
                           <TouchableOpacity
                             style={inviteSheet.inviteBtn}
@@ -534,6 +711,28 @@ export default function ChatDetailScreen() {
 
     return (
       <View style={styles.listHeaderWrap}>
+        {/* 어느 공모전에 대한 팀 채팅방인지 알 수 있는 모집글 배너 — 탭하면 모집글 상세로 */}
+        {chat.type === 'group' && chat.postId && chat.teamInfo?.postTitle && (
+          <TouchableOpacity
+            style={postBanner.wrap}
+            activeOpacity={0.8}
+            onPress={() =>
+              router.push(`/messages/post/${chat.postId}?contestId=${chat.teamInfo?.contestId ?? ''}` as never)
+            }
+          >
+            <View style={postBanner.iconCircle}>
+              <Text style={postBanner.icon}>🏆</Text>
+            </View>
+            <View style={postBanner.textWrap}>
+              <Text style={postBanner.title} numberOfLines={1}>{chat.teamInfo.postTitle}</Text>
+              {!!chat.teamInfo.contestTitle && (
+                <Text style={postBanner.subtitle} numberOfLines={1}>{chat.teamInfo.contestTitle}</Text>
+              )}
+            </View>
+            <Text style={postBanner.chevron}>›</Text>
+          </TouchableOpacity>
+        )}
+
         {chat.type === 'group' && chat.teamInfo && (
           <View style={teamCard.wrap}>
             {/* ── 상단 배너 ──────────────────────────────────────────────────
@@ -566,23 +765,22 @@ export default function ChatDetailScreen() {
             <Text style={teamCard.title}>팀 현황</Text>
 
             {/* 팀원 아바타 행
-                isHost=true 멤버: 주황 테두리 (모집자·팀원 화면 공통 적용) */}
+                isHost=true 멤버: 주황 테두리 (모집자·팀원 화면 공통 적용)
+                빈 자리는 모집 인원수만큼 그대로 표시 — 모집자면 각각 탭해서 초대 가능,
+                아니면 "모집중" 표시만 (하드코딩된 슬롯 1개로 뭉치지 않도록 주의)
+                팀이 확정된 이후에는 더 이상 모집하지 않으므로 빈 자리 자체를 표시하지 않음 */}
             <View style={teamCard.memberRow}>
-              {chat.teamInfo.members
-                .filter((m) => m.filled)
-                .map((m) => (
-                  <View key={m.id} style={teamCard.memberItem}>
+              {chat.teamInfo.members.map((m, idx) =>
+                m.filled ? (
+                  <View key={m.id ?? `filled-${idx}`} style={teamCard.memberItem}>
                     <View style={[teamCard.memberAvatar, m.isHost && teamCard.hostAvatar]}>
                       <Text style={teamCard.memberAvatarText}>{m.avatar}</Text>
                     </View>
                     <Text style={teamCard.memberName} numberOfLines={1}>{m.name}</Text>
                   </View>
-                ))}
-
-              {/* 초대하기 버튼 – 모집자만, 미확정 & 슬롯 남을 때 */}
-              {amIRecruiter && !isTeamConfirmed &&
-                chat.teamInfo.currentCount < chat.teamInfo.totalCount && (
+                ) : isTeamConfirmed ? null : amIRecruiter && !isExpired ? (
                   <TouchableOpacity
+                    key={`invite-${idx}`}
                     style={teamCard.memberItem}
                     onPress={() => setIsInviteSheetVisible(true)}
                     activeOpacity={0.7}
@@ -592,7 +790,15 @@ export default function ChatDetailScreen() {
                     </View>
                     <Text style={teamCard.inviteLabel}>초대하기</Text>
                   </TouchableOpacity>
-                )}
+                ) : (
+                  <View key={`recruiting-${idx}`} style={teamCard.memberItem}>
+                    <View style={teamCard.recruitingCircle}>
+                      <Text style={teamCard.recruitingPlus}>+</Text>
+                    </View>
+                    <Text style={teamCard.inviteLabel}>{isExpired ? '마감' : '모집중'}</Text>
+                  </View>
+                ),
+              )}
             </View>
 
             {/* 팀원 확정하기 버튼 + 안내 문구 – 모집자만, 미확정 때 */}
@@ -600,7 +806,16 @@ export default function ChatDetailScreen() {
               <>
                 <TouchableOpacity
                   style={teamCard.confirmBtn}
-                  onPress={() => setIsConfirmTeamModalVisible(true)}
+                  onPress={() => {
+                    if (reviewableCount === 0) {
+                      Alert.alert(
+                        '팀원 확정 불가',
+                        '아직 합류한 팀원이 없어요. 팀원이 최소 1명 이상 있어야 팀을 확정할 수 있어요.',
+                      );
+                      return;
+                    }
+                    setIsConfirmTeamModalVisible(true);
+                  }}
                   activeOpacity={0.85}
                 >
                   <Text style={teamCard.confirmBtnText}>팀원 확정하기</Text>
@@ -625,6 +840,7 @@ export default function ChatDetailScreen() {
   const isExpired = chat?.teamInfo?.isExpired === true;
   const renderReviewBanner = () => {
     if (chat?.type !== 'group') return null;
+    if (!isTeamConfirmed) return null;
 
     // 공모전 기한 만료 → 리뷰 작성 유도 배너 (클릭 가능)
     if (isExpired) {
@@ -655,7 +871,6 @@ export default function ChatDetailScreen() {
     }
 
     // 팀원 확정 후, 아직 기한 전 → 사전 안내 배너
-    if (!isTeamConfirmed) return null;
     return (
       <View style={reviewBanner.wrap}>
         <Text style={reviewBanner.icon}>💡</Text>
@@ -725,7 +940,7 @@ export default function ChatDetailScreen() {
                 <Text style={styles.headerSubtitle}>{headerSubtitle}</Text>
                 {dDay !== undefined && (
                   <View style={styles.dDayBadge}>
-                    <Text style={styles.dDayText}>D-{dDay}</Text>
+                    <Text style={styles.dDayText}>{formatDDay(dDay)}</Text>
                   </View>
                 )}
               </View>
@@ -740,6 +955,7 @@ export default function ChatDetailScreen() {
         {renderMoreSheet()}
         {renderBlockConfirm()}
         {renderLeaveConfirm()}
+        {renderDeleteRoomConfirm()}
         {renderRenameModal()}
         {/* 팀원 초대 바텀시트·확정 모달은 모집자만 사용 가능 */}
         {amIRecruiter && renderConfirmTeamModal()}
@@ -754,7 +970,7 @@ export default function ChatDetailScreen() {
               message={item}
               showSenderName={isGroup}
               onPressAvatar={(senderId) =>
-                router.push(`/explore/talent/${senderId}` as never)
+                router.push(`/messages/talent/${senderId}` as never)
               }
             />
           )}
@@ -888,6 +1104,33 @@ const styles = StyleSheet.create({
 });
 
 // ── 팀 현황 카드 스타일 ────────────────────────────────────────────────────────
+// ── 모집글 배너 스타일 ─────────────────────────────────────────────────────────
+const postBanner = StyleSheet.create({
+  wrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    backgroundColor: Colors.white,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.lightGray,
+  },
+  iconCircle: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: Colors.ogTint,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  icon: { fontSize: 18 },
+  textWrap: { flex: 1 },
+  title: { fontSize: 13, fontWeight: '700', color: Colors.dark },
+  subtitle: { fontSize: 11, color: Colors.grayMedium, marginTop: 1 },
+  chevron: { fontSize: 20, color: Colors.grayMedium },
+});
+
 const teamCard = StyleSheet.create({
   wrap: {
     backgroundColor: Colors.ogTint,
@@ -940,6 +1183,15 @@ const teamCard = StyleSheet.create({
   },
   invitePlus: { fontSize: 22, color: Colors.white, fontWeight: '300' },
   inviteLabel: { fontSize: 11, color: Colors.grayMedium, textAlign: 'center' },
+
+  // 모집중 슬롯 (팀원 시점 — 탭 불가)
+  recruitingCircle: {
+    width: 52, height: 52, borderRadius: 26,
+    borderWidth: 1.5, borderColor: Colors.lightGray, borderStyle: 'dashed',
+    backgroundColor: Colors.white,
+    alignItems: 'center', justifyContent: 'center', marginBottom: 6,
+  },
+  recruitingPlus: { fontSize: 22, color: Colors.grayLight, fontWeight: '300' },
 
   // 팀원 확정하기 버튼
   confirmBtn: {

@@ -1,5 +1,9 @@
 import { Stack } from 'expo-router';
 
+export const unstable_settings = {
+  initialRouteName: 'index',
+};
+
 export default function ProfileStackLayout() {
   return (
     <Stack screenOptions={{ headerShown: false }}>
@@ -16,10 +20,14 @@ export default function ProfileStackLayout() {
       <Stack.Screen name="add-contest" />
       <Stack.Screen name="add-certificate" />
       <Stack.Screen name="matching-profile" />
+      <Stack.Screen name="matching-profile-card" />
       <Stack.Screen name="applicants" />
-      <Stack.Screen name="applicant-detail" />
       <Stack.Screen name="likes" />
       <Stack.Screen name="post/[postId]" />
+      <Stack.Screen name="post/recruiter-profile" />
+      <Stack.Screen name="talent/[userId]" />
+      <Stack.Screen name="contest/[contestId]" />
+      <Stack.Screen name="chat/[chatId]" />
     </Stack>
   );
 }

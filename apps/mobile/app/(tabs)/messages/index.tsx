@@ -19,6 +19,8 @@ import { getInvitations } from '../../../src/services/invitationService';
 import { ChatRoom } from '../../../src/types/message';
 import { Invitation } from '../../../src/types/invitation';
 import { useReadStore } from '../../../src/store/useReadStore';
+import { useAuthStore } from '../../../src/store/useAuthStore';
+import { GuestPrompt } from '../../../src/components/common/GuestPrompt';
 
 type Tab = 'chats' | 'invitations';
 
@@ -41,12 +43,14 @@ export default function MessagesScreen() {
   const [invitations, setInvitations] = useState<Invitation[]>([]);
   const [sections, setSections] = useState<SectionData[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const { readChats, markInvitationAsRead } = useReadStore();
+  const { markInvitationAsRead } = useReadStore();
+  const currentUserId = useAuthStore((s) => s.currentUserId);
+  const currentUserIdReady = useAuthStore((s) => s.currentUserIdReady);
 
   useFocusEffect(
     useCallback(() => {
-      loadAll();
-    }, []),
+      if (currentUserId) loadAll();
+    }, [currentUserId]),
   );
 
   const loadAll = async () => {
@@ -91,6 +95,26 @@ export default function MessagesScreen() {
   };
 
   const invitationCount = invitations.length;
+
+  if (currentUserIdReady) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <ScreenHeader title="메시지" />
+        <View style={styles.center}>
+          <ActivityIndicator size="large" color={Colors.primary} />
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  if (!currentUserId) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <ScreenHeader title="메시지" />
+        <GuestPrompt returnPath="/(tabs)/messages" />
+      </SafeAreaView>
+    );
+  }
 
   if (isLoading) {
     return (
@@ -153,7 +177,7 @@ export default function MessagesScreen() {
             renderItem={({ item, section }) =>
               section.data.length === 0 ? null : (
                 <ChatRoomItem
-                  chatRoom={readChats[item.id] ? { ...item, unreadCount: 0 } : item}
+                  chatRoom={item}
                   onPress={() => handleChatPress(item.id)}
                 />
               )

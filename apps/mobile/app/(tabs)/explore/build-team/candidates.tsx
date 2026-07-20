@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -9,10 +9,43 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
 import { Colors } from '../../../../src/constants/colors';
-import { dummyCandidates } from '../../../../src/data/candidates';
 import { Candidate } from '../../../../src/types/team';
+import { PostApplicant } from '../../../../src/types/mypage';
 import { useInvitationStore } from '../../../../src/store/useInvitationStore';
 import { sendInvitation } from '../../../../src/services/invitationService';
+import { getContestCandidates, getAllContestCandidates } from '../../../../src/services/mypageService';
+
+const IS_MOCK = process.env.EXPO_PUBLIC_API_MODE === 'mock';
+
+function adaptCandidate(a: PostApplicant): Candidate {
+  return {
+    id: a.userId,
+    name: a.nickname,
+    gender: a.gender === 'FEMALE' ? '여성' : '남성',
+    school: a.school,
+    location: a.regionLabel,
+    intro: a.appealTitle,
+    introContent: a.appealContent,
+    skills: a.skills,
+    averageRating: a.averageRating,
+    matchScore: 0,
+    intensity: a.intensityLabel,
+    meetingType: a.meetingTypeLabel,
+    teamVibe: '',
+    feedbackStyle: '',
+    leadershipStyle: a.leadershipLabel,
+    contestCount: 0,
+    contestExperience: a.experienceLabel,
+    contestExperienceDetail: a.experienceLabel,
+    contestHistory: [],
+    certifications: [],
+    isVerified: a.isSchoolVerified,
+    reviewStats: { totalRating: '', responseSpeed: '', deadlineCompletion: '', participationIntensity: '' },
+    reviewKeywords: [],
+    teamReviews: [],
+    reviews: [],
+  };
+}
 
 const leadershipSymbol = (style: string) => {
   if (style.includes('가능') || style.includes('리더')) return '○';
@@ -80,7 +113,7 @@ function CandidateCard({
           </View>
           <View style={styles.tempPillWrap}>
             <View style={styles.tempPill}>
-              <Text style={styles.tempText}>{candidate.temperature}°C</Text>
+              <Text style={styles.tempText}>★ {candidate.averageRating.toFixed(1)}</Text>
             </View>
           </View>
         </View>
@@ -136,15 +169,68 @@ function CandidateCard({
 /* ─── 메인 화면 ─── */
 export default function CandidatesScreen() {
   const insets = useSafeAreaInsets();
-  const { contestId } = useLocalSearchParams<{ contestId: string }>();
+  const { contestId, postId } = useLocalSearchParams<{ contestId: string; postId?: string }>();
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
   const [isSending, setIsSending] = useState(false);
+  const [candidates, setCandidates] = useState<Candidate[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [allCandidates, setAllCandidates] = useState<Candidate[]>([]);
+  const [allLoading, setAllLoading] = useState(true);
+  const [allLoadingMore, setAllLoadingMore] = useState(false);
+  const [allPage, setAllPage] = useState(0);
+  const [allTotalPages, setAllTotalPages] = useState(0);
   const { addInvitationMessages } = useInvitationStore();
+
+  useEffect(() => {
+    if (IS_MOCK) {
+      import('../../../../src/data/candidates').then(({ dummyCandidates }) => {
+        setCandidates(dummyCandidates);
+        setLoading(false);
+        setAllCandidates(dummyCandidates);
+        setAllLoading(false);
+      });
+    } else {
+      const pid = Number(postId);
+      if (pid) {
+        getContestCandidates(pid)
+          .then((applicants) => setCandidates(applicants.map(adaptCandidate)))
+          .catch(console.error)
+          .finally(() => setLoading(false));
+        getAllContestCandidates(pid, 0)
+          .then((res) => {
+            setAllCandidates(res.content.map(adaptCandidate));
+            setAllPage(res.currentPage);
+            setAllTotalPages(res.totalPages);
+          })
+          .catch(console.error)
+          .finally(() => setAllLoading(false));
+      } else {
+        setLoading(false);
+        setAllLoading(false);
+      }
+    }
+  }, [postId]);
+
+  const loadMoreAllCandidates = () => {
+    const pid = Number(postId);
+    if (!pid || allLoadingMore || allPage + 1 >= allTotalPages) return;
+    setAllLoadingMore(true);
+    getAllContestCandidates(pid, allPage + 1)
+      .then((res) => {
+        setAllCandidates((prev) => [...prev, ...res.content.map(adaptCandidate)]);
+        setAllPage(res.currentPage);
+        setAllTotalPages(res.totalPages);
+      })
+      .catch(console.error)
+      .finally(() => setAllLoadingMore(false));
+  };
 
   const toggleSelect = (id: number) =>
     setSelectedIds((prev) =>
       prev.includes(id) ? prev.filter((i) => i !== id) : [...prev, id]
     );
+
+  const resolvedPostId = Number(postId) || 1;
 
   const handleSendInvitations = async () => {
     if (selectedIds.length === 0 || isSending) return;
@@ -153,9 +239,13 @@ export default function CandidatesScreen() {
       const now = new Date().toISOString();
       await Promise.all(
         selectedIds.map(async (cid, i) => {
-          const candidate = dummyCandidates.find((c) => c.id === cid);
+          const candidate = candidates.find((c) => c.id === cid) ?? allCandidates.find((c) => c.id === cid);
           if (!candidate) return;
-          const { chatRoomId: chatId } = await sendInvitation(1, candidate.id);
+          const { chatRoomId: chatId } = await sendInvitation(resolvedPostId, candidate.id);
+          // 실서버 모드에선 초대 발송 시 백엔드(ChatService.sendInvitationMessages)가
+          // 인사말 + 초대장 카드 메시지를 이미 채팅방에 저장해서, 채팅방을 열면 getChat()으로
+          // 그대로 내려온다. 여기서 또 로컬에 추가하면 메시지가 두 번 보이므로 mock 전용으로만 추가한다.
+          if (!IS_MOCK) return;
           const baseId = Date.now() + i * 100;
           addInvitationMessages(chatId, [
             {
@@ -181,7 +271,7 @@ export default function CandidatesScreen() {
                 totalMembers: 5,
                 contestName: contestId ? `공모전 #${contestId}` : '공모전',
                 senderName: '나',
-                postId: 1,
+                postId: resolvedPostId,
                 invitationId: 1,
               },
             },
@@ -219,17 +309,75 @@ export default function CandidatesScreen() {
           <Text style={styles.sectionHint}>카드를 클릭하면 상세정보를 확인할 수 있습니다</Text>
         </View>
 
-        {dummyCandidates.map((c) => (
-          <CandidateCard
-            key={c.id}
-            candidate={c}
-            selected={selectedIds.includes(c.id)}
-            onSelect={() => toggleSelect(c.id)}
-            onDetail={() =>
-              router.push(`/explore/build-team/candidate/${c.id}?contestId=${contestId}` as never)
-            }
-          />
-        ))}
+        {loading ? (
+          <View style={styles.emptyBox}>
+            <Text style={styles.emptyText}>매칭 중이에요...</Text>
+          </View>
+        ) : candidates.length === 0 ? (
+          <View style={styles.emptyBox}>
+            <Text style={styles.emptyIcon}>🔍</Text>
+            <Text style={styles.emptyTitle}>조건에 맞는 후보가 없어요</Text>
+            <Text style={styles.emptyDesc}>
+              공모전 후보로 등록된 팀원이 없거나{'\n'}모집 조건과 맞는 사람이 아직 없어요
+            </Text>
+          </View>
+        ) : (
+          candidates.map((c) => (
+            <CandidateCard
+              key={c.id}
+              candidate={c}
+              selected={selectedIds.includes(c.id)}
+              onSelect={() => toggleSelect(c.id)}
+              onDetail={() =>
+                router.push(`/explore/build-team/candidate/${c.id}?contestId=${contestId}` as never)
+              }
+            />
+          ))
+        )}
+
+        {/* ─ 전체 후보 ─ 매칭 조건과 무관하게 이 공모전에 등록된 모든 후보.
+            초반엔 매칭된 후보가 너무 적을 수 있어 아래에 함께 보여준다 */}
+        <View style={[styles.sectionTitleRow, styles.allSectionTitleRow]}>
+          <Text style={styles.sectionTitle}>전체 후보</Text>
+          <Text style={styles.sectionHint}>이 공모전에 후보로 등록한 모든 사람이에요</Text>
+        </View>
+
+        {allLoading ? (
+          <View style={styles.emptyBox}>
+            <Text style={styles.emptyText}>불러오는 중이에요...</Text>
+          </View>
+        ) : allCandidates.length === 0 ? (
+          <View style={styles.emptyBox}>
+            <Text style={styles.emptyIcon}>👥</Text>
+            <Text style={styles.emptyTitle}>후보로 등록한 사람이 없어요</Text>
+          </View>
+        ) : (
+          <>
+            {allCandidates.map((c) => (
+              <CandidateCard
+                key={c.id}
+                candidate={c}
+                selected={selectedIds.includes(c.id)}
+                onSelect={() => toggleSelect(c.id)}
+                onDetail={() =>
+                  router.push(`/explore/build-team/candidate/${c.id}?contestId=${contestId}` as never)
+                }
+              />
+            ))}
+            {allPage + 1 < allTotalPages && (
+              <TouchableOpacity
+                style={styles.loadMoreBtn}
+                onPress={loadMoreAllCandidates}
+                disabled={allLoadingMore}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.loadMoreBtnText}>
+                  {allLoadingMore ? '불러오는 중...' : '더보기'}
+                </Text>
+              </TouchableOpacity>
+            )}
+          </>
+        )}
       </ScrollView>
 
       {/* ─ 하단 버튼 ─ */}
@@ -288,6 +436,22 @@ const styles = StyleSheet.create({
     gap: 8,
     marginBottom: 2,
   },
+  allSectionTitleRow: {
+    marginTop: 24,
+    paddingTop: 16,
+    borderTopWidth: 1,
+    borderTopColor: Colors.lightGray,
+  },
+  loadMoreBtn: {
+    alignItems: 'center',
+    paddingVertical: 14,
+    marginTop: 4,
+  },
+  loadMoreBtnText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: Colors.primary,
+  },
   sectionTitle: {
     fontSize: 16,
     fontWeight: '700',
@@ -297,6 +461,18 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: Colors.primary,
   },
+
+  /* 빈 상태 */
+  emptyBox: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 48,
+    gap: 8,
+  },
+  emptyIcon: { fontSize: 40, marginBottom: 4 },
+  emptyTitle: { fontSize: 15, fontWeight: '700', color: Colors.dark },
+  emptyDesc: { fontSize: 13, color: Colors.gray, textAlign: 'center', lineHeight: 20 },
+  emptyText: { fontSize: 14, color: Colors.grayMedium },
 
   /* 카드 */
   card: {

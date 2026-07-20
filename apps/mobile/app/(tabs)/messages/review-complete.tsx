@@ -1,10 +1,12 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Colors } from '../../../src/constants/colors';
-import { dummyChatRooms } from '../../../src/data/chatRooms';
 import { useReviewStore } from '../../../src/store/useReviewStore';
+import { TeamMemberStatus } from '../../../src/types/message';
+import { getChat } from '../../../src/services/messageService';
+import { useAuthStore } from '../../../src/store/useAuthStore';
 
 export default function ReviewCompleteScreen() {
   const insets = useSafeAreaInsets();
@@ -12,14 +14,20 @@ export default function ReviewCompleteScreen() {
   const { chatId, memberName } = useLocalSearchParams<{ chatId: string; memberName: string }>();
   const chatIdNum = parseInt(chatId ?? '0');
 
-  const MY_USER_ID = 1;
-  const chat = dummyChatRooms.find((c) => c.id === chatIdNum);
-  const reviewableMembers = (chat?.teamInfo?.members ?? []).filter((m) => m.id !== MY_USER_ID);
+  const MY_USER_ID = useAuthStore((state) => state.currentUserId) ?? 0;
+  const [reviewableMembers, setReviewableMembers] = useState<TeamMemberStatus[]>([]);
 
-  const { getSubmittedReviews } = useReviewStore();
-  const submittedCount  = getSubmittedReviews(chatIdNum).length;
+  useEffect(() => {
+    getChat(chatIdNum).then((chat) => {
+      setReviewableMembers((chat?.teamInfo?.members ?? []).filter((m) => m.filled && m.id !== MY_USER_ID));
+    }).catch(() => {});
+  }, [chatIdNum, MY_USER_ID]);
+
+  const { loadSubmitted, getSubmittedReceiverIds } = useReviewStore();
+  useEffect(() => { loadSubmitted(chatIdNum); }, [chatIdNum]);
+  const submittedCount  = getSubmittedReceiverIds(chatIdNum).length;
   const totalCount      = reviewableMembers.length;
-  const allDone         = submittedCount >= totalCount;
+  const allDone         = totalCount > 0 && submittedCount >= totalCount;
 
   return (
     <SafeAreaView style={s.container} edges={['top', 'bottom']}>
