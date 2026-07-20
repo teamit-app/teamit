@@ -1,14 +1,27 @@
 export const Colors = {
-  primary: '#E8611A',
-  primaryLight: '#F4874B',
-  primaryDark: '#C04F12',
+  // ── 브랜드 컬러 시스템 ──────────────────────────────────────
+  primary:   '#FF6B1C',   // Primary
+  dark:      '#212121',   // Dark
+  gray:      '#757575',   // Gray
+  grayMedium:'#9E9E9E',   // Text (3단계)
+  grayLight: '#B8B8B8',   // Text (4단계)
+  lightGray: '#E0E0E0',   // Light Gray / Border
+  ogTint:    '#FFF2EB',   // OG Tint (브랜드 라이트 배경 · Sub)
+  white:     '#FFFFFF',   // White
+  pageBg:    '#F7F7F7',   // Background (라이트 그레이)
 
-  textDark: '#1A1A2E',
-  textGray: '#555555',
-
-  backgroundLight: '#F8F8F8',
+  // ── 시맨틱 alias (기존 코드 호환) ───────────────────────────
+  textDark:        '#212121',
+  textGray:        '#757575',
+  backgroundLight: '#FFF2EB',
   backgroundWhite: '#FFFFFF',
+  border:          '#E0E0E0',
+  error:           '#D32F2F',
 
-  border: '#E0E0E0',
-  error: '#D32F2F',
+  // ── 신규 컬러 (마이페이지 개편) ─────────────────────────────
+  tempBadgeBg:   '#FFFBD3',
+  tempBadgeText: '#DDA90D',
+  roleTagBg:     '#EFF0FF',
+  roleTagText:   '#5959CC',
+  segmentBg:     '#FFF3E0',
 } as const;

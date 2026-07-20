@@ -4,6 +4,12 @@ apps/server/build/
 apps/server/*.jar
 apps/server/out/
 apps/server/.idea/
+apps/server/src/main/resources/application-local.yml
+apps/server/src/main/resources/application-prod.yml
+apps/server/uploads/
+apps/server/*.log
+apps/server/hs_err_pid*.log
+apps/server/replay_pid*.log
 
 # React Native
 apps/mobile/node_modules/
@@ -15,3 +21,4 @@ apps/mobile/.env
 .DS_Store
 *.env
 *.env.local
+.idea/

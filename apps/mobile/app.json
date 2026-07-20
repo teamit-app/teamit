@@ -4,30 +4,40 @@
     "slug": "teamit",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/icon.png",
+    "icon": "./assets/teamit_logo.png",
     "scheme": "teamit",
     "userInterfaceStyle": "light",
+    "splash": {
+      "image": "./assets/teamit_logo.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#FFFFFF"
+    },
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "com.teamit.app"
     },
     "android": {
       "adaptiveIcon": {
-        "backgroundColor": "#E8611A",
-        "foregroundImage": "./assets/android-icon-foreground.png",
-        "backgroundImage": "./assets/android-icon-background.png",
-        "monochromeImage": "./assets/android-icon-monochrome.png"
+        "backgroundColor": "#FF6B1C",
+        "foregroundImage": "./assets/teamit_logo.png"
       },
       "package": "com.teamit.app",
       "predictiveBackGestureEnabled": false
     },
     "web": {
-      "favicon": "./assets/favicon.png",
-      "bundler": "metro"
+      "favicon": "./assets/teamit_logo.png",
+      "bundler": "metro",
+      "output": "single"
     },
     "plugins": [
       "expo-router",
-      "expo-status-bar"
+      "expo-web-browser",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "학력 인증을 위해 사진 앨범 접근이 필요합니다."
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true

@@ -1,0 +1,41 @@
+spring:
+  profiles:
+    active: local
+  application:
+    name: teamit
+  servlet:
+    multipart:
+      max-file-size: 5MB
+      max-request-size: 5MB
+  datasource:
+    url: ${DB_URL:}
+    username: ${DB_USERNAME:}
+    password: ${DB_PASSWORD:}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+  jpa:
+    hibernate:
+      ddl-auto: ${JPA_DDL_AUTO:validate}
+    show-sql: false
+    database-platform: org.hibernate.dialect.MySQLDialect
+
+server:
+  port: 8080
+
+jwt:
+  access-token-expiry: 1800000       # 30분 (ms)
+  refresh-token-expiry: 1209600000   # 14일 (ms)
+  secret: ${JWT_SECRET:}
+
+kakao:
+  client-id: ${KAKAO_CLIENT_ID:}
+  client-secret: ${KAKAO_CLIENT_SECRET:}
+  redirect-uri: ${KAKAO_REDIRECT_URI:}
+
+admin:
+  user-id: ${ADMIN_USER_ID:}
+
+file:
+  upload-dir: uploads   # 서버 프로세스 작업 디렉터리(apps/server) 기준 상대경로
+
+# local/prod 프로필별 값(application-local.yml 등)이 위 ${...} 플레이스홀더를 덮어쓴다.
+# 컨테이너 배포 시에는 별도 프로필 yml 없이 환경변수만으로 채워진다 (docker-compose.yml 참고).
