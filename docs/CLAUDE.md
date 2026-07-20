@@ -164,3 +164,38 @@ git push origin feature/작업이름-fe
 - 탐색: 인재풀 / 공모전 탭 (필터, 하트)
 - 메시지: 단체채팅 / 1:1 채팅
 - 내정보: 프로필, 경험, 기술스택, 매칭 프로필, 나의 매칭
+
+# 티밋(Teamit) 개발 워크플로우 (AI 하네스 규칙)
+
+이 프로젝트에서 Claude Code로 작업할 때는 아래 순서를 기본으로 한다.
+
+## 1. Plan-first + Human Approval Gate
+
+- 세션 기본 권한 모드는 `plan` (`settings.json`의 `permissions.defaultMode: "plan"`).
+  Claude는 코드를 바로 수정하지 않고 먼저 조사/계획만 하고 멈춘다.
+- 계획이 나오면 사람이 검토 후 승인해야 실제 구현(수정 권한)으로 전환된다.
+  (승인 시 Shift+Tab으로 전환되거나, 계획 승인 프롬프트에서 진행 모드 선택)
+- 범위가 큰 작업일수록 계획 단계에서 "변경 파일 목록"과 "건드리지 않을 범위"를 반드시 명시하게 한다.
+## 2. 역할 분리 (Researcher → Planner → 구현 → Reviewer)
+
+새 기능/버그 수정/리팩터링은 아래 순서로 진행한다.
+
+1. **Researcher** 서브에이전트로 관련 코드/문서 조사 (읽기 전용)
+2. **Planner** 서브에이전트로 계획 수립 (읽기 전용, 실행 안 함) → 사람 승인
+3. 승인된 계획대로 메인 세션(또는 별도 구현 담당)이 실제 구현
+4. **Reviewer** 서브에이전트로 diff 검토 (읽기 전용 + 테스트 실행만) → 커밋/PR 전 최종 확인
+   구현과 검증을 같은 컨텍스트에서 하지 않는 것이 핵심이다. Reviewer는 항상 새 세션/서브에이전트로 호출해서
+   구현 과정의 편향(자기가 짠 코드를 스스로 정당화하는 것)을 줄인다.
+
+## 3. 프롬프트/도구 사용 로그
+
+- `.claude/hooks/log_event.py` 가 UserPromptSubmit / PreToolUse / PostToolUse 훅으로 등록되어 있다.
+- 모든 프롬프트, 호출된 도구, 도구 입력/결과가 프로젝트 루트의 `logs/claude-audit.jsonl` 에 한 줄씩(JSONL) 기록된다.
+- 문제 발생 시 `logs/claude-audit.jsonl` 을 시간순으로 확인하면 어떤 질문 → 어떤 조사/계획 → 어떤 파일 수정 → 어떤 명령 실행으로 이어졌는지 추적 가능하다.
+- `logs/` 는 `.gitignore` 에 추가하거나, 팀 감사 목적이라면 별도 저장소/스토리지로 주기적으로 옮기는 것을 권장한다.
+## IntelliJ(JetBrains 플러그인)에서 사용 시 참고
+
+- JetBrains 플러그인은 내부적으로 동일한 Claude Code CLI를 IDE 터미널에서 구동하므로
+  `.claude/settings.json`, `.claude/agents/*.md`, `.claude/hooks/*` 설정이 그대로 적용된다.
+- 모드 전환(Shift+Tab)도 CLI와 동일하게 동작한다.
+- 서브에이전트 파일은 세션 시작 시 로드되므로, `.claude/agents/`에 새 파일을 추가했다면 IntelliJ에서 세션을 재시작해야 인식된다.

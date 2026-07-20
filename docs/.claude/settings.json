@@ -1,0 +1,30 @@
+{
+  "permissions": {
+    "defaultMode": "plan"
+  },
+  "hooks": {
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          { "type": "command", "command": "python .claude/hooks/log_event.py" }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "",
+        "hooks": [
+          { "type": "command", "command": "python .claude/hooks/log_event.py" }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "",
+        "hooks": [
+          { "type": "command", "command": "python .claude/hooks/log_event.py" }
+        ]
+      }
+    ]
+  }
+}
