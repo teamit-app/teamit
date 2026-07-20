@@ -41,6 +41,26 @@ public class MatchingController {
         return ApiResponse.success(response, "초대를 보냈어요! 채팅방이 생성되었습니다");
     }
 
+    @Operation(summary = "보낸 초대장 목록 조회", description = "모집자가 해당 모집글에 대해 보낸 초대장 목록을 조회합니다 (모집자 본인만 가능).")
+    @GetMapping("/posts/{postId}/invitations")
+    public ApiResponse<java.util.List<SentInvitationResponse>> getSentInvitations(
+            @PathVariable Long postId,
+            @LoginUser CustomUserDetails userDetails) {
+        java.util.List<SentInvitationResponse> response =
+                matchingService.getSentInvitations(postId, userDetails.getUserId());
+        return ApiResponse.success(response, "보낸 초대장 목록 조회 성공");
+    }
+
+    @Operation(summary = "초대 취소", description = "모집자가 자신이 보낸 대기 중인 초대를 철회합니다. 철회하면 해당 사용자에게 다시 초대를 보낼 수 있습니다.")
+    @DeleteMapping("/posts/{postId}/invitations/{invitationId}")
+    public ApiResponse<Void> cancelInvitation(
+            @PathVariable Long postId,
+            @PathVariable Long invitationId,
+            @LoginUser CustomUserDetails userDetails) {
+        matchingService.cancelInvitation(postId, invitationId, userDetails.getUserId());
+        return ApiResponse.success(null, "초대를 취소했습니다");
+    }
+
     @Operation(summary = "매칭 수락", description = "지원/초대를 수락합니다. 수락 시 GROUP 채팅방이 자동 생성됩니다. type: applications | invitations")
     @PatchMapping("/matching/{type}/{id}/accept")
     public ApiResponse<AcceptMatchingResponse> accept(

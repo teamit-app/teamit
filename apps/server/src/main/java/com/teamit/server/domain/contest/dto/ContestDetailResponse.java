@@ -1,6 +1,7 @@
 package com.teamit.server.domain.contest.dto;
 
 import com.teamit.server.domain.contest.entity.Contest;
+import com.teamit.server.domain.contest.entity.ContestCategory;
 import lombok.Builder;
 import lombok.Getter;
 
@@ -14,40 +15,34 @@ public class ContestDetailResponse {
     private Long contestId;
     private String title;
     private String organizer;
-    private String category;
-    private String endDate;
+    private ContestCategory category;
+    private String target;
+    private String recruitField;
+    private String prize;
+    private LocalDate startDate;
+    private LocalDate endDate;
+    private String linkUrl;
+    private String content;
+    private String imageUrl;
     private long dDay;
-    private boolean isNew;
-    private String targetAudience;
-    private String fields;
-    private String prizeScale;
-    private String registrationPeriod;
-    private String registrationUrl;
 
     public static ContestDetailResponse from(Contest contest) {
         LocalDate today = LocalDate.now();
         long dDay = ChronoUnit.DAYS.between(today, contest.getEndDate());
-        boolean isNew = contest.getCreatedAt() != null &&
-                ChronoUnit.DAYS.between(contest.getCreatedAt().toLocalDate(), today) <= 7;
-
-        String period = "";
-        if (contest.getStartDate() != null) {
-            period = contest.getStartDate() + " ~ " + contest.getEndDate();
-        }
-
         return ContestDetailResponse.builder()
                 .contestId(contest.getId())
                 .title(contest.getTitle())
                 .organizer(contest.getOrganizer())
-                .category(contest.getCategory().name())
-                .endDate(contest.getEndDate().toString())
+                .category(contest.getCategory())
+                .target(contest.getTarget())
+                .recruitField(contest.getRecruitField())
+                .prize(contest.getPrize())
+                .startDate(contest.getStartDate())
+                .endDate(contest.getEndDate())
+                .linkUrl(contest.getLinkUrl())
+                .content(contest.getContent())
+                .imageUrl(contest.getImageUrl())
                 .dDay(dDay)
-                .isNew(isNew)
-                .targetAudience(contest.getTarget() != null ? contest.getTarget() : "")
-                .fields(contest.getRecruitField() != null ? contest.getRecruitField() : "")
-                .prizeScale(contest.getPrize() != null ? contest.getPrize() : "")
-                .registrationPeriod(period)
-                .registrationUrl(contest.getLinkUrl() != null ? contest.getLinkUrl() : "")
                 .build();
     }
 }

@@ -7,5 +7,5 @@ import lombok.Getter;
 @Builder
 public class MatchingStatusResponse {
     private long receivedInvitationCount;
-    private long appliedTeamCount;
+    private long myPostApplicantCount;
 }

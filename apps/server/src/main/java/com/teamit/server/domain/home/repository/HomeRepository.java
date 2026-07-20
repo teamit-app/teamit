@@ -26,11 +26,14 @@ public class HomeRepository {
         }
     }
 
+    // 내 모집글에 지원한 사람 수(응답 대기 중인 지원만 집계)
     @Transactional(propagation = Propagation.REQUIRES_NEW)
-    public long countApplications(Long userId) {
+    public long countApplicantsToMyPosts(Long userId) {
         try {
             Number result = (Number) em.createNativeQuery(
-                    "SELECT COUNT(*) FROM post_applications WHERE user_id = :userId"
+                    "SELECT COUNT(*) FROM post_applications pa " +
+                    "JOIN posts p ON pa.post_id = p.id " +
+                    "WHERE p.user_id = :userId AND pa.status = 'PENDING'"
             ).setParameter("userId", userId).getSingleResult();
             return result.longValue();
         } catch (Exception e) {

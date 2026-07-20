@@ -7,12 +7,11 @@ import java.util.List;
 
 @Getter
 @NoArgsConstructor
-public class CreatePostRequest {
+public class UpdatePostRequest {
     private String title;
     private String description;
-    private Long contestId;
+    // 아래 필드들은 아직 합류한 팀원이 없는 모집글에서만 적용됨(PostService.updatePost 참고)
     private Integer recruitCount;
-    private String deadline;
     private String onlineOffline;
     private String genderCondition;
     private String schoolCondition;
