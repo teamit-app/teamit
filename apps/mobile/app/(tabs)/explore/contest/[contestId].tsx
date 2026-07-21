@@ -134,6 +134,8 @@ export default function ContestDetailScreen() {
   const [detail, setDetail] = useState<ContestDetail | null>(null);
   const [apiPosts, setApiPosts] = useState<RecruitPost[]>([]);
   const [isParticipant, setIsParticipant] = useState(false);
+  // 포스터 실제 가로세로 비율을 구해서 컨테이너에 꽉 차게(레터박스 없이) 보여준다
+  const [posterAspectRatio, setPosterAspectRatio] = useState<number | null>(null);
 
   const contests = useExploreStore((s) => s.contests);
   const toggleContestHeart = useExploreStore((s) => s.toggleContestHeart);
@@ -153,6 +155,16 @@ export default function ContestDetailScreen() {
       .then(setIsParticipant)
       .catch(() => {});
   }, [id]);
+
+  useEffect(() => {
+    const uri = resolveImageUrl(detail?.imageUrl);
+    if (!uri) { setPosterAspectRatio(null); return; }
+    Image.getSize(
+      uri,
+      (width, height) => setPosterAspectRatio(width / height),
+      () => setPosterAspectRatio(null),
+    );
+  }, [detail?.imageUrl]);
 
   // 탐색 목록 스토어의 isRegisteredAsParticipant도 참고해 초기값 설정
   const storeParticipant = contests.find((c) => c.contestId === id)?.isRegisteredAsParticipant ?? false;
@@ -205,8 +217,11 @@ export default function ContestDetailScreen() {
         {resolveImageUrl(detail?.imageUrl) ? (
           <Image
             source={{ uri: resolveImageUrl(detail?.imageUrl)! }}
-            style={styles.imagePlaceholder}
-            resizeMode="contain"
+            style={[
+              styles.imagePlaceholder,
+              posterAspectRatio ? { height: undefined, aspectRatio: posterAspectRatio } : null,
+            ]}
+            resizeMode="cover"
           />
         ) : (
           <View style={styles.imagePlaceholder}>
