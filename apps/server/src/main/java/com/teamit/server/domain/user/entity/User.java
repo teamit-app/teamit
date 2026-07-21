@@ -43,6 +43,10 @@ public class User extends BaseTimeEntity {
     @Column(name = "is_matching_active", nullable = false)
     private Boolean isMatchingActive;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "role", nullable = false, length = 20)
+    private Role role;
+
     @Builder
     public User(Long kakaoId, String nickname, String name, Gender gender, LocalDate birthDate,
                 String profileImageUrl, Boolean isMatchingActive) {
@@ -53,6 +57,7 @@ public class User extends BaseTimeEntity {
         this.birthDate = birthDate;
         this.profileImageUrl = profileImageUrl;
         this.isMatchingActive = isMatchingActive != null ? isMatchingActive : false;
+        this.role = Role.USER;
     }
 
     /** 온보딩 기본정보 저장/수정 */
