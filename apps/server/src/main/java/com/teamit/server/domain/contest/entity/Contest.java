@@ -25,8 +25,11 @@ public class Contest extends BaseTimeEntity {
     @Column(name = "organizer", nullable = false)
     private String organizer;
 
+    // varchar로 명시하지 않으면 MySQL에서 Hibernate가 네이티브 ENUM(...) 컬럼을 만들어서,
+    // 나중에 카테고리를 추가할 때마다 DB 컬럼 자체를 ALTER해야 하는 문제가 있었다(MARKETING
+    // 추가 시 재현됨). varchar로 고정해서 이후 카테고리 추가는 코드만 바꾸면 되게 한다.
     @Enumerated(EnumType.STRING)
-    @Column(name = "category", nullable = false)
+    @Column(name = "category", nullable = false, length = 20)
     private ContestCategory category;
 
     @Column(name = "target")
