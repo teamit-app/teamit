@@ -1,5 +1,7 @@
+import { Platform } from 'react-native';
 import { apiRequest } from './api';
 import { tokenStorage } from './tokenStorage';
+import { guessMimeType } from './mypageService';
 import { ContestCategory } from '../types/contest';
 
 const BASE_URL = process.env.EXPO_PUBLIC_API_URL ?? 'https://api.teamit.kr/api/v1';
@@ -92,3 +94,28 @@ export const updateContest = (contestId: number, data: ContestFormData): Promise
 
 export const deleteContest = (contestId: number): Promise<void> =>
   apiRequest<void>(`/admin/contests/${contestId}`, { method: 'DELETE' });
+
+// 갤러리에서 고른 포스터 이미지를 업로드하고 URL을 받아온다 (프로필 사진 업로드와 동일한 패턴).
+// 등록/수정 폼에서는 이 URL을 ContestFormData.imageUrl에 담아서 createContest/updateContest를 호출한다.
+export const uploadContestPosterImage = async (fileUri: string, fileName: string): Promise<string> => {
+  const formData = new FormData();
+
+  if (Platform.OS === 'web') {
+    // 웹에서는 uri가 blob: URL이라 fetch로 실제 바이트를 받아 Blob으로 붙여야 한다
+    const res = await fetch(fileUri);
+    const blob = await res.blob();
+    formData.append('file', blob, fileName);
+  } else {
+    formData.append('file', {
+      uri: fileUri,
+      name: fileName,
+      type: guessMimeType(fileName),
+    } as unknown as Blob);
+  }
+
+  const res = await apiRequest<{ imageUrl: string }>('/admin/contests/images', {
+    method: 'POST',
+    body: formData,
+  });
+  return res.imageUrl;
+};

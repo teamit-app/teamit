@@ -136,7 +136,7 @@ export const getAllContestCandidates = (
 export const getLikedPosts = (): Promise<LikedPost[]> =>
   apiRequest<LikedPost[]>('/users/liked-posts');
 
-function guessMimeType(fileName: string): string {
+export function guessMimeType(fileName: string): string {
   const ext = fileName.split('.').pop()?.toLowerCase();
   switch (ext) {
     case 'jpg':

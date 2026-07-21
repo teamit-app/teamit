@@ -8,9 +8,11 @@ import {
   ActivityIndicator,
   Modal,
   TextInput,
+  Image,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
+import * as ImagePicker from 'expo-image-picker';
 import { Colors } from '../../src/constants/colors';
 import { ScreenHeader } from '../../src/components/common/ScreenHeader';
 import { Alert } from '../../src/utils/alert';
@@ -19,10 +21,12 @@ import {
   createContest,
   updateContest,
   deleteContest,
+  uploadContestPosterImage,
   AdminContest,
   ContestFormData,
 } from '../../src/services/adminService';
 import { ContestCategory } from '../../src/types/contest';
+import { resolveImageUrl } from '../../src/utils/imageUrl';
 
 const CATEGORIES: ContestCategory[] = ['IT', 'STARTUP', 'DESIGN', 'SOCIAL', 'ENGINEERING', 'ARTS', 'MARKETING', 'ETC'];
 const CATEGORY_LABEL: Record<ContestCategory, string> = {
@@ -51,7 +55,7 @@ const EMPTY_FORM: ContestFormData = {
 };
 
 // 내부 관리용 화면 — 별도 메뉴 진입점 없이 직접 이 경로로 접속해서 사용한다.
-// (베타테스트 단계: 관리자 role 체계 없이 백엔드에서 admin.user-id 하나만 허용)
+// (관리자 권한은 백엔드에서 users.role = ADMIN 여부로 체크한다)
 export default function AdminContestsScreen() {
   const insets = useSafeAreaInsets();
   const [items, setItems] = useState<AdminContest[]>([]);
@@ -61,6 +65,7 @@ export default function AdminContestsScreen() {
   const [editingId, setEditingId] = useState<number | null>(null);
   const [form, setForm] = useState<ContestFormData>(EMPTY_FORM);
   const [submitting, setSubmitting] = useState(false);
+  const [uploadingImage, setUploadingImage] = useState(false);
 
   const load = () => {
     setIsLoading(true);
@@ -97,6 +102,31 @@ export default function AdminContestsScreen() {
   };
 
   const closeForm = () => setFormVisible(false);
+
+  const handlePickImage = async () => {
+    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!permission.granted) {
+      Alert.alert('권한 필요', '사진 라이브러리 접근 권한이 필요해요');
+      return;
+    }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      quality: 0.8,
+    });
+    if (result.canceled || !result.assets[0]) return;
+
+    const asset = result.assets[0];
+    const fileName = asset.fileName ?? `poster.${asset.mimeType?.split('/')[1] ?? 'jpg'}`;
+    setUploadingImage(true);
+    try {
+      const imageUrl = await uploadContestPosterImage(asset.uri, fileName);
+      setForm((f) => ({ ...f, imageUrl }));
+    } catch (e) {
+      Alert.alert('오류', e instanceof Error ? e.message : '이미지 업로드에 실패했어요.');
+    } finally {
+      setUploadingImage(false);
+    }
+  };
 
   const handleSubmit = async () => {
     if (!form.title.trim() || !form.organizer.trim() || !form.endDate.trim()) {
@@ -217,7 +247,24 @@ export default function AdminContestsScreen() {
               placeholder="2026-02-28"
             />
             <FormField label="접수 URL" value={form.linkUrl ?? ''} onChangeText={(v) => setForm((f) => ({ ...f, linkUrl: v }))} />
-            <FormField label="포스터 이미지 URL" value={form.imageUrl ?? ''} onChangeText={(v) => setForm((f) => ({ ...f, imageUrl: v }))} />
+
+            <Text style={s.label}>포스터 이미지</Text>
+            {form.imageUrl ? (
+              <Image source={{ uri: resolveImageUrl(form.imageUrl) ?? undefined }} style={s.posterPreview} />
+            ) : null}
+            <TouchableOpacity
+              style={s.pickImageBtn}
+              onPress={handlePickImage}
+              disabled={uploadingImage}
+              activeOpacity={0.85}
+            >
+              {uploadingImage ? (
+                <ActivityIndicator size="small" color={Colors.primary} />
+              ) : (
+                <Text style={s.pickImageBtnText}>갤러리에서 선택</Text>
+              )}
+            </TouchableOpacity>
+            <FormField label="포스터 이미지 URL (직접 입력도 가능)" value={form.imageUrl ?? ''} onChangeText={(v) => setForm((f) => ({ ...f, imageUrl: v }))} />
 
             <Text style={s.label}>상세내용</Text>
             <TextInput
@@ -330,6 +377,24 @@ const s = StyleSheet.create({
   catChipActive: { borderColor: Colors.primary, backgroundColor: Colors.ogTint },
   catChipText: { fontSize: 13, color: Colors.grayMedium },
   catChipTextActive: { color: Colors.primary, fontWeight: '700' },
+
+  posterPreview: {
+    width: '100%',
+    height: 160,
+    borderRadius: 10,
+    marginBottom: 10,
+    backgroundColor: Colors.lightGray,
+  },
+  pickImageBtn: {
+    height: 44,
+    borderRadius: 10,
+    borderWidth: 1.5,
+    borderColor: Colors.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 14,
+  },
+  pickImageBtnText: { fontSize: 14, fontWeight: '700', color: Colors.primary },
 
   contentInput: {
     borderWidth: 1,

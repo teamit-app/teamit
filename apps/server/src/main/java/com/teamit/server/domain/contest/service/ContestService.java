@@ -17,12 +17,14 @@ import com.teamit.server.domain.user.entity.MatchingProfile;
 import com.teamit.server.domain.user.entity.User;
 import com.teamit.server.domain.user.repository.MatchingProfileRepository;
 import com.teamit.server.domain.user.repository.UserRepository;
+import com.teamit.server.global.storage.FileStorageService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.time.LocalDate;
 import java.util.List;
@@ -32,12 +34,15 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class ContestService {
 
+    private static final String CONTEST_POSTER_SUB_DIR = "contest-posters";
+
     private final ContestRepository contestRepository;
     private final ContestHeartRepository contestHeartRepository;
     private final ContestParticipantRepository contestParticipantRepository;
     private final UserRepository userRepository;
     private final MatchingProfileRepository matchingProfileRepository;
     private final UserRegionRepository userRegionRepository;
+    private final FileStorageService fileStorageService;
     private final PostRepository postRepository;
     private final ChatService chatService;
 
@@ -106,6 +111,13 @@ public class ContestService {
         return contestRepository.findAllByOrderByIdDesc().stream()
                 .map(ContestDetailResponse::from)
                 .collect(Collectors.toList());
+    }
+
+    // 포스터 이미지를 올리고 URL만 반환한다. 등록/수정 폼에서 이 URL을 ContestRequest.imageUrl에
+    // 담아서 보내는 2단계 흐름(프로필 사진 업로드와 동일한 패턴, UserService.updateProfileImage 참고)
+    public String uploadPosterImage(MultipartFile file) {
+        String storedFileName = fileStorageService.store(file, CONTEST_POSTER_SUB_DIR);
+        return "/files/" + CONTEST_POSTER_SUB_DIR + "/" + storedFileName;
     }
 
     @Transactional
