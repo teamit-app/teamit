@@ -23,7 +23,7 @@ public class User extends BaseTimeEntity {
     @Column(name = "kakao_id", unique = true)
     private Long kakaoId;
 
-    @Column(name = "nickname", length = 20)
+    @Column(name = "nickname", length = 20, unique = true)
     private String nickname;
 
     // 온보딩 완료 전까지 null 허용

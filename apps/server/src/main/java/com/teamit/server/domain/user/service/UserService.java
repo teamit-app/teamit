@@ -93,7 +93,17 @@ public class UserService {
     public void updateMyProfile(Long userId, UpdateMyProfileRequest request) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new IllegalArgumentException("사용자를 찾을 수 없습니다"));
+        ensureNicknameAvailable(userId, request.getNickname());
         user.updateBasicInfo(request.getNickname(), request.getName(), request.getGender(), request.getBirthDate());
+    }
+
+    // 자기 자신의 기존 닉네임과 같으면(안 바꾸고 그대로 제출) 중복으로 취급하지 않는다.
+    private void ensureNicknameAvailable(Long userId, String nickname) {
+        userRepository.findByNickname(nickname).ifPresent(existing -> {
+            if (!existing.getId().equals(userId)) {
+                throw new IllegalStateException("이미 사용 중인 닉네임입니다");
+            }
+        });
     }
 
     // 프로필 사진은 인재풀 등 다른 사람에게도 보여야 하므로 인증 없이도 접근 가능한
@@ -175,6 +185,7 @@ public class UserService {
     public OnboardingBasicResponse saveBasicInfo(Long userId, OnboardingBasicRequest request) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new IllegalArgumentException("사용자를 찾을 수 없습니다"));
+        ensureNicknameAvailable(userId, request.getNickname());
         user.updateBasicInfo(request.getNickname(), request.getName(),
                 request.getGender(), request.getBirthDate());
         return OnboardingBasicResponse.builder()

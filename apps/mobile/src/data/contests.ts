@@ -70,7 +70,7 @@ export const dummyContests: Contest[] = [
     contestId: 6,
     title: '대학생 마케팅 아이디어 공모전',
     organizer: '한국마케팅협회',
-    category: 'ETC',
+    category: 'MARKETING',
     categoryLabel: '마케팅',
     status: 'DEADLINE_SOON',
     endDate: '2025-07-19',
