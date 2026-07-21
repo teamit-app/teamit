@@ -11,9 +11,12 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
+import java.util.Map;
 
 @Tag(name = "Admin", description = "관리자 전용 API (users.role = ADMIN인 유저만 허용)")
 @RestController
@@ -29,6 +32,16 @@ public class AdminContestController {
     public ApiResponse<List<ContestDetailResponse>> getAllContests(@LoginUser CustomUserDetails userDetails) {
         adminAuthorizer.check(userDetails.getUserId());
         return ApiResponse.success(contestService.getAllContestsForAdmin(), "공모전 목록 조회 성공");
+    }
+
+    @Operation(summary = "공모전 포스터 이미지 업로드")
+    @PostMapping(value = "/images", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ApiResponse<Map<String, String>> uploadPosterImage(
+            @LoginUser CustomUserDetails userDetails,
+            @RequestParam("file") MultipartFile file) {
+        adminAuthorizer.check(userDetails.getUserId());
+        String url = contestService.uploadPosterImage(file);
+        return ApiResponse.success(Map.of("imageUrl", url), "포스터 이미지가 업로드되었습니다");
     }
 
     @Operation(summary = "공모전 등록")
