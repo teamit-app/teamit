@@ -13,7 +13,7 @@ import { CategoryFilterModal, CategoryFilter } from '../../../src/components/exp
 import { useExploreStore } from '../../../src/store/useExploreStore';
 import { useAuthStore } from '../../../src/store/useAuthStore';
 import { getOrCreateDirectChatRoom } from '../../../src/services/messageService';
-import { requireAuthForChat } from '../../../src/utils/authGuard';
+import { requireAuthForChat, requireAuthForHeart } from '../../../src/utils/authGuard';
 
 type MainTab = 'POOL' | 'CONTEST';
 type SortFilter = 'ALL' | 'LATEST' | 'POPULAR';
@@ -96,7 +96,7 @@ export default function ExploreScreen() {
         title="탐색"
         rightElement={
           <TouchableOpacity
-            onPress={() => router.push('/(tabs)/profile/likes')}
+            onPress={() => { if (requireAuthForHeart()) router.push('/(tabs)/profile/likes'); }}
             hitSlop={8}
           >
             <Text style={styles.heartIcon}>♡</Text>
