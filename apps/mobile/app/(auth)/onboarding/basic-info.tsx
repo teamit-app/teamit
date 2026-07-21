@@ -16,6 +16,7 @@ import { DrumRollPicker } from '../../../src/components/common/DrumRollPicker';
 import { submitBasicInfo } from '../../../src/services/onboardingService';
 import { withdraw } from '../../../src/services/authService';
 import { useOnboardingStore } from '../../../src/store/useOnboardingStore';
+import { Alert } from '../../../src/utils/alert';
 
 type Gender = 'MALE' | 'FEMALE' | null;
 
@@ -74,6 +75,8 @@ export default function BasicInfoScreen() {
       });
       setUserId(userId);
       router.replace(resumeHref as never);
+    } catch (e) {
+      Alert.alert('오류', e instanceof Error ? e.message : '저장에 실패했어요. 다시 시도해주세요.');
     } finally {
       setLoading(false);
     }

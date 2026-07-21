@@ -181,8 +181,8 @@ export default function EditBasicScreen() {
       } else {
         router.back();
       }
-    } catch {
-      Alert.alert('오류', '저장에 실패했어요. 다시 시도해주세요.');
+    } catch (e) {
+      Alert.alert('오류', e instanceof Error ? e.message : '저장에 실패했어요. 다시 시도해주세요.');
     } finally {
       setLoading(false);
     }
