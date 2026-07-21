@@ -44,15 +44,18 @@ public class Contest extends BaseTimeEntity {
     @Column(name = "end_date", nullable = false)
     private LocalDate endDate;
 
-    @Column(name = "link_url")
+    // 기본 varchar(255)로는 마케팅 사이트의 트래킹 파라미터 붙은 접수 URL이 잘려서
+    // 저장 실패(Data too long)가 나는 경우가 있어 TEXT로 넉넉하게 잡는다
+    @Column(name = "link_url", columnDefinition = "TEXT")
     private String linkUrl;
 
     // 공모전 상세내용 본문(줄바꿈 포함 자유 텍스트) — 상세 화면 "상세내용" 섹션에 그대로 렌더링
     @Column(name = "content", columnDefinition = "TEXT")
     private String content;
 
-    // 공모전 포스터 이미지 — 실제 업로드 파이프라인 대신 linkUrl과 동일하게 외부 이미지 URL을 저장
-    @Column(name = "image_url")
+    // 관리자가 갤러리에서 업로드하면 짧은 내부 경로(/files/...)지만, 외부 URL을 직접 입력하는
+    // 경로도 계속 지원하므로 linkUrl과 같은 이유로 TEXT로 잡는다
+    @Column(name = "image_url", columnDefinition = "TEXT")
     private String imageUrl;
 
     @Builder
