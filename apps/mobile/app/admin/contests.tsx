@@ -250,7 +250,11 @@ export default function AdminContestsScreen() {
 
             <Text style={s.label}>포스터 이미지</Text>
             {form.imageUrl ? (
-              <Image source={{ uri: resolveImageUrl(form.imageUrl) ?? undefined }} style={s.posterPreview} />
+              <Image
+                source={{ uri: resolveImageUrl(form.imageUrl) ?? undefined }}
+                style={s.posterPreview}
+                resizeMode="contain"
+              />
             ) : null}
             <TouchableOpacity
               style={s.pickImageBtn}
@@ -380,7 +384,7 @@ const s = StyleSheet.create({
 
   posterPreview: {
     width: '100%',
-    height: 160,
+    height: 240,
     borderRadius: 10,
     marginBottom: 10,
     backgroundColor: Colors.lightGray,

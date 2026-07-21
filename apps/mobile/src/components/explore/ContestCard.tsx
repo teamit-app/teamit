@@ -1,8 +1,9 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, Image, StyleSheet } from 'react-native';
 import { Colors } from '../../constants/colors';
 import { Contest } from '../../types/contest';
 import { formatDDay } from '../../utils/dday';
+import { resolveImageUrl } from '../../utils/imageUrl';
 
 interface ContestCardProps {
   contest: Contest;
@@ -13,14 +14,19 @@ interface ContestCardProps {
 
 export function ContestCard({ contest, variant, onPress, onPressHeart }: ContestCardProps) {
   const formattedDeadline = contest.endDate.replace(/-/g, '.');
+  const thumbnailUrl = resolveImageUrl(contest.imageUrl);
 
   return (
     <TouchableOpacity style={styles.card} onPress={onPress} activeOpacity={onPress ? 0.85 : 1}>
       {variant === 'full' && (
         <View style={styles.row}>
-          <View style={styles.thumbnail}>
-            <Text style={styles.thumbnailText}>공모전{'\n'}이미지</Text>
-          </View>
+          {thumbnailUrl ? (
+            <Image source={{ uri: thumbnailUrl }} style={styles.thumbnail} resizeMode="cover" />
+          ) : (
+            <View style={styles.thumbnail}>
+              <Text style={styles.thumbnailText}>공모전{'\n'}이미지</Text>
+            </View>
+          )}
           <View style={styles.content}>
             <View style={styles.topRow}>
               <View style={styles.badgeRow}>

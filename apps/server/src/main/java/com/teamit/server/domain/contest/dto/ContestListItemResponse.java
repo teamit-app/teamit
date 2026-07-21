@@ -21,6 +21,7 @@ public class ContestListItemResponse {
     private long dDay;
     @JsonProperty("isNew")
     private boolean isNew;
+    private String imageUrl;
 
     public static ContestListItemResponse from(Contest contest) {
         LocalDate today = LocalDate.now();
@@ -35,6 +36,7 @@ public class ContestListItemResponse {
                 .endDate(contest.getEndDate())
                 .dDay(dDay)
                 .isNew(isNew)
+                .imageUrl(contest.getImageUrl())
                 .build();
     }
 }
