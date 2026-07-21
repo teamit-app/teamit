@@ -12,7 +12,7 @@ import { useNotificationStore } from '../../../src/store/useNotificationStore';
 import { Contest, ContestStatus } from '../../../src/types/contest';
 import { MatchingStatus } from '../../../src/types/matching';
 import { useAuthStore } from '../../../src/store/useAuthStore';
-import { withAuth } from '../../../src/utils/authGuard';
+import { withAuth, requireAuthForNotifications } from '../../../src/utils/authGuard';
 
 type StatusFilter = 'ALL' | ContestStatus;
 
@@ -53,7 +53,11 @@ export default function HomeScreen() {
     <View style={[styles.container, { paddingTop: insets.top }]}>
       <View style={styles.header}>
         <Text style={styles.logo}>티밋</Text>
-        <TouchableOpacity onPress={() => router.push('/home/notifications')} hitSlop={8} style={styles.bellWrap}>
+        <TouchableOpacity
+          onPress={() => { if (requireAuthForNotifications()) router.push('/home/notifications'); }}
+          hitSlop={8}
+          style={styles.bellWrap}
+        >
           <Text style={styles.bellIcon}>🔔</Text>
           {unreadCount > 0 && <View style={styles.bellBadge} />}
         </TouchableOpacity>
