@@ -24,6 +24,7 @@ export interface Contest {
   isNew: boolean;
   isHearted: boolean;
   isRegisteredAsParticipant: boolean;
+  imageUrl?: string;
 }
 
 export interface ContestDetail extends Contest {
@@ -33,9 +34,8 @@ export interface ContestDetail extends Contest {
   registrationPeriod: string;
   registrationUrl: string;
   hasRegisteredForMatching: boolean;
-  // 공모전 상세내용 본문(줄바꿈 포함) + 포스터 이미지 URL — 관리자가 등록/수정
+  // 공모전 상세내용 본문(줄바꿈 포함) — 관리자가 등록/수정. imageUrl은 Contest에서 상속
   content?: string;
-  imageUrl?: string;
 }
 
 export interface TeamMember {
