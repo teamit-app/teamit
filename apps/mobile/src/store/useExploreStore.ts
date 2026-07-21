@@ -15,6 +15,7 @@ import {
   removeTalentHeart,
 } from '../services/talentService';
 import { useAuthStore } from './useAuthStore';
+import { requireAuthForHeart } from '../utils/authGuard';
 
 interface ExploreState {
   contests: Contest[];
@@ -137,8 +138,8 @@ export const useExploreStore = create<ExploreState>((set, get) => ({
   },
 
   toggleTalentHeart: async (targetUserId: number, knownCurrentState?: boolean) => {
-    const userId = useAuthStore.getState().currentUserId;
-    if (!userId) return;
+    if (!requireAuthForHeart()) return;
+    const userId = useAuthStore.getState().currentUserId as number;
 
     const prevState = knownCurrentState
       ?? get().talents.find((t) => t.userId === targetUserId)?.isHearted
@@ -170,8 +171,8 @@ export const useExploreStore = create<ExploreState>((set, get) => ({
   },
 
   toggleContestHeart: async (contestId: number, knownCurrentState?: boolean) => {
-    const userId = useAuthStore.getState().currentUserId;
-    if (!userId) return;
+    if (!requireAuthForHeart()) return;
+    const userId = useAuthStore.getState().currentUserId as number;
 
     const prevState = knownCurrentState
       ?? get().contests.find((c) => c.contestId === contestId)?.isHearted
