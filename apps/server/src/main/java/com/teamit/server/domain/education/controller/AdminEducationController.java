@@ -20,7 +20,7 @@ import java.io.IOException;
 import java.net.URLConnection;
 import java.util.List;
 
-@Tag(name = "Admin", description = "관리자 전용 API (베타테스트 단계: 특정 user-id 하나만 허용)")
+@Tag(name = "Admin", description = "관리자 전용 API (users.role = ADMIN인 유저만 허용)")
 @RestController
 @RequestMapping("/api/v1/admin/educations")
 @RequiredArgsConstructor
