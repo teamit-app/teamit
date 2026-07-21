@@ -156,14 +156,9 @@ export default function ContestDetailScreen() {
       .catch(() => {});
   }, [id]);
 
+  // 이미지가 바뀌면(다른 공모전으로 이동 등) 이전 비율이 잠깐 남아있지 않도록 초기화
   useEffect(() => {
-    const uri = resolveImageUrl(detail?.imageUrl);
-    if (!uri) { setPosterAspectRatio(null); return; }
-    Image.getSize(
-      uri,
-      (width, height) => setPosterAspectRatio(width / height),
-      () => setPosterAspectRatio(null),
-    );
+    setPosterAspectRatio(null);
   }, [detail?.imageUrl]);
 
   // 탐색 목록 스토어의 isRegisteredAsParticipant도 참고해 초기값 설정
@@ -217,11 +212,16 @@ export default function ContestDetailScreen() {
         {resolveImageUrl(detail?.imageUrl) ? (
           <Image
             source={{ uri: resolveImageUrl(detail?.imageUrl)! }}
-            style={[
-              styles.imagePlaceholder,
-              posterAspectRatio ? { height: undefined, aspectRatio: posterAspectRatio } : null,
-            ]}
+            style={
+              posterAspectRatio
+                ? { width: '100%' as const, aspectRatio: posterAspectRatio }
+                : styles.imagePlaceholder
+            }
             resizeMode="cover"
+            onLoad={(e) => {
+              const { width, height } = e.nativeEvent.source;
+              if (width && height) setPosterAspectRatio(width / height);
+            }}
           />
         ) : (
           <View style={styles.imagePlaceholder}>
