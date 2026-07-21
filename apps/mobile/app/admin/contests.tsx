@@ -24,7 +24,7 @@ import {
 } from '../../src/services/adminService';
 import { ContestCategory } from '../../src/types/contest';
 
-const CATEGORIES: ContestCategory[] = ['IT', 'STARTUP', 'DESIGN', 'SOCIAL', 'ENGINEERING', 'ARTS', 'ETC'];
+const CATEGORIES: ContestCategory[] = ['IT', 'STARTUP', 'DESIGN', 'SOCIAL', 'ENGINEERING', 'ARTS', 'MARKETING', 'ETC'];
 const CATEGORY_LABEL: Record<ContestCategory, string> = {
   IT: 'IT·개발',
   STARTUP: '창업·아이디어',
@@ -32,6 +32,7 @@ const CATEGORY_LABEL: Record<ContestCategory, string> = {
   SOCIAL: '사회혁신',
   ENGINEERING: '공학',
   ARTS: '예술',
+  MARKETING: '마케팅',
   ETC: '기타',
 };
 

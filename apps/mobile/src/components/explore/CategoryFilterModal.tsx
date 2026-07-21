@@ -26,6 +26,7 @@ const CATEGORY_OPTIONS: CategoryOption[] = [
   { key: 'SOCIAL', label: '사회·환경', emoji: '🌱' },
   { key: 'ENGINEERING', label: '공학·기술', emoji: '⚙️' },
   { key: 'ARTS', label: '예술·문화', emoji: '🎭' },
+  { key: 'MARKETING', label: '마케팅', emoji: '📢' },
   { key: 'ETC', label: '기타', emoji: '📌' },
 ];
 

@@ -51,6 +51,7 @@ const CATEGORY_LABELS: Record<ContestCategory, string> = {
   ENGINEERING: '공학',
   ARTS: '예술',
   ETC: '기타',
+  MARKETING: '마케팅',
 };
 
 function getContestStatus(dDay: number): ContestStatus {

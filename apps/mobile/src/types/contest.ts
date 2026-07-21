@@ -5,7 +5,8 @@ export type ContestCategory =
   | 'SOCIAL'
   | 'ENGINEERING'
   | 'ARTS'
-  | 'ETC';
+  | 'ETC'
+  | 'MARKETING';
 
 export type ContestStatus = 'ONGOING' | 'DEADLINE_SOON' | 'CLOSED';
 
