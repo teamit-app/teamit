@@ -20,6 +20,7 @@ import { getPostsByContest, PostListItem } from '../../../../src/services/postSe
 import { SortOption, RecruitPost, ContestDetail } from '../../../../src/types/contest';
 import { formatDDay } from '../../../../src/utils/dday';
 import { withAuth } from '../../../../src/utils/authGuard';
+import { resolveImageUrl } from '../../../../src/utils/imageUrl';
 
 const SORT_LABEL: Record<SortOption, string> = {
   LATEST: '최신순',
@@ -201,8 +202,12 @@ export default function ContestDetailScreen() {
         </View>
 
         {/* ── 공모전 이미지 ── */}
-        {detail?.imageUrl ? (
-          <Image source={{ uri: detail.imageUrl }} style={styles.imagePlaceholder} resizeMode="cover" />
+        {resolveImageUrl(detail?.imageUrl) ? (
+          <Image
+            source={{ uri: resolveImageUrl(detail?.imageUrl)! }}
+            style={styles.imagePlaceholder}
+            resizeMode="contain"
+          />
         ) : (
           <View style={styles.imagePlaceholder}>
             <Text style={styles.imagePlaceholderText}>공모전 이미지</Text>

@@ -12,6 +12,7 @@ interface BackendContest {
   endDate: string;
   dDay: number;
   isNew: boolean;
+  imageUrl?: string;
 }
 
 interface BackendContestDetail {
