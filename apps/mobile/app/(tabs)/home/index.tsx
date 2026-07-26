@@ -13,6 +13,7 @@ import { Contest, ContestStatus } from '../../../src/types/contest';
 import { MatchingStatus } from '../../../src/types/matching';
 import { useAuthStore } from '../../../src/store/useAuthStore';
 import { withAuth, requireAuthForNotifications } from '../../../src/utils/authGuard';
+import { trackEvent } from '../../../src/services/gtm';
 
 type StatusFilter = 'ALL' | ContestStatus;
 
@@ -143,7 +144,18 @@ export default function HomeScreen() {
           <Text style={styles.sectionSubtitle}>이번 주 가장 주목받는 공모전이에요</Text>
 
           <View style={styles.filterRow}>
-            <FilterPills options={STATUS_OPTIONS} value={statusFilter} onChange={setStatusFilter} />
+            <FilterPills
+              options={STATUS_OPTIONS}
+              value={statusFilter}
+              onChange={(status) => {
+                trackEvent('tab_select', {
+                  tab_group: 'home_popular_contests',
+                  tab_name: status.toLowerCase(),
+                  from_tab: statusFilter.toLowerCase(),
+                });
+                setStatusFilter(status);
+              }}
+            />
           </View>
 
           <View style={styles.list}>

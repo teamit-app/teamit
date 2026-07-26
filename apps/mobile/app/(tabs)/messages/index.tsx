@@ -21,6 +21,7 @@ import { Invitation } from '../../../src/types/invitation';
 import { useReadStore } from '../../../src/store/useReadStore';
 import { useAuthStore } from '../../../src/store/useAuthStore';
 import { GuestPrompt } from '../../../src/components/common/GuestPrompt';
+import { trackEvent } from '../../../src/services/gtm';
 
 type Tab = 'chats' | 'invitations';
 
@@ -135,7 +136,10 @@ export default function MessagesScreen() {
       <View style={styles.tabBar}>
         <TouchableOpacity
           style={[styles.tab, activeTab === 'chats' && styles.tabActive]}
-          onPress={() => setActiveTab('chats')}
+          onPress={() => {
+            trackEvent('tab_select', { tab_group: 'messages_menu', tab_name: 'chats', from_tab: activeTab });
+            setActiveTab('chats');
+          }}
           activeOpacity={0.8}
         >
           <Text style={[styles.tabText, activeTab === 'chats' && styles.tabTextActive]}>
@@ -144,7 +148,10 @@ export default function MessagesScreen() {
         </TouchableOpacity>
         <TouchableOpacity
           style={[styles.tab, activeTab === 'invitations' && styles.tabActive]}
-          onPress={() => setActiveTab('invitations')}
+          onPress={() => {
+            trackEvent('tab_select', { tab_group: 'messages_menu', tab_name: 'invitations', from_tab: activeTab });
+            setActiveTab('invitations');
+          }}
           activeOpacity={0.8}
         >
           <Text style={[styles.tabText, activeTab === 'invitations' && styles.tabTextActive]}>
