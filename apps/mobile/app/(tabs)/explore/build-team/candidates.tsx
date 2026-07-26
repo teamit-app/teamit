@@ -12,6 +12,7 @@ import { Colors } from '../../../../src/constants/colors';
 import { Candidate } from '../../../../src/types/team';
 import { PostApplicant } from '../../../../src/types/mypage';
 import { useInvitationStore } from '../../../../src/store/useInvitationStore';
+import { useAuthStore } from '../../../../src/store/useAuthStore';
 import { sendInvitation } from '../../../../src/services/invitationService';
 import { getContestCandidates, getAllContestCandidates } from '../../../../src/services/mypageService';
 
@@ -28,7 +29,7 @@ function adaptCandidate(a: PostApplicant): Candidate {
     introContent: a.appealContent,
     skills: a.skills,
     averageRating: a.averageRating,
-    matchScore: 0,
+    matchScore: a.matchScore ?? null,
     intensity: a.intensityLabel,
     meetingType: a.meetingTypeLabel,
     teamVibe: '',
@@ -92,11 +93,13 @@ function CandidateCard({
   selected,
   onSelect,
   onDetail,
+  showMatchScore,
 }: {
   candidate: Candidate;
   selected: boolean;
   onSelect: () => void;
   onDetail: () => void;
+  showMatchScore?: boolean;
 }) {
   return (
     <TouchableOpacity
@@ -123,6 +126,13 @@ function CandidateCard({
           <View style={styles.nameRow}>
             <Text style={styles.nameText}>{candidate.name}</Text>
             <Text style={styles.genderText}> {candidate.gender}</Text>
+            {/* 조건 일치도 — "매칭된 후보"에서만, 값이 있을 때만 표시. 별점 배지 옆(이름 줄)에 붙여서
+                별도 줄을 차지하지 않게 한다 */}
+            {showMatchScore && candidate.matchScore != null && (
+              <View style={styles.matchScoreBadge}>
+                <Text style={styles.matchScoreBadgeText}>🎯 {candidate.matchScore}%</Text>
+              </View>
+            )}
           </View>
           <View style={styles.schoolRow}>
             <Text style={styles.schoolText}>{candidate.school}</Text>
@@ -180,25 +190,31 @@ export default function CandidatesScreen() {
   const [allPage, setAllPage] = useState(0);
   const [allTotalPages, setAllTotalPages] = useState(0);
   const { addInvitationMessages } = useInvitationStore();
+  const currentUserId = useAuthStore((s) => s.currentUserId);
+
+  // 서버가 모집글 작성자를 후보에서 제외하지만, 만약을 대비해 클라이언트에서도
+  // 로그인한 본인은 후보 목록에 절대 나오지 않도록 한 번 더 필터링한다.
+  const excludeSelf = (list: Candidate[]) =>
+    currentUserId == null ? list : list.filter((c) => c.id !== currentUserId);
 
   useEffect(() => {
     if (IS_MOCK) {
       import('../../../../src/data/candidates').then(({ dummyCandidates }) => {
-        setCandidates(dummyCandidates);
+        setCandidates(excludeSelf(dummyCandidates));
         setLoading(false);
-        setAllCandidates(dummyCandidates);
+        setAllCandidates(excludeSelf(dummyCandidates));
         setAllLoading(false);
       });
     } else {
       const pid = Number(postId);
       if (pid) {
         getContestCandidates(pid)
-          .then((applicants) => setCandidates(applicants.map(adaptCandidate)))
+          .then((applicants) => setCandidates(excludeSelf(applicants.map(adaptCandidate))))
           .catch(console.error)
           .finally(() => setLoading(false));
         getAllContestCandidates(pid, 0)
           .then((res) => {
-            setAllCandidates(res.content.map(adaptCandidate));
+            setAllCandidates(excludeSelf(res.content.map(adaptCandidate)));
             setAllPage(res.currentPage);
             setAllTotalPages(res.totalPages);
           })
@@ -209,7 +225,7 @@ export default function CandidatesScreen() {
         setAllLoading(false);
       }
     }
-  }, [postId]);
+  }, [postId, currentUserId]);
 
   const loadMoreAllCandidates = () => {
     const pid = Number(postId);
@@ -217,7 +233,7 @@ export default function CandidatesScreen() {
     setAllLoadingMore(true);
     getAllContestCandidates(pid, allPage + 1)
       .then((res) => {
-        setAllCandidates((prev) => [...prev, ...res.content.map(adaptCandidate)]);
+        setAllCandidates((prev) => [...prev, ...excludeSelf(res.content.map(adaptCandidate))]);
         setAllPage(res.currentPage);
         setAllTotalPages(res.totalPages);
       })
@@ -289,21 +305,16 @@ export default function CandidatesScreen() {
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
 
-      {/* ─ 상단 배너 ─ */}
-      <View style={styles.banner}>
-        <View style={styles.bannerIconWrap}>
-          <Text style={styles.bannerIconText}>✓</Text>
-        </View>
-        <Text style={styles.bannerTitle}>
-          팀원 모집글과 팀 채팅방이{'\n'}생성되었어요!
-        </Text>
-        <Text style={styles.bannerSubtitle}>
-          만들어진 팀 채팅방에 팀원을 초대할 수 있어요
-        </Text>
-      </View>
-
       {/* ─ 후보 목록 ─ */}
       <ScrollView contentContainerStyle={styles.listContent} showsVerticalScrollIndicator={false}>
+        {/* ─ 상단 배너 — 스크롤에 같이 딸려가도록 목록 안에 둔다 ─ */}
+        <View style={styles.banner}>
+          <Text style={styles.bannerTitle}>팀원 모집글과 팀 채팅방이 생성되었어요!</Text>
+          <Text style={styles.bannerSubtitle}>
+            만들어진 팀 채팅방에 팀원을 초대할 수 있어요
+          </Text>
+        </View>
+
         <View style={styles.sectionTitleRow}>
           <Text style={styles.sectionTitle}>매칭된 팀원 후보</Text>
           <Text style={styles.sectionHint}>카드를 클릭하면 상세정보를 확인할 수 있습니다</Text>
@@ -331,6 +342,7 @@ export default function CandidatesScreen() {
               onDetail={() =>
                 router.push(`/explore/build-team/candidate/${c.id}?contestId=${contestId}` as never)
               }
+              showMatchScore
             />
           ))
         )}
@@ -399,33 +411,22 @@ export default function CandidatesScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.pageBg },
 
-  /* 배너 */
+  /* 배너 — 더 이상 화면 상단에 고정되지 않고 목록과 같이 스크롤된다 */
   banner: {
     backgroundColor: Colors.ogTint,
+    borderRadius: 12,
     alignItems: 'center',
-    paddingTop: 32,
-    paddingBottom: 28,
-    paddingHorizontal: 24,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
   },
-  bannerIconWrap: {
-    width: 64,
-    height: 64,
-    borderRadius: 16,
-    backgroundColor: '#34C759',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 16,
-  },
-  bannerIconText: { fontSize: 34, color: '#fff', fontWeight: '900' },
   bannerTitle: {
-    fontSize: 18,
+    fontSize: 14,
     fontWeight: '700',
     color: Colors.dark,
     textAlign: 'center',
-    lineHeight: 26,
-    marginBottom: 8,
+    marginBottom: 2,
   },
-  bannerSubtitle: { fontSize: 13, color: Colors.gray, textAlign: 'center' },
+  bannerSubtitle: { fontSize: 12, color: Colors.gray, textAlign: 'center' },
 
   /* 리스트 */
   listContent: { padding: 16, gap: 10 },
@@ -487,6 +488,19 @@ const styles = StyleSheet.create({
   },
   cardSelected: { borderColor: Colors.primary, borderWidth: 2 },
 
+  /* 조건 일치도 배지 */
+  matchScoreBadge: {
+    backgroundColor: Colors.ogTint,
+    borderRadius: 999,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+  },
+  matchScoreBadgeText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: Colors.primary,
+  },
+
   /* Row 1 - 프로필 */
   profileRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
 
@@ -523,7 +537,7 @@ const styles = StyleSheet.create({
   tempText: { fontSize: 11, fontWeight: '700', color: '#947340' },
 
   profileInfo: { flex: 1, gap: 3 },
-  nameRow: { flexDirection: 'row', alignItems: 'baseline', flexWrap: 'wrap' },
+  nameRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 6 },
   nameText: { fontSize: 16, fontWeight: '700', color: Colors.dark },
   genderText: { fontSize: 12, fontWeight: '400', color: Colors.grayMedium },
 

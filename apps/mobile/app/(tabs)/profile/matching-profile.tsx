@@ -34,9 +34,11 @@ const TOTAL_STEPS = 7;
 const SKILL_CATEGORIES: Record<string, string[]> = {
   전체: [],
   디자인: ['Figma', 'Photoshop', 'Illustrator', 'XD', 'Sketch', 'Canva', 'After Effects', 'Zeplin'],
-  개발: ['React', 'React Native', 'Vue', 'Next.js', 'Flutter', 'iOS', 'Android', 'Spring', 'Node.js', 'Python', 'Django', 'Java', 'TypeScript', 'Kotlin', 'Swift'],
+  // 세부 기술 스택을 잘 모르는 사람도 고를 수 있도록 상위 개념의 범용 항목을 함께 제공한다
+  개발: ['개발', '프론트엔드 개발', '백엔드 개발', 'AI', 'React', 'React Native', 'Vue', 'Next.js', 'Flutter', 'iOS', 'Android', 'Spring', 'Node.js', 'Python', 'Django', 'Java', 'TypeScript', 'Kotlin', 'Swift'],
   데이터: ['SQL', 'Python', 'R', 'Tableau', 'Power BI', 'Excel', '데이터 분석', 'Pandas', 'TensorFlow'],
   기획: ['기획', 'PM', 'UX Research', 'Notion', 'Jira', 'GA/GTM', 'PPT', 'Slack'],
+  마케팅: ['마케팅', '퍼포먼스 마케팅', '콘텐츠 마케팅', 'SNS 운영', '브랜드 마케팅', 'GA4', '메타 광고관리자', '카피라이팅'],
 };
 
 const ALL_SKILLS: string[] = Array.from(
@@ -632,10 +634,6 @@ export default function MatchingProfileScreen() {
     }
   };
 
-  const handleSkip = () => {
-    navigateAfterAction();
-  };
-
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
       <ScreenHeader title="매칭 프로필" onBack={goPrev} />
@@ -982,7 +980,7 @@ export default function MatchingProfileScreen() {
             <View style={styles.guideSection}>
               <Text style={styles.guideSectionTitle}>작성 가이드</Text>
               {[
-                { emoji: '💪', title: '관심 분야', desc: '어떤 분야에 관심이 있는지 말려주세요!' },
+                { emoji: '💪', title: '관심 분야', desc: '어떤 분야에 관심이 있는지 알려주세요!' },
                 { emoji: '✅', title: '희망 직무', desc: '어떤 직무를 희망하고 있는지 적어주세요!' },
                 { emoji: '🔥', title: '소프트 스킬', desc: '발표 역량, 일정 관리 능력 등 업무 수행 시 본인의 강점을 작성해 주세요!' },
               ].map((item) => (
@@ -1035,14 +1033,12 @@ export default function MatchingProfileScreen() {
                 </View>
               )}
               {step === totalSteps && (
+                // 마지막 단계엔 "건너뛰기"를 두지 않는다 — 저장(setDraftCard/updateMatchingProfile)
+                // 없이 건너뛰면 returnTo 화면(참여하기/팀 꾸리기)이 "참여카드 없음"으로 판단해
+                // 이 질문지 1단계로 다시 돌려보내는 무한 루프가 생겼었다. "완료"만 동작하게 한다.
                 <View style={styles.footerRow}>
-                  <TouchableOpacity
-                    style={styles.prevBtn}
-                    onPress={totalSteps === TOTAL_STEPS ? handleSkip : goPrev}
-                  >
-                    <Text style={styles.prevBtnText}>
-                      {totalSteps === TOTAL_STEPS ? '건너뛰기' : '이전'}
-                    </Text>
+                  <TouchableOpacity style={styles.prevBtn} onPress={goPrev}>
+                    <Text style={styles.prevBtnText}>이전</Text>
                   </TouchableOpacity>
                   <TouchableOpacity
                     style={[styles.nextBtn, saving && styles.btnDisabled]}

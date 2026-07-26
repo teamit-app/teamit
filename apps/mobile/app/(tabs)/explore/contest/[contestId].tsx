@@ -279,16 +279,27 @@ export default function ContestDetailScreen() {
           {!currentUserId && (
             <View style={styles.loginNoticeBanner}>
               <Text style={styles.loginNoticeText}>🔒 로그인이 필요한 기능이에요</Text>
+              <TouchableOpacity
+                style={styles.loginNoticeBtn}
+                activeOpacity={0.8}
+                onPress={() => withAuth(`/explore/contest/${id}`)}
+              >
+                <Text style={styles.loginNoticeBtnText}>로그인하기</Text>
+              </TouchableOpacity>
             </View>
           )}
 
           {/* 팀 직접 꾸리기 */}
           <TouchableOpacity
-            style={[styles.participateCard, !!myPost && styles.participateCardDone]}
-            activeOpacity={myPost ? 1 : 0.85}
-            onPress={myPost ? undefined : () => withAuth(`/explore/build-team/${id}`)}
+            style={[
+              styles.participateCard,
+              (!!myPost || !currentUserId) && styles.participateCardDone,
+            ]}
+            activeOpacity={myPost || !currentUserId ? 1 : 0.85}
+            disabled={!currentUserId}
+            onPress={myPost || !currentUserId ? undefined : () => withAuth(`/explore/build-team/${id}`)}
           >
-            <View style={[styles.participateAccentBar, !!myPost && styles.participateAccentBarDone]} />
+            <View style={[styles.participateAccentBar, (!!myPost || !currentUserId) && styles.participateAccentBarDone]} />
             <View style={styles.participateCardContent}>
               <Text style={styles.participateEmoji}>{myPost ? '✅' : '🚀'}</Text>
               <View style={styles.participateTextWrap}>
@@ -313,11 +324,19 @@ export default function ContestDetailScreen() {
 
           {/* 팀 매칭 제안 받기 */}
           <TouchableOpacity
-            style={[styles.participateCard, participated && styles.participateCardDone]}
-            activeOpacity={participated ? 1 : 0.85}
-            onPress={participated ? undefined : () => withAuth(`/explore/participate?contestId=${id}`)}
+            style={[
+              styles.participateCard,
+              (participated || !currentUserId) && styles.participateCardDone,
+            ]}
+            activeOpacity={participated || !currentUserId ? 1 : 0.85}
+            disabled={!currentUserId}
+            onPress={
+              participated || !currentUserId
+                ? undefined
+                : () => withAuth(`/explore/participate?contestId=${id}`)
+            }
           >
-            <View style={[styles.participateAccentBar, participated && styles.participateAccentBarDone]} />
+            <View style={[styles.participateAccentBar, (participated || !currentUserId) && styles.participateAccentBarDone]} />
             <View style={styles.participateCardContent}>
               <Text style={styles.participateEmoji}>{participated ? '✅' : '💌'}</Text>
               <View style={styles.participateTextWrap}>
@@ -564,16 +583,31 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   loginNoticeBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     backgroundColor: Colors.ogTint,
     borderRadius: 12,
     paddingVertical: 12,
     paddingHorizontal: 14,
     marginBottom: 14,
+    gap: 8,
   },
   loginNoticeText: {
     fontSize: 13,
     fontWeight: '600',
     color: Colors.primary,
+  },
+  loginNoticeBtn: {
+    backgroundColor: Colors.primary,
+    borderRadius: 999,
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+  },
+  loginNoticeBtnText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#fff',
   },
   participateCard: {
     flexDirection: 'row',

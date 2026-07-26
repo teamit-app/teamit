@@ -18,7 +18,7 @@ import { useMypageStore } from '../../../src/store/useMypageStore';
 import { useAuthStore } from '../../../src/store/useAuthStore';
 import { useExploreStore } from '../../../src/store/useExploreStore';
 import { logout as logoutApi, withdraw as withdrawApi } from '../../../src/services/authService';
-import { uploadProfileImage } from '../../../src/services/mypageService';
+import { uploadProfileImage, deleteProfileImage } from '../../../src/services/mypageService';
 import { formatRegionsLabel } from '../../../src/utils/region';
 import { resolveImageUrl } from '../../../src/utils/imageUrl';
 import { EDUCATION_STATUS_LABEL } from '../../../src/constants/education';
@@ -73,7 +73,7 @@ export default function ProfileScreen() {
     if (MY_USER_ID) loadProfile();
   }, [MY_USER_ID]);
 
-  const handleChangePhoto = async () => {
+  const pickAndUploadPhoto = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (status !== 'granted') {
       Alert.alert('권한 필요', '사진 라이브러리 접근 권한이 필요해요');
@@ -98,6 +98,39 @@ export default function ProfileScreen() {
     } finally {
       setUploadingPhoto(false);
     }
+  };
+
+  const handleRemovePhoto = () => {
+    Alert.alert('사진 삭제', '프로필 사진을 삭제하시겠어요?', [
+      { text: '취소', style: 'cancel' },
+      {
+        text: '삭제',
+        style: 'destructive',
+        onPress: async () => {
+          setUploadingPhoto(true);
+          try {
+            await deleteProfileImage();
+            await reloadProfile();
+          } catch {
+            Alert.alert('오류', '프로필 사진 삭제에 실패했어요. 다시 시도해주세요.');
+          } finally {
+            setUploadingPhoto(false);
+          }
+        },
+      },
+    ]);
+  };
+
+  const handleChangePhoto = () => {
+    if (!profile?.profileImageUrl) {
+      pickAndUploadPhoto();
+      return;
+    }
+    Alert.alert('프로필 사진', undefined, [
+      { text: '취소', style: 'cancel' },
+      { text: '사진 변경', onPress: pickAndUploadPhoto },
+      { text: '사진 삭제', style: 'destructive', onPress: handleRemovePhoto },
+    ]);
   };
 
   const reviewStats = buildReviewStats(receivedReviews);

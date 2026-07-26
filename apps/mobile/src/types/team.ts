@@ -29,7 +29,8 @@ export interface Candidate {
   introContent: string;
   skills: string[];
   averageRating: number;
-  matchScore: number;
+  // "매칭된 후보"에서만 값이 있다 — "전체 후보"는 null(조건 일치도 배지 미표시)
+  matchScore: number | null;
   intensity: string;
   meetingType: string;
   teamVibe: string;

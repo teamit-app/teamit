@@ -19,6 +19,7 @@ import { useExploreStore } from '../../../../src/store/useExploreStore';
 import { TalentDetail, TalentRecruitPost } from '../../../../src/types/talent';
 import { ReviewStatsCard } from '../../../../src/components/profile/ReviewStatsCard';
 import { requireAuthForChat } from '../../../../src/utils/authGuard';
+import { Alert } from '../../../../src/utils/alert';
 import { resolveImageUrl } from '../../../../src/utils/imageUrl';
 
 const IS_MOCK = process.env.EXPO_PUBLIC_API_MODE === 'mock';
@@ -107,6 +108,8 @@ export default function TalentDetailScreen() {
   const { userId } = useLocalSearchParams<{ userId: string }>();
   const [hearted, setHearted] = useState(false);
   const [detail, setDetail] = useState<TalentDetail | null>(null);
+  const [loadError, setLoadError] = useState(false);
+  const [reloadKey, setReloadKey] = useState(0);
   const currentUserId = useAuthStore((s) => s.currentUserId);
   const toggleTalentHeartInStore = useExploreStore((s) => s.toggleTalentHeart);
   const isMe = detail?.userId === currentUserId;
@@ -114,6 +117,7 @@ export default function TalentDetailScreen() {
   const sourceTab = (segments[1] as string) ?? 'explore';
 
   useEffect(() => {
+    setLoadError(false);
     if (IS_MOCK) {
       // mock 모드: 로컬 더미 데이터 사용
       import('../../../../src/data/talents').then(({ dummyTalentDetails }) => {
@@ -123,15 +127,19 @@ export default function TalentDetailScreen() {
         setHearted(found.isHearted);
       });
     } else {
-      // 서버 모드: API 호출
+      // 서버 모드: API 호출. 실패 시 이전엔 console.error만 하고 넘어가서 화면이 로딩
+      // 스피너에 계속 멈춰있는 것처럼 보였다 — 에러 상태를 보여주고 재시도할 수 있게 한다.
       getUserDetail(Number(userId))
         .then((d) => {
           setDetail(d);
           setHearted(d.isHearted);
         })
-        .catch(console.error);
+        .catch((e) => {
+          console.error('[TalentDetail] 프로필 조회 실패:', e);
+          setLoadError(true);
+        });
     }
-  }, [userId]);
+  }, [userId, reloadKey]);
 
   // useExploreStore를 통해 토글해야 탐색 > 인재풀 목록의 하트 상태도 함께 갱신된다
   // (그 store가 인재 좋아요의 단일 진실 공급원 역할을 함)
@@ -155,10 +163,28 @@ export default function TalentDetailScreen() {
       // messages 탭은 채팅방이 자기 자신의 [chatId] 화면이라 /chat 접두사가 없다
       const chatPath = sourceTab === 'messages' ? `/messages/${chatRoomId}` : `/${sourceTab}/chat/${chatRoomId}`;
       router.push(chatPath as never);
-    } catch {
-      // 채팅방 생성 실패 시 무시
+    } catch (e) {
+      // 이전엔 실패 시 아무 반응도 없이 조용히 무시해서, 버튼을 눌러도 채팅창으로
+      // 안 들어가지는 것처럼 보이는 버그였다 — 실패를 사용자에게 알리고 다시 시도하게 한다.
+      console.error('[TalentDetail] 채팅방 생성 실패:', e);
+      Alert.alert('채팅을 시작하지 못했어요', '잠시 후 다시 시도해주세요.');
     }
   };
+
+  if (loadError) {
+    return (
+      <View style={[s.container, { paddingTop: insets.top, alignItems: 'center', justifyContent: 'center', gap: 12 }]}>
+        <Text style={{ fontSize: 14, color: Colors.grayMedium }}>프로필을 불러오지 못했어요.</Text>
+        <TouchableOpacity
+          style={s.chatPill}
+          onPress={() => setReloadKey((k) => k + 1)}
+          activeOpacity={0.85}
+        >
+          <Text style={s.chatPillText}>다시 시도</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
 
   if (!detail) {
     return (
