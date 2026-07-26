@@ -49,10 +49,13 @@ export default function CandidateDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const [hearted, setHearted] = useState(false);
   const [detail, setDetail] = useState<TalentDetail | null>(null);
+  const [loadError, setLoadError] = useState(false);
+  const [reloadKey, setReloadKey] = useState(0);
   const currentUserId = useAuthStore((s) => s.currentUserId);
   const toggleTalentHeartInStore = useExploreStore((s) => s.toggleTalentHeart);
 
   useEffect(() => {
+    setLoadError(false);
     if (IS_MOCK) {
       // mock 모드: 인재풀 상세정보와 동일한 더미 데이터 사용
       import('../../../../../src/data/talents').then(({ dummyTalentDetails }) => {
@@ -61,15 +64,20 @@ export default function CandidateDetailScreen() {
         setHearted(found.isHearted);
       });
     } else {
-      // 서버 모드: 후보자 목록에서 넘어온 id는 실제 userId — 인재풀 상세정보와 동일한 API 사용
+      // 서버 모드: 후보자 목록에서 넘어온 id는 실제 userId — 인재풀 상세정보와 동일한 API 사용.
+      // 실패 시 이전엔 console.error만 하고 넘어가서 화면이 로딩 스피너에 계속 멈춰있는
+      // 것처럼 보였다 — 에러 상태를 보여주고 재시도할 수 있게 한다.
       getUserDetail(Number(id))
         .then((d) => {
           setDetail(d);
           setHearted(d.isHearted);
         })
-        .catch(console.error);
+        .catch((e) => {
+          console.error('[CandidateDetail] 프로필 조회 실패:', e);
+          setLoadError(true);
+        });
     }
-  }, [id]);
+  }, [id, reloadKey]);
 
   // 인재풀 하트와 동일한 대상 — 여기서 좋아요를 눌러도 탐색 > 인재풀 상세정보에 그대로 반영된다
   const handleToggleHeart = async () => {
@@ -83,6 +91,21 @@ export default function CandidateDetailScreen() {
       setHearted(prev);
     }
   };
+
+  if (loadError) {
+    return (
+      <View style={[s.container, { paddingTop: insets.top, alignItems: 'center', justifyContent: 'center', gap: 12 }]}>
+        <Text style={{ fontSize: 14, color: Colors.grayMedium }}>프로필을 불러오지 못했어요.</Text>
+        <TouchableOpacity
+          style={{ backgroundColor: Colors.primary, borderRadius: 999, paddingHorizontal: 16, paddingVertical: 10 }}
+          onPress={() => setReloadKey((k) => k + 1)}
+          activeOpacity={0.85}
+        >
+          <Text style={{ fontSize: 13, fontWeight: '700', color: Colors.white }}>다시 시도</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
 
   if (!detail) {
     return (

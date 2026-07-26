@@ -14,6 +14,7 @@ import { EDUCATION_STATUS_LABEL } from '../../../../src/constants/education';
 import { getPostDetail } from '../../../../src/services/postService';
 import { getOrCreateDirectChatRoom } from '../../../../src/services/messageService';
 import { getUserDetail } from '../../../../src/services/talentService';
+import { Alert } from '../../../../src/utils/alert';
 import { useAuthStore } from '../../../../src/store/useAuthStore';
 import { useExploreStore } from '../../../../src/store/useExploreStore';
 import { TalentDetail, TalentRecruitPost } from '../../../../src/types/talent';
@@ -115,6 +116,8 @@ export default function RecruiterProfileScreen() {
   const { postId } = useLocalSearchParams<{ postId: string }>();
   const [hearted, setHearted] = useState(false);
   const [detail, setDetail] = useState<TalentDetail | null>(null);
+  const [loadError, setLoadError] = useState(false);
+  const [reloadKey, setReloadKey] = useState(0);
   const currentUserId = useAuthStore((s) => s.currentUserId);
   const toggleTalentHeartInStore = useExploreStore((s) => s.toggleTalentHeart);
   const isMe = detail?.userId === currentUserId;
@@ -123,6 +126,7 @@ export default function RecruiterProfileScreen() {
 
   useEffect(() => {
     const id = Number(postId);
+    setLoadError(false);
     if (IS_MOCK) {
       // mock 모드: 인재풀 상세정보와 동일한 더미 데이터 사용
       import('../../../../src/data/talents').then(({ dummyTalentDetails }) => {
@@ -133,16 +137,25 @@ export default function RecruiterProfileScreen() {
     }
     // 서버 모드: 모집글에서 작성자 userId를 가져온 뒤,
     // 인재풀 상세정보와 동일한 API(getUserDetail)로 프로필을 조회한다.
+    // 이전엔 실패 시 console.error만 하고 넘어가서, 조회가 실패한 한 사람만 화면이
+    // 로딩 스피너에 계속 멈춰있는 것처럼 보였다(=모집자 프로필이 안 보이는 버그).
+    // 이제는 명시적으로 에러 상태를 보여주고 재시도할 수 있게 한다.
     getPostDetail(id)
       .then((post) => {
-        if (post.ownerUserId == null) return;
+        if (post.ownerUserId == null) {
+          setLoadError(true);
+          return;
+        }
         return getUserDetail(post.ownerUserId).then((d) => {
           setDetail(d);
           setHearted(d.isHearted);
         });
       })
-      .catch(console.error);
-  }, [postId]);
+      .catch((e) => {
+        console.error('[RecruiterProfile] 모집자 프로필 조회 실패:', e);
+        setLoadError(true);
+      });
+  }, [postId, reloadKey]);
 
   const handleToggleHeart = async () => {
     if (!detail) return;
@@ -165,10 +178,28 @@ export default function RecruiterProfileScreen() {
       const chatRoomId = await getOrCreateDirectChatRoom(detail.userId);
       const chatPath = sourceTab === 'messages' ? `/messages/${chatRoomId}` : `/${sourceTab}/chat/${chatRoomId}`;
       router.push(chatPath as never);
-    } catch {
-      // 채팅방 생성 실패 시 무시
+    } catch (e) {
+      // 이전엔 실패 시 아무 반응도 없이 조용히 무시해서, 버튼을 눌러도 채팅창으로
+      // 안 들어가지는 것처럼 보이는 버그였다 — 실패를 사용자에게 알리고 다시 시도하게 한다.
+      console.error('[RecruiterProfile] 채팅방 생성 실패:', e);
+      Alert.alert('채팅을 시작하지 못했어요', '잠시 후 다시 시도해주세요.');
     }
   };
+
+  if (loadError) {
+    return (
+      <View style={[s.container, { paddingTop: insets.top, alignItems: 'center', justifyContent: 'center', gap: 12 }]}>
+        <Text style={{ fontSize: 14, color: Colors.grayMedium }}>프로필을 불러오지 못했어요.</Text>
+        <TouchableOpacity
+          style={s.chatPill}
+          onPress={() => setReloadKey((k) => k + 1)}
+          activeOpacity={0.85}
+        >
+          <Text style={s.chatPillText}>다시 시도</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
 
   if (!detail) {
     return (

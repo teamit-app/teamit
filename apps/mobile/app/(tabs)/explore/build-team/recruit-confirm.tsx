@@ -124,9 +124,20 @@ export default function RecruitConfirmScreen() {
       // 프로필을 읽어서 스냅샷을 만드는데, 이 화면에서 "수정"으로 고친 내용은
       // draftCard에만 있고 라이브 프로필엔 없으므로, draft가 있으면 곧바로 그 값으로
       // 스냅샷을 덮어써준다(라이브 프로필 자체는 여전히 안 건드림).
+      // 이 호출이 조용히 실패하면 모집자 프로필(라이브 프로필 기준, 비어있을 수 있음)이
+      // 그대로 남아 "모집자 프로필이 안 보이는" 버그로 이어지므로, 한 번 재시도하고
+      // 그래도 실패하면 최소한 로그는 남긴다.
       const draftCard = useMypageStore.getState().draftCard;
       if (draftCard) {
-        await registerAsParticipant(id, draftCard).catch(() => {});
+        try {
+          await registerAsParticipant(id, draftCard);
+        } catch {
+          try {
+            await registerAsParticipant(id, draftCard);
+          } catch (e2) {
+            console.error('[RecruitConfirm] 모집자 참여 카드 스냅샷 덮어쓰기 실패:', e2);
+          }
+        }
         useMypageStore.getState().clearDraftCard();
       }
       markContestParticipant(id); // 스토어 낙관적 업데이트

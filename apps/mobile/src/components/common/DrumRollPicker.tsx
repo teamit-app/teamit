@@ -1,4 +1,4 @@
-import React, { useRef, useState, useLayoutEffect } from 'react';
+import React, { useEffect, useMemo, useRef, useState, useLayoutEffect } from 'react';
 import {
   View,
   Text,
@@ -26,6 +26,7 @@ interface DrumColumnProps {
 function DrumColumn({ items, initialIndex, onChange }: DrumColumnProps) {
   const ref = useRef<ScrollView>(null);
   const [selected, setSelected] = useState(initialIndex);
+  const webSnapTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useLayoutEffect(() => {
     const t = setTimeout(() => {
@@ -34,12 +35,57 @@ function DrumColumn({ items, initialIndex, onChange }: DrumColumnProps) {
     return () => clearTimeout(t);
   }, []);
 
-  const handleScrollEnd = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
-    const idx = Math.round(e.nativeEvent.contentOffset.y / ITEM_HEIGHT);
+  useEffect(() => () => {
+    if (webSnapTimer.current) clearTimeout(webSnapTimer.current);
+  }, []);
+
+  // snapToInterval만으로는 스크롤이 정확한 아이템 경계에 멈추지 않고 애매하게 걸치는
+  // 경우가 있어(사용자 리포트), 네이티브 관성 스크롤이 완전히 멈춘 뒤 가장 가까운
+  // 아이템 위치로 한 번 더 보정한다. 주의: 드래그를 놓는 시점(onScrollEndDrag)에는
+  // 절대 스냅을 걸면 안 된다 — 그 시점엔 아직 관성(플릭) 스크롤이 이어지는 중일 수
+  // 있는데, 여기서 scrollTo를 부르면 그 관성을 끊어버려서 사용자가 원하는 위치까지
+  // 스크롤이 도달하기 전에 멈춰버리는 문제가 생긴다(이전 버그).
+  const snapTo = (idx: number, animated: boolean) => {
     const clamped = Math.max(0, Math.min(idx, items.length - 1));
     setSelected(clamped);
     onChange(clamped);
+    ref.current?.scrollTo({ y: clamped * ITEM_HEIGHT, animated });
   };
+
+  const handleMomentumScrollEnd = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
+    const idx = Math.round(e.nativeEvent.contentOffset.y / ITEM_HEIGHT);
+    snapTo(idx, true);
+  };
+
+  // 웹(react-native-web)은 관성 스크롤 개념이 없어 onMomentumScrollEnd/onScrollEndDrag가
+  // 아예 호출되지 않고 onScroll만 스크롤 도중 계속 호출된다. 그래서 "스크롤이 멈췄다"를
+  // 직접 감지해야 한다: onScroll이 올 때마다 타이머를 리셋하고, 일정 시간(120ms) 동안
+  // 더 이상 onScroll이 안 오면 그때 비로소 가장 가까운 아이템으로 스냅한다.
+  const handleWebScroll = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
+    const offsetY = e.nativeEvent.contentOffset.y;
+    const idx = Math.round(offsetY / ITEM_HEIGHT);
+    const clamped = Math.max(0, Math.min(idx, items.length - 1));
+    setSelected(clamped);
+    onChange(clamped);
+
+    if (webSnapTimer.current) clearTimeout(webSnapTimer.current);
+    webSnapTimer.current = setTimeout(() => {
+      ref.current?.scrollTo({ y: clamped * ITEM_HEIGHT, animated: true });
+    }, 120);
+  };
+
+  // 일(day) 컬럼처럼 월이 바뀌면 항목 수가 줄어들 수 있는 경우 — 예: 3월 31일을 선택한
+  // 상태에서 4월로 바꾸면 31일이 없으므로, 그 달의 마지막 날로 자동으로 당겨준다.
+  // (그대로 두면 "2024-04-31" 같은 존재하지 않는 날짜가 서버로 전송되어 등록이 실패한다)
+  useEffect(() => {
+    if (selected > items.length - 1) {
+      const clamped = items.length - 1;
+      setSelected(clamped);
+      onChange(clamped);
+      ref.current?.scrollTo({ y: clamped * ITEM_HEIGHT, animated: true });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [items.length]);
 
   return (
     <View style={styles.columnWrap}>
@@ -50,10 +96,8 @@ function DrumColumn({ items, initialIndex, onChange }: DrumColumnProps) {
         showsVerticalScrollIndicator={false}
         snapToInterval={ITEM_HEIGHT}
         decelerationRate={Platform.OS === 'ios' ? 'fast' : 0.98}
-        onMomentumScrollEnd={handleScrollEnd}
-        // react-native-web은 터치 모멘텀 개념이 없어 onMomentumScrollEnd를 호출하지 않고
-        // 스크롤이 멈췄을 때도 onScroll만 재호출하므로, 웹에서는 onScroll로 선택값을 갱신한다.
-        onScroll={Platform.OS === 'web' ? handleScrollEnd : undefined}
+        onMomentumScrollEnd={Platform.OS === 'web' ? undefined : handleMomentumScrollEnd}
+        onScroll={Platform.OS === 'web' ? handleWebScroll : undefined}
         contentContainerStyle={{ paddingVertical: ITEM_HEIGHT * CENTER_IDX }}
         scrollEventThrottle={16}
         bounces={false}
@@ -139,7 +183,11 @@ interface DrumRollPickerProps {
 const CURRENT_YEAR = new Date().getFullYear();
 const YEARS = Array.from({ length: CURRENT_YEAR - 1980 + 1 }, (_, i) => `${1980 + i}년`);
 const MONTHS = Array.from({ length: 12 }, (_, i) => `${i + 1}월`);
-const DAYS = Array.from({ length: 31 }, (_, i) => `${i + 1}일`);
+
+// month은 1~12, 해당 월의 실제 일수(윤년 2월도 정확히 계산)
+function daysInMonth(year: number, month: number): number {
+  return new Date(year, month, 0).getDate();
+}
 
 export function DrumRollPicker({
   visible,
@@ -151,16 +199,20 @@ export function DrumRollPicker({
   onConfirm,
   onCancel,
 }: DrumRollPickerProps) {
-  const yearIdx = useRef(initialYear - 1980);
-  const monthIdx = useRef(initialMonth - 1);
-  const dayIdx = useRef(initialDay - 1);
+  const [yearIdx, setYearIdx] = useState(initialYear - 1980);
+  const [monthIdx, setMonthIdx] = useState(initialMonth - 1);
+  const [dayIdx, setDayIdx] = useState(initialDay - 1);
+
+  const selectedYear = 1980 + yearIdx;
+  const selectedMonth = monthIdx + 1;
+  // 존재하지 않는 날짜(2월 30일 등)를 고를 수 없도록 선택된 연/월 기준으로 일 목록을 매번 새로 계산한다
+  const DAYS = useMemo(
+    () => Array.from({ length: daysInMonth(selectedYear, selectedMonth) }, (_, i) => `${i + 1}일`),
+    [selectedYear, selectedMonth],
+  );
 
   const handleConfirm = () => {
-    onConfirm(
-      1980 + yearIdx.current,
-      monthIdx.current + 1,
-      dayIdx.current + 1,
-    );
+    onConfirm(selectedYear, selectedMonth, dayIdx + 1);
   };
 
   return (
@@ -173,18 +225,18 @@ export function DrumRollPicker({
           <View style={styles.pickerRow}>
             <DrumColumn
               items={YEARS}
-              initialIndex={yearIdx.current}
-              onChange={(i) => { yearIdx.current = i; }}
+              initialIndex={yearIdx}
+              onChange={setYearIdx}
             />
             <DrumColumn
               items={MONTHS}
-              initialIndex={monthIdx.current}
-              onChange={(i) => { monthIdx.current = i; }}
+              initialIndex={monthIdx}
+              onChange={setMonthIdx}
             />
             <DrumColumn
               items={DAYS}
-              initialIndex={dayIdx.current}
-              onChange={(i) => { dayIdx.current = i; }}
+              initialIndex={dayIdx}
+              onChange={setDayIdx}
             />
           </View>
 

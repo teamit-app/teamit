@@ -198,6 +198,9 @@ export const uploadProfileImage = async (fileUri: string, fileName: string): Pro
   return res.profileImageUrl;
 };
 
+export const deleteProfileImage = (): Promise<void> =>
+  apiRequest<void>('/users/me/profile-image', { method: 'DELETE' });
+
 export const cancelEducationCert = (educationId: number): Promise<void> =>
   apiRequest<void>(`/users/educations/${educationId}/verification`, { method: 'DELETE' });
 

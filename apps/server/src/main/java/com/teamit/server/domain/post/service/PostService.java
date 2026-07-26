@@ -379,7 +379,8 @@ public class PostService {
                         sc.user(),
                         educationMap.get(sc.user().getId()),
                         cpSnapshotMap.get(sc.user().getId()),
-                        averageRatingOf(sc.user().getId())
+                        averageRatingOf(sc.user().getId()),
+                        (int) Math.round(sc.score())
                 ))
                 .collect(Collectors.toList());
     }
