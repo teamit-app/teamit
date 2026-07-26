@@ -14,6 +14,7 @@ import { useExploreStore } from '../../../src/store/useExploreStore';
 import { useAuthStore } from '../../../src/store/useAuthStore';
 import { getOrCreateDirectChatRoom } from '../../../src/services/messageService';
 import { requireAuthForChat, requireAuthForHeart } from '../../../src/utils/authGuard';
+import { trackEvent } from '../../../src/services/gtm';
 
 type MainTab = 'POOL' | 'CONTEST';
 type SortFilter = 'ALL' | 'LATEST' | 'POPULAR';
@@ -111,7 +112,14 @@ export default function ExploreScreen() {
             { key: 'CONTEST', label: '공모전' },
           ]}
           value={mainTab}
-          onChange={setMainTab}
+          onChange={(tab) => {
+            trackEvent('tab_select', {
+              tab_group: 'explore_menu',
+              tab_name: tab.toLowerCase(),
+              from_tab: mainTab.toLowerCase(),
+            });
+            setMainTab(tab);
+          }}
         />
       </View>
 
