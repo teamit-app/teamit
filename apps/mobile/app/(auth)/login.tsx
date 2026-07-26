@@ -62,9 +62,19 @@ export default function LoginScreen() {
     cancelKakaoPollRef.current = false;
 
     const sessionId = Math.random().toString(36).substring(2) + Date.now().toString(36);
+    const kakaoUrl = `${SERVER_BASE}/api/v1/auth/kakao/web?sessionId=${sessionId}`;
 
-    // 브라우저 열기 (await 안 함 — 폴링과 병행)
-    WebBrowser.openBrowserAsync(`${SERVER_BASE}/api/v1/auth/kakao/web?sessionId=${sessionId}`);
+    // 웹에서는 WebBrowser.dismissBrowser()가 아무 동작도 하지 않는다(네이티브 전용 API) —
+    // 그래서 로그인 자체는 폴링으로 성공 처리되는데도 카카오 콜백이 띄운 빈 탭/팝업은
+    // 그대로 하얀 화면으로 남아있는 버그가 있었다. 웹에서는 window.open으로 직접 띄워서
+    // 그 창 레퍼런스를 들고 있다가, 폴링 성공 시 우리가 직접 닫아준다.
+    let webPopup: Window | null = null;
+    if (Platform.OS === 'web') {
+      webPopup = window.open(kakaoUrl, '_blank');
+    } else {
+      // 브라우저 열기 (await 안 함 — 폴링과 병행)
+      WebBrowser.openBrowserAsync(kakaoUrl);
+    }
 
     // 카카오 인증 최소 소요 시간 확보
     await new Promise((r) => setTimeout(r, 2000));
@@ -89,7 +99,11 @@ export default function LoginScreen() {
         // "비로그인"으로 오판해 데이터를 잘못 캐싱하는 레이스 컨디션이 생긴다.
         // 여기서 이미 확보한 userId를 바로 반영해 그 창을 없앤다.
         useAuthStore.getState().setCurrentUserId(userId);
-        WebBrowser.dismissBrowser();
+        if (Platform.OS === 'web') {
+          webPopup?.close();
+        } else {
+          WebBrowser.dismissBrowser();
+        }
 
         if (isNewUser) {
           router.replace(onboardingHref as never);
@@ -102,6 +116,9 @@ export default function LoginScreen() {
       }
     }
 
+    if (Platform.OS === 'web') {
+      webPopup?.close();
+    }
     setIsLoggingIn(false);
     Alert.alert('로그인 실패', '시간이 초과되었습니다. 다시 시도해주세요');
   };

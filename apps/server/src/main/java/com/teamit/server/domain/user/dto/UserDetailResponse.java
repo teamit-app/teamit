@@ -213,7 +213,7 @@ public class UserDetailResponse {
                 .gender(user.getGender() != null ? user.getGender().name() : null)
                 .schoolName(education != null ? education.getSchoolName() : "")
                 .major(education != null ? education.getMajor() : "")
-                .status(education != null ? education.getStatus().name() : null)
+                .status(education != null && education.getStatus() != null ? education.getStatus().name() : null)
                 .verified(education != null && education.isVerified())
                 .isMatchingActive(Boolean.TRUE.equals(user.getIsMatchingActive()))
                 .isHearted(isHearted)

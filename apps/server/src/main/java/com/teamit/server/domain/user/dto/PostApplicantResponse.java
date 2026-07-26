@@ -34,6 +34,9 @@ public class PostApplicantResponse {
     private String leadershipLabel;
     private String appealTitle;
     private String appealContent;
+    // "매칭된 후보"(getCandidates)에서만 계산해 채워준다. "전체 후보"(getAllCandidates)는
+    // 하드필터·스코어링을 하지 않으므로 null — 프론트에서 null이면 일치도 배지를 표시하지 않는다.
+    private Integer matchScore;
 
     public static PostApplicantResponse from(User user,
                                              Education education,
@@ -122,6 +125,14 @@ public class PostApplicantResponse {
                                                       Education education,
                                                       ContestParticipant snapshot,
                                                       double averageRating) {
+        return fromSnapshot(user, education, snapshot, averageRating, null);
+    }
+
+    public static PostApplicantResponse fromSnapshot(User user,
+                                                      Education education,
+                                                      ContestParticipant snapshot,
+                                                      double averageRating,
+                                                      Integer matchScore) {
         List<String> skillNames = (snapshot != null && snapshot.getSkillsCsv() != null && !snapshot.getSkillsCsv().isBlank())
                 ? Arrays.stream(snapshot.getSkillsCsv().split(","))
                         .map(String::trim)
@@ -194,6 +205,7 @@ public class PostApplicantResponse {
                 .leadershipLabel(leadershipLabel)
                 .appealTitle(appealTitle)
                 .appealContent(appealContent)
+                .matchScore(matchScore)
                 .build();
     }
 

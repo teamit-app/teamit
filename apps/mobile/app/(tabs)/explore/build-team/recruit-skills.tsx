@@ -16,9 +16,11 @@ import { useBuildTeamStore } from '../../../../src/store/useBuildTeamStore';
 const SKILL_CATEGORIES: Record<string, string[]> = {
   전체: [],
   디자인: ['Figma', 'Sketch', 'Photoshop', 'Zeplin', 'Protopie', '영상편집', '디자인'],
-  개발: ['React', 'TypeScript', 'JavaScript', 'Flutter', 'SwiftUI', 'Python', 'FastAPI', 'Spring Boot', 'Node.js', 'AWS', 'Firebase'],
-  기획: ['기획', 'PM', 'UX Research', '데이터분석', 'SQL'],
-  마케팅: ['마케팅', '콘텐츠기획', 'SNS운영', '카피라이팅'],
+  // 세부 기술 스택을 잘 모르는 모집자도 고를 수 있도록 상위 개념의 범용 항목을 함께 제공한다
+  개발: ['개발', '프론트엔드 개발', '백엔드 개발', 'AI', 'React', 'TypeScript', 'JavaScript', 'Flutter', 'SwiftUI', 'Python', 'FastAPI', 'Spring Boot', 'Node.js', 'AWS', 'Firebase'],
+  기획: ['기획', 'PM', 'UX Research'],
+  마케팅: ['마케팅', '퍼포먼스 마케팅', '콘텐츠 마케팅', 'SNS 운영', '브랜드 마케팅', 'GA4', '메타 광고관리자', '카피라이팅'],
+  데이터: ['데이터 분석', 'SQL', 'Python', 'R', 'Tableau', 'Power BI', 'Excel', 'Pandas'],
 };
 
 const ALL_SKILLS = Object.values(SKILL_CATEGORIES)

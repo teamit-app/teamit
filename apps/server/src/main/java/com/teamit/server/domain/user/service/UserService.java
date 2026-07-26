@@ -119,6 +119,13 @@ public class UserService {
     }
 
     @Transactional
+    public void deleteProfileImage(Long userId) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new IllegalArgumentException("사용자를 찾을 수 없습니다"));
+        user.updateProfileImage(null);
+    }
+
+    @Transactional
     public CareerItemResponse addContestCareer(Long userId, AddContestCareerRequest request) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new IllegalArgumentException("사용자를 찾을 수 없습니다"));

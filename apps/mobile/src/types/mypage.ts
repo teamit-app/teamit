@@ -168,6 +168,8 @@ export interface PostApplicant {
   leadershipLabel: string;
   appealTitle: string;
   appealContent: string;
+  // "매칭된 후보" 조회에서만 내려온다 — "전체 후보"는 null(조건 일치도 배지 미표시)
+  matchScore?: number | null;
 }
 
 export interface PostApplicantPage {

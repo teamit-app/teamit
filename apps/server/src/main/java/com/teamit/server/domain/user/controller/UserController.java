@@ -55,6 +55,13 @@ public class UserController {
         return ApiResponse.success(Map.of("profileImageUrl", url), "프로필 사진이 등록되었습니다");
     }
 
+    @Operation(summary = "프로필 사진 삭제")
+    @DeleteMapping("/me/profile-image")
+    public ApiResponse<Void> deleteProfileImage(@LoginUser CustomUserDetails userDetails) {
+        userService.deleteProfileImage(userDetails.getUserId());
+        return ApiResponse.success(null, "프로필 사진이 삭제되었습니다");
+    }
+
     @Operation(summary = "온보딩 기본정보 저장")
     @PostMapping("/onboarding/basic")
     @ResponseStatus(HttpStatus.CREATED)

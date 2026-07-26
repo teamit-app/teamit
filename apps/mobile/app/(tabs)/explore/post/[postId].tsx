@@ -213,7 +213,7 @@ export default function PostDetailScreen() {
           </View>
         ) : (
           <TouchableOpacity
-            style={[styles.applyBtn, hasRegistered && styles.applyBtnReady]}
+            style={styles.applyBtn}
             onPress={handleApply}
             activeOpacity={0.85}
           >
@@ -339,14 +339,13 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   applyBtn: {
+    // 참여카드 미등록 상태에서도 눌리는(참여카드 등록으로 이동하는) 버튼이라
+    // 회색으로 비활성처럼 보이면 안 된다 — 항상 활성화된 주황 버튼으로 보여준다
     flex: 1,
-    backgroundColor: Colors.grayMedium,
+    backgroundColor: Colors.primary,
     borderRadius: 14,
     paddingVertical: 15,
     alignItems: 'center',
-  },
-  applyBtnReady: {
-    backgroundColor: Colors.primary,
   },
   applyBtnText: {
     fontSize: 16,

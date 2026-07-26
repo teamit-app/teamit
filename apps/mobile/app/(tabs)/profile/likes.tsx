@@ -17,6 +17,7 @@ import { getHeartedContests } from '../../../src/services/contestService';
 import { getLikedPosts } from '../../../src/services/mypageService';
 import { getOrCreateDirectChatRoom } from '../../../src/services/messageService';
 import { requireAuthForChat } from '../../../src/utils/authGuard';
+import { Alert } from '../../../src/utils/alert';
 import { useExploreStore } from '../../../src/store/useExploreStore';
 import { LikedPost } from '../../../src/types/mypage';
 import { PoolUser } from '../../../src/types/talent';
@@ -167,7 +168,10 @@ export default function LikesScreen() {
       const chatRoomId = await getOrCreateDirectChatRoom(targetUserId);
       router.push(`/explore/chat/${chatRoomId}` as never);
     } catch (e) {
+      // 이전엔 로그만 남기고 사용자에게는 아무 반응도 없어서, 버튼을 눌러도 채팅창으로
+      // 안 들어가지는 것처럼 보이는 버그였다 — 실패를 사용자에게 알리고 다시 시도하게 한다.
       console.error('[Likes] 채팅방 생성 실패:', e);
+      Alert.alert('채팅을 시작하지 못했어요', '잠시 후 다시 시도해주세요.');
     }
   };
 

@@ -42,8 +42,20 @@ public class KakaoCallbackController {
             authService.storeSession(state, loginResponse);
             log.info("[카카오 콜백] 세션 저장 완료");
 
-            // 앱이 폴링으로 감지 후 브라우저를 닫으므로 빈 흰 화면만 반환
-            String html = "<html><head><meta charset='UTF-8'><style>body{margin:0;background:#fff}</style></head><body></body></html>";
+            // 앱(로그인 화면)이 폴링으로 로그인 완료를 감지하면 이 창을 직접 닫아준다.
+            // 다만 그 폴링이 어떤 이유로든 못 미치는 경우를 대비해, 이 페이지 스스로도
+            // 잠시 후 닫기를 시도하고, 그마저 브라우저 정책상 막히면 안내 문구를 보여준다
+            // (이전엔 완전히 빈 화면만 남아 로그인 실패로 오해하게 만드는 버그가 있었음).
+            String html = "<html><head><meta charset='UTF-8'>"
+                    + "<style>body{margin:0;background:#fff;display:flex;align-items:center;justify-content:center;"
+                    + "height:100vh;font-family:sans-serif;color:#888;font-size:14px}</style></head>"
+                    + "<body><span id='msg'></span>"
+                    + "<script>"
+                    + "setTimeout(function(){"
+                    + "  try { window.close(); } catch (e) {}"
+                    + "  document.getElementById('msg').textContent = '로그인이 완료됐어요. 이 창을 닫고 앱으로 돌아가주세요.';"
+                    + "}, 1500);"
+                    + "</script></body></html>";
 
             return ResponseEntity.ok()
                     .contentType(new MediaType("text", "html", java.nio.charset.StandardCharsets.UTF_8))

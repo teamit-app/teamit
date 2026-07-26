@@ -454,6 +454,16 @@ public class ChatService {
     public void sendInvitationMessages(ChatRoom chatRoom, User sender, User receiver, Long invitationId) {
         chatMessageRepository.save(ChatMessage.text(
                 chatRoom, sender, sender.getNickname() + "님이 " + receiver.getNickname() + "님을 팀에 초대하셨어요! 🎉"));
-        chatMessageRepository.save(ChatMessage.invitationCard(chatRoom, sender, "", invitationId));
+        ChatMessage cardMessage = chatMessageRepository.save(
+                ChatMessage.invitationCard(chatRoom, sender, "", invitationId));
+
+        // sendMessage()와 동일하게 발신자 본인의 lastReadMessageId도 갱신해야 한다.
+        // 이걸 빼먹으면 본인이 보낸 초대 메시지 2건이 자기 자신에게도 "안읽음"으로 집계되어,
+        // 메시지 목록 배지 숫자에 본인이 보낸 메시지가 섞여 답장 여부를 혼동하게 만든다.
+        chatRoomMemberRepository.findByUserIdAndChatRoomId(sender.getId(), chatRoom.getId())
+                .ifPresent(member -> {
+                    member.updateLastRead(cardMessage.getId());
+                    chatRoomMemberRepository.save(member);
+                });
     }
 }

@@ -22,17 +22,26 @@ function ApplicantCard({
   isHearted,
   onToggleHeart,
   onPress,
+  showMatchScore,
 }: {
   person: PostApplicant;
   isHearted: boolean;
   onToggleHeart: () => void;
   onPress: () => void;
+  showMatchScore?: boolean;
 }) {
   return (
     <TouchableOpacity style={card.container} onPress={onPress} activeOpacity={0.75}>
       <View style={card.topRow}>
-        <View style={card.tempBadge}>
-          <Text style={card.tempText}>★ {person.averageRating.toFixed(1)}</Text>
+        <View style={card.topRowLeft}>
+          <View style={card.tempBadge}>
+            <Text style={card.tempText}>★ {person.averageRating.toFixed(1)}</Text>
+          </View>
+          {showMatchScore && person.matchScore != null && (
+            <View style={card.matchScoreBadge}>
+              <Text style={card.matchScoreBadgeText}>🎯 조건 일치도 {person.matchScore}%</Text>
+            </View>
+          )}
         </View>
         <TouchableOpacity onPress={onToggleHeart} hitSlop={10}>
           <Text style={[card.heartIcon, isHearted && card.heartIconActive]}>
@@ -94,11 +103,27 @@ const card = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#F0F0F0',
   },
+  matchScoreBadge: {
+    backgroundColor: Colors.tempBadgeBg,
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+  },
+  matchScoreBadgeText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: Colors.primary,
+  },
   topRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 10,
+  },
+  topRowLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
   },
   tempBadge: {
     backgroundColor: Colors.tempBadgeBg,
@@ -347,6 +372,7 @@ export default function ApplicantsScreen() {
                     isHearted={likedIds.has(person.userId)}
                     onToggleHeart={() => toggleHeart(person.userId)}
                     onPress={() => navigateToDetail(person)}
+                    showMatchScore
                   />
                 ))
               )}
