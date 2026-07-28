@@ -21,6 +21,7 @@ import { ReviewStatsCard } from '../../../../src/components/profile/ReviewStatsC
 import { requireAuthForChat } from '../../../../src/utils/authGuard';
 import { Alert } from '../../../../src/utils/alert';
 import { resolveImageUrl } from '../../../../src/utils/imageUrl';
+import { useScrollDepthTracking } from '../../../../src/hooks/useScrollDepthTracking';
 
 const IS_MOCK = process.env.EXPO_PUBLIC_API_MODE === 'mock';
 
@@ -115,6 +116,7 @@ export default function TalentDetailScreen() {
   const isMe = detail?.userId === currentUserId;
   const segments = useSegments();
   const sourceTab = (segments[1] as string) ?? 'explore';
+  const scrollTracking = useScrollDepthTracking('profile_detail', userId);
 
   useEffect(() => {
     setLoadError(false);
@@ -206,7 +208,11 @@ export default function TalentDetailScreen() {
         <View style={s.headerSide} />
       </View>
 
-      <ScrollView contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        contentContainerStyle={s.scroll}
+        showsVerticalScrollIndicator={false}
+        {...scrollTracking}
+      >
 
         {/* ── 프로필 카드 ── */}
         <View style={s.profileCard}>

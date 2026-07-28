@@ -30,6 +30,7 @@ import { cancelPostApplication } from '../../../../src/services/mypageService';
 import { useAuthStore } from '../../../../src/store/useAuthStore';
 import { requireAuth } from '../../../../src/utils/authGuard';
 import { RecruitPostDetail } from '../../../../src/types/contest';
+import { useScrollDepthTracking } from '../../../../src/hooks/useScrollDepthTracking';
 
 // ── 메인 화면 ─────────────────────────────────────────────────────────────────
 export default function PostDetailScreen() {
@@ -56,6 +57,7 @@ export default function PostDetailScreen() {
   const isOwner = post?.ownerUserId != null && post.ownerUserId === currentUserId;
   const segments = useSegments();
   const sourceTab = (segments[1] as string) ?? 'explore';
+  const scrollTracking = useScrollDepthTracking('post_detail', postId);
 
   const id = Number(postId);
   // URL에 contestId가 안 넘어온 경우를 대비해 조회된 모집글 자체의 contestId로 폴백
@@ -162,6 +164,7 @@ export default function PostDetailScreen() {
         ref={scrollRef}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
+        {...scrollTracking}
       >
 
         <PostDetailContent
