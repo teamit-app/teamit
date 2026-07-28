@@ -16,6 +16,7 @@ import {
 } from '../services/talentService';
 import { useAuthStore } from './useAuthStore';
 import { requireAuthForHeart } from '../utils/authGuard';
+import { trackEvent } from '../services/gtm';
 
 interface ExploreState {
   contests: Contest[];
@@ -152,6 +153,12 @@ export const useExploreStore = create<ExploreState>((set, get) => ({
       ),
     }));
 
+    trackEvent('like', {
+      item_type: 'talent',
+      item_id: targetUserId,
+      action: prevState ? 'unlike' : 'like',
+    });
+
     try {
       if (prevState) {
         await removeTalentHeart(userId, targetUserId);
@@ -184,6 +191,12 @@ export const useExploreStore = create<ExploreState>((set, get) => ({
         c.contestId === contestId ? { ...c, isHearted: !prevState } : c,
       ),
     }));
+
+    trackEvent('like', {
+      item_type: 'contest',
+      item_id: contestId,
+      action: prevState ? 'unlike' : 'like',
+    });
 
     try {
       if (prevState) {
