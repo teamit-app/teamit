@@ -20,6 +20,23 @@ public interface ChatRoomMemberRepository extends JpaRepository<ChatRoomMember, 
 
     long countByChatRoomId(Long chatRoomId);
 
+    @Query("SELECT m.chatRoom.id AS chatRoomId, COUNT(m) AS count FROM ChatRoomMember m WHERE m.chatRoom.id IN :chatRoomIds GROUP BY m.chatRoom.id")
+    List<ChatRoomMemberCountProjection> countGroupedByChatRoomIdIn(@Param("chatRoomIds") List<Long> chatRoomIds);
+
+    interface ChatRoomMemberCountProjection {
+        Long getChatRoomId();
+        Long getCount();
+    }
+
+    // 채팅방 목록(getChatRooms) 배치 조회용 — user까지 함께 fetch해서 방 멤버 표시(닉네임 등)에
+    // 필요한 정보를 건당 추가 쿼리 없이 바로 쓸 수 있게 한다.
+    @Query("SELECT m FROM ChatRoomMember m JOIN FETCH m.user WHERE m.chatRoom.id IN :chatRoomIds")
+    List<ChatRoomMember> findByChatRoomIdIn(@Param("chatRoomIds") List<Long> chatRoomIds);
+
+    // getChatRooms 배치 조회용 — user별 멤버십 리스트를 방(chatRoom)까지 한 번에 가져온다.
+    @Query("SELECT m FROM ChatRoomMember m JOIN FETCH m.chatRoom WHERE m.user.id = :userId")
+    List<ChatRoomMember> findByUserIdWithChatRoom(@Param("userId") Long userId);
+
     @Modifying
     @Query("DELETE FROM ChatRoomMember m WHERE m.chatRoom.id = :chatRoomId")
     void deleteAllByChatRoomId(@Param("chatRoomId") Long chatRoomId);

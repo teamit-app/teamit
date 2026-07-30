@@ -18,8 +18,8 @@ import {
   cancelPostApplication,
 } from '../../../src/services/mypageService';
 import { ContestRegistration, PostApplication } from '../../../src/types/mypage';
-import { useExploreStore } from '../../../src/store/useExploreStore';
 import { trackEvent } from '../../../src/services/gtm';
+import { unmarkContestParticipant } from '../../../src/hooks/useExploreData';
 
 type Tab = 'contest' | 'post';
 
@@ -77,7 +77,6 @@ export default function MyApplicationsScreen() {
   const [registrations, setRegistrations] = useState<ContestRegistration[]>([]);
   const [postApps, setPostApps] = useState<PostApplication[]>([]);
   const [loading, setLoading] = useState(true);
-  const unmarkContestParticipant = useExploreStore((s) => s.unmarkContestParticipant);
 
   const handleTabPress = (key: Tab) => {
     trackEvent('tab_select', { tab_group: 'my_applications_menu', tab_name: key, from_tab: tab });

@@ -2,10 +2,10 @@ import { create } from 'zustand';
 import { User } from '../types/user';
 import { getMyProfile } from '../services/mypageService';
 import { useMypageStore } from './useMypageStore';
-import { useExploreStore } from './useExploreStore';
 import { useOnboardingStore } from './useOnboardingStore';
 import { useBuildTeamStore } from './useBuildTeamStore';
 import { setUserId, trackEvent } from '../services/gtm';
+import { queryClient } from '../lib/queryClient';
 
 interface AuthState {
   user: User | null;
@@ -30,11 +30,13 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   setUser: (user) => set({ user, isLoggedIn: true }),
   setCurrentUserId: (userId) => set({ currentUserId: userId }),
   logout: (reason = 'logout') => {
-    // 다른 유저로 재로그인 시 이전 유저의 캐시가 남지 않도록 유저-스코프 스토어를 함께 초기화
+    // 다른 유저로 재로그인 시 이전 유저의 캐시가 남지 않도록 유저-스코프 스토어를 함께 초기화.
+    // React Query 캐시는 어떤 쿼리 키를 빠뜨렸는지 매번 따질 필요 없이 통째로 비운다 —
+    // 로그아웃 직후엔 어차피 재사용할 가치가 없고, 재로그인하면 다시 최신 데이터로 채워진다.
     useMypageStore.getState().reset();
-    useExploreStore.getState().reset();
     useOnboardingStore.getState().reset();
     useBuildTeamStore.getState().reset();
+    queryClient.clear();
     set({ user: null, isLoggedIn: false, currentUserId: null, currentUserIdReady: null });
     // user_id가 아직 살아있는 상태에서 이벤트를 먼저 보내야 GA4가 이 이벤트를 해당
     // 유저에게 귀속시킬 수 있다. 순서를 바꾸면(clear를 먼저 하면) 이벤트가 트리거를

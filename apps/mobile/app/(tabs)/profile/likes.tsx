@@ -18,7 +18,7 @@ import { getLikedPosts } from '../../../src/services/mypageService';
 import { getOrCreateDirectChatRoom } from '../../../src/services/messageService';
 import { requireAuthForChat } from '../../../src/utils/authGuard';
 import { Alert } from '../../../src/utils/alert';
-import { useExploreStore } from '../../../src/store/useExploreStore';
+import { toggleTalentHeart as toggleTalentHeartInStore, toggleContestHeart as toggleContestHeartInStore } from '../../../src/hooks/useExploreData';
 import { LikedPost } from '../../../src/types/mypage';
 import { PoolUser } from '../../../src/types/talent';
 import { Contest } from '../../../src/types/contest';
@@ -134,8 +134,6 @@ export default function LikesScreen() {
     setTab(key);
   };
 
-  const toggleTalentHeartInStore = useExploreStore((s) => s.toggleTalentHeart);
-  const toggleContestHeartInStore = useExploreStore((s) => s.toggleContestHeart);
   const [likedTalents, setLikedTalents] = useState<PoolUser[]>([]);
   const [likedContests, setLikedContests] = useState<Contest[]>([]);
   const [likedPosts, setLikedPosts] = useState<LikedPost[]>([]);
@@ -156,7 +154,7 @@ export default function LikesScreen() {
   }, []);
 
   // 좋아요 목록 화면에서는 항상 "취소"만 가능 — 목록에서 바로 제거
-  // useExploreStore를 거쳐야 탐색 탭 목록/상세정보에도 그대로 반영된다
+  // useExploreData의 toggleTalentHeart를 거쳐야 탐색 탭 목록/상세정보에도 그대로 반영된다
   const removeTalentLike = async (targetUserId: number) => {
     const prev = likedTalents;
     setLikedTalents((cur) => cur.filter((t) => t.userId !== targetUserId));

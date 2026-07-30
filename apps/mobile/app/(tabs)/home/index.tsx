@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
+import { useQuery } from '@tanstack/react-query';
 import { Colors } from '../../../src/constants/colors';
 import { ContestCard } from '../../../src/components/explore/ContestCard';
 import { FilterPills } from '../../../src/components/explore/FilterPills';
@@ -9,8 +10,8 @@ import { getPopularContests } from '../../../src/services/contestService';
 import { getMatchingStatus } from '../../../src/services/matchingService';
 import { getNotifications } from '../../../src/services/notificationService';
 import { useNotificationStore } from '../../../src/store/useNotificationStore';
-import { Contest, ContestStatus } from '../../../src/types/contest';
-import { MatchingStatus } from '../../../src/types/matching';
+import { REALTIME_STALE_TIME } from '../../../src/services/realtimeEvents';
+import { ContestStatus } from '../../../src/types/contest';
 import { useAuthStore } from '../../../src/store/useAuthStore';
 import { withAuth, requireAuthForNotifications } from '../../../src/utils/authGuard';
 import { trackEvent } from '../../../src/services/gtm';
@@ -25,26 +26,36 @@ const STATUS_OPTIONS: { key: StatusFilter; label: string }[] = [
 
 export default function HomeScreen() {
   const insets = useSafeAreaInsets();
-  const [contests, setContests] = useState<Contest[]>([]);
-  const [matchingStatus, setMatchingStatus] = useState<MatchingStatus | null>(null);
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('ALL');
   const unreadCount = useNotificationStore((s) => s.unreadCount);
   const setUnreadCount = useNotificationStore((s) => s.setUnreadCount);
   const currentUserId = useAuthStore((s) => s.currentUserId);
 
+  const { data: contests = [] } = useQuery({
+    queryKey: ['popularContests'],
+    queryFn: getPopularContests,
+  });
+
+  // 지원/초대/수락거절/팀확정 알림이 오면 realtimeEvents.ts가 즉시 무효화해주므로,
+  // staleTime은 "이벤트를 놓쳤을 때"를 위한 보수적인 상한선일 뿐이다.
+  const { data: matchingStatus = null } = useQuery({
+    queryKey: ['matchingStatus', currentUserId],
+    queryFn: getMatchingStatus,
+    enabled: !!currentUserId,
+    staleTime: REALTIME_STALE_TIME,
+  });
+
+  // 웹소켓으로 실시간 반영되는 unreadCount의 최초 값 — 소켓 연결 전/중 놓친 알림까지 포함해서 시드한다
+  const { data: notificationsSeed } = useQuery({
+    queryKey: ['notifications'],
+    queryFn: getNotifications,
+    enabled: !!currentUserId,
+    staleTime: REALTIME_STALE_TIME,
+  });
+
   useEffect(() => {
-    getPopularContests()
-      .then(setContests)
-      .catch((e) => console.error('[Home] 인기 공모전 로드 실패:', e));
-    if (!currentUserId) return;
-    getMatchingStatus()
-      .then((data) => { if (data) setMatchingStatus(data); })
-      .catch((e) => console.error('[Home] 매칭 현황 로드 실패:', e));
-    // 웹소켓으로 실시간 반영되는 unreadCount의 최초 값 — 소켓 연결 전/중 놓친 알림까지 포함해서 시드한다
-    getNotifications()
-      .then(({ unreadCount: count }) => setUnreadCount(count))
-      .catch((e) => console.error('[Home] 알림 로드 실패:', e));
-  }, [currentUserId]);
+    if (notificationsSeed) setUnreadCount(notificationsSeed.unreadCount);
+  }, [notificationsSeed, setUnreadCount]);
 
   const filteredContests = contests.filter(
     (contest) => statusFilter === 'ALL' || contest.status === statusFilter,

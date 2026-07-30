@@ -11,7 +11,7 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { Alert } from '../../../../src/utils/alert';
 import { Colors } from '../../../../src/constants/colors';
 import { useBuildTeamStore } from '../../../../src/store/useBuildTeamStore';
-import { useExploreStore } from '../../../../src/store/useExploreStore';
+import { markContestParticipant } from '../../../../src/hooks/useExploreData';
 import { useMypageStore } from '../../../../src/store/useMypageStore';
 import { getContestDetail, createPost, registerAsParticipant } from '../../../../src/services/contestService';
 import { formatRegionsLabel } from '../../../../src/utils/region';
@@ -94,7 +94,6 @@ export default function RecruitConfirmScreen() {
     : ownerMeetingType;
 
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const markContestParticipant = useExploreStore((s) => s.markContestParticipant);
 
   const goBack = () => router.back();
 

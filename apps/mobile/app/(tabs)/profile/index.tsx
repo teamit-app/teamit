@@ -16,7 +16,7 @@ import { Alert } from '../../../src/utils/alert';
 import { Colors } from '../../../src/constants/colors';
 import { useMypageStore } from '../../../src/store/useMypageStore';
 import { useAuthStore } from '../../../src/store/useAuthStore';
-import { useExploreStore } from '../../../src/store/useExploreStore';
+import { refreshExploreTalents } from '../../../src/hooks/useExploreData';
 import { logout as logoutApi, withdraw as withdrawApi } from '../../../src/services/authService';
 import { uploadProfileImage, deleteProfileImage } from '../../../src/services/mypageService';
 import { formatRegionsLabel } from '../../../src/utils/region';
@@ -361,7 +361,7 @@ export default function ProfileScreen() {
                 await setMatchingActive(v);
                 // 인재풀 목록은 세션 내내 캐시되는 값이라, 여기서 껐다 켰다 해도
                 // 다시 로그인하기 전까지는 탐색 탭에 그대로 남아있던 문제를 고치기 위함
-                useExploreStore.getState().refreshTalents();
+                refreshExploreTalents();
               }}
               trackColor={{ false: Colors.lightGray, true: Colors.primary }}
               thumbColor={Colors.white}
