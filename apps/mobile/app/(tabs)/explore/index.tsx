@@ -1,4 +1,4 @@
-import React, { useCallback, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { View, Text, ScrollView, RefreshControl, TouchableOpacity, ActivityIndicator, StyleSheet } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router, useFocusEffect } from 'expo-router';
@@ -57,6 +57,7 @@ export default function ExploreScreen() {
     if (!requireAuthForChat(`/explore/talent/${targetUserId}`)) return;
     try {
       const chatRoomId = await getOrCreateDirectChatRoom(targetUserId);
+      trackEvent('chat_start', { target_user_id: targetUserId });
       router.push(`/explore/chat/${chatRoomId}` as never);
     } catch (e) {
       // 이전엔 로그만 남기고 사용자에게는 아무 반응도 없어서, 버튼을 눌러도 채팅창으로
@@ -65,6 +66,15 @@ export default function ExploreScreen() {
       Alert.alert('채팅을 시작하지 못했어요', '잠시 후 다시 시도해주세요.');
     }
   };
+
+  // 검색어는 키 입력마다 보내면 너무 잦아서, 타이핑을 멈춘 뒤(800ms) 한 번만 보낸다
+  useEffect(() => {
+    if (!keyword.trim()) return;
+    const timer = setTimeout(() => {
+      trackEvent('explore_search', { keyword: keyword.trim(), tab_name: mainTab.toLowerCase() });
+    }, 800);
+    return () => clearTimeout(timer);
+  }, [keyword, mainTab]);
 
   const filteredTalents = talents.filter((talent) =>
     keyword.trim().length === 0
@@ -156,7 +166,10 @@ export default function ExploreScreen() {
             <FilterPills
               options={SORT_OPTIONS}
               value={sortFilter}
-              onChange={setSortFilter}
+              onChange={(sort) => {
+                trackEvent('explore_filter', { filter_type: 'sort', value: sort.toLowerCase() });
+                setSortFilter(sort);
+              }}
               trailingLabel="분야별"
               onPressTrailing={() => setCategoryModalVisible(true)}
             />
@@ -195,6 +208,7 @@ export default function ExploreScreen() {
         visible={categoryModalVisible}
         selectedCategory={categoryFilter}
         onApply={(cat) => {
+          trackEvent('explore_filter', { filter_type: 'category', value: cat.toLowerCase() });
           setCategoryFilter(cat);
           setCategoryModalVisible(false);
         }}

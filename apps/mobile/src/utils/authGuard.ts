@@ -1,6 +1,7 @@
 import { router } from 'expo-router';
 import { useAuthStore } from '../store/useAuthStore';
 import { Alert } from './alert';
+import { trackEvent } from '../services/gtm';
 
 // 로그인이 필요한 액션(후보등록·모집글작성·지원하기 등) 진입점에서 쓰는 공용 가드.
 // 로그인돼 있으면 그냥 이동/진행, 아니면 로그인 화면으로 보내고 로그인(+필요시 온보딩) 완료 후
@@ -10,6 +11,7 @@ export function withAuth(path: string): void {
   if (userId) {
     router.push(path as never);
   } else {
+    trackEvent('login_button_click', { source: 'withAuth' });
     router.push(`/(auth)/login?returnTo=${encodeURIComponent(path)}` as never);
   }
 }
@@ -19,6 +21,7 @@ export function withAuth(path: string): void {
 export function requireAuth(path: string): boolean {
   const userId = useAuthStore.getState().currentUserId;
   if (userId) return true;
+  trackEvent('login_button_click', { source: 'requireAuth' });
   router.push(`/(auth)/login?returnTo=${encodeURIComponent(path)}` as never);
   return false;
 }
@@ -33,7 +36,10 @@ export function requireAuthForChat(path: string): boolean {
     { text: '취소', style: 'cancel' },
     {
       text: '로그인하기',
-      onPress: () => router.push(`/(auth)/login?returnTo=${encodeURIComponent(path)}` as never),
+      onPress: () => {
+        trackEvent('login_button_click', { source: 'requireAuthForChat' });
+        router.push(`/(auth)/login?returnTo=${encodeURIComponent(path)}` as never);
+      },
     },
   ]);
   return false;
@@ -45,7 +51,13 @@ export function requireAuthForHeart(): boolean {
   if (userId) return true;
   Alert.alert('로그인이 필요해요', '좋아요를 누르려면 로그인해주세요', [
     { text: '취소', style: 'cancel' },
-    { text: '로그인하기', onPress: () => router.push('/(auth)/login' as never) },
+    {
+      text: '로그인하기',
+      onPress: () => {
+        trackEvent('login_button_click', { source: 'requireAuthForHeart' });
+        router.push('/(auth)/login' as never);
+      },
+    },
   ]);
   return false;
 }
@@ -56,7 +68,13 @@ export function requireAuthForNotifications(): boolean {
   if (userId) return true;
   Alert.alert('로그인이 필요해요', '알림을 확인하려면 로그인해주세요', [
     { text: '취소', style: 'cancel' },
-    { text: '로그인하기', onPress: () => router.push('/(auth)/login' as never) },
+    {
+      text: '로그인하기',
+      onPress: () => {
+        trackEvent('login_button_click', { source: 'requireAuthForNotifications' });
+        router.push('/(auth)/login' as never);
+      },
+    },
   ]);
   return false;
 }

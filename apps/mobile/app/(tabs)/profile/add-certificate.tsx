@@ -15,6 +15,7 @@ import { ScreenHeader } from '../../../src/components/common/ScreenHeader';
 import { DrumRollPicker } from '../../../src/components/common/DrumRollPicker';
 import { useMypageStore } from '../../../src/store/useMypageStore';
 import { addCertificateCareer, updateCertificateCareer } from '../../../src/services/mypageService';
+import { trackEvent } from '../../../src/services/gtm';
 
 function formatDate(year: number, month: number, day: number): string {
   return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
@@ -69,6 +70,7 @@ export default function AddCertificateScreen() {
       } else {
         const result = await addCertificateCareer(data);
         addCareerLocal(result);
+        trackEvent('career_add', { item_type: 'certificate' });
         Alert.alert('등록 완료', '자격증이 등록되었어요.', [
           { text: '확인', onPress: () => router.back() },
         ]);

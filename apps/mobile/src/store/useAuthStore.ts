@@ -4,6 +4,7 @@ import { getMyProfile } from '../services/mypageService';
 import { useMypageStore } from './useMypageStore';
 import { useOnboardingStore } from './useOnboardingStore';
 import { useBuildTeamStore } from './useBuildTeamStore';
+import { setUserId, trackEvent } from '../services/gtm';
 import { queryClient } from '../lib/queryClient';
 
 interface AuthState {
@@ -17,7 +18,7 @@ interface AuthState {
   currentUserIdReady: Promise<void> | null;
   setUser: (user: User) => void;
   setCurrentUserId: (userId: number) => void;
-  logout: () => void;
+  logout: (reason?: 'logout' | 'withdraw') => void;
   fetchCurrentUserId: () => Promise<void>;
 }
 
@@ -28,7 +29,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   currentUserIdReady: null,
   setUser: (user) => set({ user, isLoggedIn: true }),
   setCurrentUserId: (userId) => set({ currentUserId: userId }),
-  logout: () => {
+  logout: (reason = 'logout') => {
     // 다른 유저로 재로그인 시 이전 유저의 캐시가 남지 않도록 유저-스코프 스토어를 함께 초기화.
     // React Query 캐시는 어떤 쿼리 키를 빠뜨렸는지 매번 따질 필요 없이 통째로 비운다 —
     // 로그아웃 직후엔 어차피 재사용할 가치가 없고, 재로그인하면 다시 최신 데이터로 채워진다.
@@ -37,6 +38,11 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     useBuildTeamStore.getState().reset();
     queryClient.clear();
     set({ user: null, isLoggedIn: false, currentUserId: null, currentUserIdReady: null });
+    // user_id가 아직 살아있는 상태에서 이벤트를 먼저 보내야 GA4가 이 이벤트를 해당
+    // 유저에게 귀속시킬 수 있다. 순서를 바꾸면(clear를 먼저 하면) 이벤트가 트리거를
+    // 태우는 시점엔 이미 user_id가 null이라 "누구의" 로그아웃/탈퇴인지 알 수 없게 된다.
+    trackEvent(reason);
+    setUserId(null);
   },
   fetchCurrentUserId: () => {
     const inFlight = get().currentUserIdReady;

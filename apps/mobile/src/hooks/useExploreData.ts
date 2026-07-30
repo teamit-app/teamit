@@ -17,6 +17,7 @@ import {
 } from '../services/talentService';
 import { useAuthStore } from '../store/useAuthStore';
 import { requireAuthForHeart } from '../utils/authGuard';
+import { trackEvent } from '../services/gtm';
 
 // 탐색 탭(인재풀/공모전) 데이터는 여러 화면(탐색, 상세, 좋아요 목록 등)이 공유해서 보고
 // 서로 갱신해야 하는 "단일 진실 공급원"이라 쿼리 키를 고정해두고 이 파일에서만 접근한다.
@@ -123,6 +124,8 @@ export async function toggleTalentHeart(targetUserId: number, knownCurrentState?
     prev?.map((t) => (t.userId === targetUserId ? { ...t, isHearted: !prevState } : t)),
   );
 
+  trackEvent(prevState ? 'unlike' : 'like', { item_type: 'talent', item_id: targetUserId });
+
   try {
     if (prevState) {
       await removeTalentHeart(userId, targetUserId);
@@ -148,6 +151,8 @@ export async function toggleContestHeart(contestId: number, knownCurrentState?: 
   queryClient.setQueryData<Contest[]>(EXPLORE_CONTESTS_KEY, (prev) =>
     prev?.map((c) => (c.contestId === contestId ? { ...c, isHearted: !prevState } : c)),
   );
+
+  trackEvent(prevState ? 'unlike' : 'like', { item_type: 'contest', item_id: contestId });
 
   try {
     if (prevState) {

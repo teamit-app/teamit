@@ -16,6 +16,7 @@ import { useInvitationStore } from '../../../../src/store/useInvitationStore';
 import { useAuthStore } from '../../../../src/store/useAuthStore';
 import { sendInvitation } from '../../../../src/services/invitationService';
 import { getContestCandidates, getAllContestCandidates } from '../../../../src/services/mypageService';
+import { trackEvent } from '../../../../src/services/gtm';
 import { REALTIME_STALE_TIME } from '../../../../src/services/realtimeEvents';
 
 const IS_MOCK = process.env.EXPO_PUBLIC_API_MODE === 'mock';
@@ -259,6 +260,11 @@ export default function CandidatesScreen() {
           const candidate = candidates.find((c) => c.id === cid) ?? allCandidates.find((c) => c.id === cid);
           if (!candidate) return;
           const { chatRoomId: chatId } = await sendInvitation(resolvedPostId, candidate.id);
+          trackEvent('invite_sent', {
+            post_id: resolvedPostId,
+            target_user_id: candidate.id,
+            source: 'candidates_list',
+          });
           // 실서버 모드에선 초대 발송 시 백엔드(ChatService.sendInvitationMessages)가
           // 인사말 + 초대장 카드 메시지를 이미 채팅방에 저장해서, 채팅방을 열면 getChat()으로
           // 그대로 내려온다. 여기서 또 로컬에 추가하면 메시지가 두 번 보이므로 mock 전용으로만 추가한다.
@@ -310,7 +316,7 @@ export default function CandidatesScreen() {
       <ScrollView contentContainerStyle={styles.listContent} showsVerticalScrollIndicator={false}>
         {/* ─ 상단 배너 — 스크롤에 같이 딸려가도록 목록 안에 둔다 ─ */}
         <View style={styles.banner}>
-          <Text style={styles.bannerTitle}>팀원 모집글과 팀 채팅방이 생성되었어요!</Text>
+          <Text style={styles.bannerTitle}>✅ 팀원 모집글과 팀 채팅방이 생성되었어요!</Text>
           <Text style={styles.bannerSubtitle}>
             만들어진 팀 채팅방에 팀원을 초대할 수 있어요
           </Text>

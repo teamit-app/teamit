@@ -17,6 +17,7 @@ import { useMypageStore } from '../../../../src/store/useMypageStore';
 import { MatchingProfileData } from '../../../../src/types/mypage';
 import { formatRegionsLabel } from '../../../../src/utils/region';
 import { formatMatchingCard } from '../../../../src/constants/matchingLabels';
+import { trackEvent } from '../../../../src/services/gtm';
 
 function formatCard(p: MatchingProfileData) {
   const region = p.regions.length > 0 ? formatRegionsLabel(p.regions) : '';
@@ -102,6 +103,7 @@ export default function BuildTeamCardScreen() {
   };
 
   const handleNext = () => {
+    trackEvent('recruit_conditions_start', { contest_id: id });
     setContestId(id);
     router.push(`/explore/build-team/recruit-count?contestId=${id}` as never);
   };

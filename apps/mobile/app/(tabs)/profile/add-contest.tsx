@@ -16,6 +16,7 @@ import { DrumRollPicker } from '../../../src/components/common/DrumRollPicker';
 import { useMypageStore } from '../../../src/store/useMypageStore';
 import { addContestCareer, updateContestCareer } from '../../../src/services/mypageService';
 import { AwardStatus } from '../../../src/types/mypage';
+import { trackEvent } from '../../../src/services/gtm';
 
 const ROLES = [
   '기획',
@@ -119,6 +120,7 @@ export default function AddContestScreen() {
       } else {
         const result = await addContestCareer(data);
         addCareerLocal(result);
+        trackEvent('career_add', { item_type: 'contest' });
         Alert.alert('등록 완료', '공모전 경험이 등록되었어요.', [
           { text: '확인', onPress: () => router.back() },
         ]);

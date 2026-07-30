@@ -27,6 +27,7 @@ import { useAuthStore } from '../../../src/store/useAuthStore';
 import { confirmTeam } from '../../../src/services/postService';
 import { sendInvitation, getSentInvitations, cancelInvitation } from '../../../src/services/invitationService';
 import { formatDDay } from '../../../src/utils/dday';
+import { trackEvent } from '../../../src/services/gtm';
 
 const IS_MOCK = process.env.EXPO_PUBLIC_API_MODE === 'mock';
 
@@ -232,6 +233,7 @@ export default function ChatDetailScreen() {
       Alert.alert('팀 확정 실패', '팀을 확정하지 못했어요. 잠시 후 다시 시도해주세요.');
       return;
     }
+    trackEvent('team_confirm', { post_id: chat?.postId ?? null });
     setIsTeamConfirmed(true);
     const systemMsg: Message = {
       id: Date.now(),
@@ -253,6 +255,11 @@ export default function ChatDetailScreen() {
       if (!chat?.postId) return;
       try {
         const res = await sendInvitation(chat.postId, contact.id);
+        trackEvent('invite_sent', {
+          post_id: chat.postId,
+          target_user_id: contact.id,
+          source: 'chat_room',
+        });
         setInvitedUsers((prev) => [
           ...prev,
           {
@@ -281,6 +288,11 @@ export default function ChatDetailScreen() {
     };
     setInvitedUsers((prev) => [...prev, newUser]);
     setInvitedIds((prev) => new Set([...prev, contact.id]));
+    trackEvent('invite_sent', {
+      post_id: chat?.postId ?? null,
+      target_user_id: contact.id,
+      source: 'chat_room',
+    });
 
     // 1:1 채팅방에 초대 자동 메시지 추가 (mock 전용)
     const now = new Date().toISOString();
@@ -329,6 +341,7 @@ export default function ChatDetailScreen() {
         return;
       }
     }
+    trackEvent('invite_cancel', { post_id: chat?.postId ?? null, target_user_id: user.id });
     setInvitedUsers((prev) => prev.filter((u) => u.id !== user.id));
     setInvitedIds((prev) => { const s = new Set(prev); s.delete(user.id); return s; });
   };
@@ -455,6 +468,8 @@ export default function ChatDetailScreen() {
               onPress={async () => {
                 setIsLeaveConfirmVisible(false);
                 try { await leaveChatRoom(parseInt(chatId as string)); } catch {}
+                // API 실패해도 UX상 항상 나가짐 처리되므로(위 catch 참고) 이벤트도 동일하게 보낸다
+                trackEvent('chat_leave', { chat_id: parseInt(chatId as string) });
                 router.back();
               }}
             >
@@ -485,6 +500,7 @@ export default function ChatDetailScreen() {
                 setIsDeleteRoomConfirmVisible(false);
                 try {
                   await deleteChatRoom(parseInt(chatId as string));
+                  trackEvent('chat_delete', { chat_id: parseInt(chatId as string) });
                   router.back();
                 } catch (e) {
                   console.error('[ChatDetail] 채팅방 삭제 실패:', e);

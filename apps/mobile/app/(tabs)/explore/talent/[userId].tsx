@@ -21,6 +21,8 @@ import { ReviewStatsCard } from '../../../../src/components/profile/ReviewStatsC
 import { requireAuthForChat } from '../../../../src/utils/authGuard';
 import { Alert } from '../../../../src/utils/alert';
 import { resolveImageUrl } from '../../../../src/utils/imageUrl';
+import { useScrollDepthTracking } from '../../../../src/hooks/useScrollDepthTracking';
+import { trackEvent } from '../../../../src/services/gtm';
 
 const IS_MOCK = process.env.EXPO_PUBLIC_API_MODE === 'mock';
 
@@ -114,6 +116,7 @@ export default function TalentDetailScreen() {
   const isMe = detail?.userId === currentUserId;
   const segments = useSegments();
   const sourceTab = (segments[1] as string) ?? 'explore';
+  const scrollTracking = useScrollDepthTracking('profile_detail', userId);
 
   useEffect(() => {
     setLoadError(false);
@@ -159,6 +162,7 @@ export default function TalentDetailScreen() {
     if (!requireAuthForChat(`/${sourceTab}/talent/${detail.userId}`)) return;
     try {
       const chatRoomId = await getOrCreateDirectChatRoom(detail.userId);
+      trackEvent('chat_start', { target_user_id: detail.userId });
       // messages 탭은 채팅방이 자기 자신의 [chatId] 화면이라 /chat 접두사가 없다
       const chatPath = sourceTab === 'messages' ? `/messages/${chatRoomId}` : `/${sourceTab}/chat/${chatRoomId}`;
       router.push(chatPath as never);
@@ -205,7 +209,11 @@ export default function TalentDetailScreen() {
         <View style={s.headerSide} />
       </View>
 
-      <ScrollView contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        contentContainerStyle={s.scroll}
+        showsVerticalScrollIndicator={false}
+        {...scrollTracking}
+      >
 
         {/* ── 프로필 카드 ── */}
         <View style={s.profileCard}>

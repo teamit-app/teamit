@@ -22,6 +22,7 @@ import { toggleTalentHeart as toggleTalentHeartInStore, toggleContestHeart as to
 import { LikedPost } from '../../../src/types/mypage';
 import { PoolUser } from '../../../src/types/talent';
 import { Contest } from '../../../src/types/contest';
+import { trackEvent } from '../../../src/services/gtm';
 
 type Tab = 'TALENT' | 'CONTEST' | 'POST';
 type PostFilter = 'ALL' | 'OPEN' | 'CLOSED';
@@ -128,6 +129,11 @@ export default function LikesScreen() {
   const [tab, setTab] = useState<Tab>('TALENT');
   const [postFilter, setPostFilter] = useState<PostFilter>('ALL');
 
+  const handleTabPress = (key: Tab) => {
+    trackEvent('tab_select', { tab_group: 'likes_menu', tab_name: key.toLowerCase(), from_tab: tab.toLowerCase() });
+    setTab(key);
+  };
+
   const [likedTalents, setLikedTalents] = useState<PoolUser[]>([]);
   const [likedContests, setLikedContests] = useState<Contest[]>([]);
   const [likedPosts, setLikedPosts] = useState<LikedPost[]>([]);
@@ -164,6 +170,7 @@ export default function LikesScreen() {
     if (!requireAuthForChat(`/explore/talent/${targetUserId}`)) return;
     try {
       const chatRoomId = await getOrCreateDirectChatRoom(targetUserId);
+      trackEvent('chat_start', { target_user_id: targetUserId });
       router.push(`/explore/chat/${chatRoomId}` as never);
     } catch (e) {
       // 이전엔 로그만 남기고 사용자에게는 아무 반응도 없어서, 버튼을 눌러도 채팅창으로
@@ -207,7 +214,7 @@ export default function LikesScreen() {
             <TouchableOpacity
               key={key}
               style={[styles.segTab, tab === key && styles.segTabActive]}
-              onPress={() => setTab(key)}
+              onPress={() => handleTabPress(key)}
               activeOpacity={0.8}
             >
               <Text style={[styles.segTabText, tab === key && styles.segTabTextActive]}>

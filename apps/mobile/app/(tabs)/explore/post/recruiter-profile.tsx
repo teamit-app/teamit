@@ -20,6 +20,8 @@ import { toggleTalentHeart as toggleTalentHeartInStore } from '../../../../src/h
 import { TalentDetail, TalentRecruitPost } from '../../../../src/types/talent';
 import { StarRating } from '../../../../src/components/common/StarRating';
 import { requireAuthForChat } from '../../../../src/utils/authGuard';
+import { useScrollDepthTracking } from '../../../../src/hooks/useScrollDepthTracking';
+import { trackEvent } from '../../../../src/services/gtm';
 
 const IS_MOCK = process.env.EXPO_PUBLIC_API_MODE === 'mock';
 
@@ -122,6 +124,9 @@ export default function RecruiterProfileScreen() {
   const isMe = detail?.userId === currentUserId;
   const segments = useSegments();
   const sourceTab = (segments[1] as string) ?? 'explore';
+  // ScrollView는 detail 로드가 끝난 뒤에만 렌더링되므로, 실제로 스크롤이
+  // 발생하는 시점엔 이미 detail.userId를 알고 있다.
+  const scrollTracking = useScrollDepthTracking('profile_detail', detail?.userId ?? postId);
 
   useEffect(() => {
     const id = Number(postId);
@@ -175,6 +180,7 @@ export default function RecruiterProfileScreen() {
     if (!requireAuthForChat(`/${sourceTab}/post/recruiter-profile?postId=${postId}`)) return;
     try {
       const chatRoomId = await getOrCreateDirectChatRoom(detail.userId);
+      trackEvent('chat_start', { target_user_id: detail.userId });
       const chatPath = sourceTab === 'messages' ? `/messages/${chatRoomId}` : `/${sourceTab}/chat/${chatRoomId}`;
       router.push(chatPath as never);
     } catch (e) {
@@ -220,7 +226,11 @@ export default function RecruiterProfileScreen() {
         <View style={s.headerSide} />
       </View>
 
-      <ScrollView contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        contentContainerStyle={s.scroll}
+        showsVerticalScrollIndicator={false}
+        {...scrollTracking}
+      >
 
         {/* ── 프로필 카드 ── */}
         <View style={s.profileCard}>

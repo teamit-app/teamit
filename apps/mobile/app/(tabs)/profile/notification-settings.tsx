@@ -9,6 +9,7 @@ import {
   updateNotificationSettings,
 } from '../../../src/services/mypageService';
 import { NotificationSettings } from '../../../src/types/mypage';
+import { trackEvent } from '../../../src/services/gtm';
 
 const SETTINGS_CONFIG: {
   key: keyof NotificationSettings;
@@ -68,6 +69,7 @@ export default function NotificationSettingsScreen() {
   const handleToggle = async (key: keyof NotificationSettings, value: boolean) => {
     const prev = settings;
     setSettings({ ...settings, [key]: value });
+    trackEvent('notification_toggle', { item_type: key, action: value ? 'enable' : 'disable' });
     try {
       await updateNotificationSettings({ [key]: value });
     } catch {

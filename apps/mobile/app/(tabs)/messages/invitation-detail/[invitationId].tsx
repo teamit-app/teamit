@@ -18,6 +18,8 @@ import { getPostDetail, adaptToRecruitPostDetail } from '../../../../src/service
 import { declineInvitation, acceptInvitation } from '../../../../src/services/invitationService';
 import { RecruitPostDetail } from '../../../../src/types/contest';
 import { Alert } from '../../../../src/utils/alert';
+import { trackEvent } from '../../../../src/services/gtm';
+import { useScrollDepthTracking } from '../../../../src/hooks/useScrollDepthTracking';
 
 // ── 거절 확인 팝업 ─────────────────────────────────────────────────────────
 function DeclineModal({
@@ -70,6 +72,9 @@ export default function InvitationDetailScreen() {
   const iid = Number(invitationId);
   const pid = Number(postId);
   const [post, setPost] = useState<RecruitPostDetail | null>(null);
+  // 초대장에 실린 모집글도 결국 같은 게시글 콘텐츠라, 일반 모집글 상세와 같은
+  // item_type으로 합쳐서 "모집글을 얼마나 읽는지"를 진입 경로와 무관하게 집계한다.
+  const scrollTracking = useScrollDepthTracking('post_detail', pid);
 
   useEffect(() => {
     getPostDetail(pid).then((d) => setPost(adaptToRecruitPostDetail(d))).catch(() => {});
@@ -79,6 +84,8 @@ export default function InvitationDetailScreen() {
     try {
       await declineInvitation(iid);
     } catch (_) {}
+    // 실패해도 UX상 거절은 그대로 진행되므로(사유: 위 catch 참고) 이벤트도 동일하게 보낸다
+    trackEvent('invitation_decline', { item_id: iid });
     setDeclineModalVisible(false);
     router.back();
   };
@@ -86,6 +93,7 @@ export default function InvitationDetailScreen() {
   const handleAccept = async () => {
     try {
       await acceptInvitation(iid);
+      trackEvent('invitation_accept', { item_id: iid });
       router.replace('/(tabs)/messages' as never);
     } catch (e) {
       // 수락 전에 모집글이 마감되면 서버가 초대장을 삭제하고 에러를 내려준다 —
@@ -109,6 +117,7 @@ export default function InvitationDetailScreen() {
         ref={scrollRef}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
+        {...scrollTracking}
       >
 
         <PostDetailContent
