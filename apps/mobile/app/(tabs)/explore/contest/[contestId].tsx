@@ -21,6 +21,7 @@ import { SortOption, RecruitPost, ContestDetail } from '../../../../src/types/co
 import { formatDDay } from '../../../../src/utils/dday';
 import { withAuth } from '../../../../src/utils/authGuard';
 import { resolveImageUrl } from '../../../../src/utils/imageUrl';
+import { trackEvent } from '../../../../src/services/gtm';
 
 const SORT_LABEL: Record<SortOption, string> = {
   LATEST: '최신순',
@@ -143,6 +144,16 @@ export default function ContestDetailScreen() {
   const id = Number(contestId);
   const storeContest = contests.find((c) => c.contestId === id);
   const isHearted = storeContest?.isHearted ?? detail?.isHearted ?? false;
+
+  const handleBuildTeamPress = () => {
+    trackEvent('build_team_start', { contest_id: id, source: 'contest_detail' });
+    withAuth(`/explore/build-team/${id}`);
+  };
+
+  const handleParticipatePress = () => {
+    trackEvent('participate_start', { contest_id: id });
+    withAuth(`/explore/participate?contestId=${id}`);
+  };
 
   useEffect(() => {
     getContestDetail(id).then(setDetail).catch(() => {});
@@ -295,7 +306,7 @@ export default function ContestDetailScreen() {
             ]}
             activeOpacity={myPost || !currentUserId ? 1 : 0.85}
             disabled={!currentUserId}
-            onPress={myPost || !currentUserId ? undefined : () => withAuth(`/explore/build-team/${id}`)}
+            onPress={myPost || !currentUserId ? undefined : handleBuildTeamPress}
           >
             <View style={[styles.participateAccentBar, (!!myPost || !currentUserId) && styles.participateAccentBarDone]} />
             <View style={styles.participateCardContent}>
@@ -313,7 +324,7 @@ export default function ContestDetailScreen() {
                 </View>
                 <Text style={[styles.participateDesc, !!myPost && styles.participateDescDone]}>
                   {myPost
-                    ? '이 공모전에는 이미 모집글을 작성했어요.\n공모전당 모집글은 하나만 작성할 수 있어요.'
+                    ? '이 공모전에는 이미 모집글을 작성했어요.\n모집글은 공모전당 하나만 작성할 수 있어요.'
                     : '내가 모집자가 되어 팀원을 직접 찾아요.\n원하는 팀 구성을 주도하고 싶다면 추천해요.'}
                 </Text>
               </View>
@@ -331,7 +342,7 @@ export default function ContestDetailScreen() {
             onPress={
               participated || !currentUserId
                 ? undefined
-                : () => withAuth(`/explore/participate?contestId=${id}`)
+                : handleParticipatePress
             }
           >
             <View style={[styles.participateAccentBar, (participated || !currentUserId) && styles.participateAccentBarDone]} />
@@ -340,7 +351,7 @@ export default function ContestDetailScreen() {
               <View style={styles.participateTextWrap}>
                 <View style={styles.participateTitleRow}>
                   <Text style={[styles.participateTitle, participated && styles.participateTitleDone]}>
-                    {participated ? '매칭 후보 등록 완료' : '팀 매칭 제안 받기'}
+                    {participated ? '매칭 후보 등록 완료' : '팀 매칭 제안 받기 (후보 등록)'}
                   </Text>
                   {!participated && (
                     <View style={styles.timeBadge}>

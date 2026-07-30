@@ -12,6 +12,7 @@ import { Colors } from '../../../../src/constants/colors';
 import { useBuildTeamStore } from '../../../../src/store/useBuildTeamStore';
 import { getPostDetail } from '../../../../src/services/postService';
 import { getContestRegistrations } from '../../../../src/services/mypageService';
+import { trackEvent } from '../../../../src/services/gtm';
 
 const MIN = 1;
 const MAX = 8;
@@ -68,6 +69,7 @@ export default function RecruitCountScreen() {
       // 뒤로가기를 눌렀을 때 방금 지나온 다른 수정 화면으로 엉뚱하게 튐
       router.replace(`/explore/build-team/recruit-confirm?contestId=${contestId}` as never);
     } else {
+      trackEvent('recruit_step_complete', { contest_id: Number(contestId), step: CURRENT_STEP });
       router.push(`/explore/build-team/recruit-skills?contestId=${contestId}${editSuffix}` as never);
     }
   };

@@ -226,7 +226,7 @@ export default function ProfileScreen() {
             } catch {
               Alert.alert('오류', '탈퇴 처리 중 문제가 발생했어요. 다시 시도해주세요.');
             } finally {
-              useAuthStore.getState().logout();
+              useAuthStore.getState().logout('withdraw');
               router.replace('/(tabs)/home');
             }
           },

@@ -20,6 +20,7 @@ import { useOnboardingStore } from '../../src/store/useOnboardingStore';
 import { useAuthStore } from '../../src/store/useAuthStore';
 import { tokenStorage } from '../../src/services/tokenStorage';
 import { devLogin } from '../../src/services/authService';
+import { trackEvent, setUserId as setGtmUserId } from '../../src/services/gtm';
 
 const { height: SCREEN_H } = Dimensions.get('window');
 const IS_MOCK = process.env.EXPO_PUBLIC_API_MODE === 'mock';
@@ -44,6 +45,7 @@ export default function LoginScreen() {
   const cancelKakaoPollRef = useRef(false);
 
   useEffect(() => {
+    trackEvent('login_page_view');
     return () => {
       cancelKakaoPollRef.current = true;
     };
@@ -51,6 +53,7 @@ export default function LoginScreen() {
 
   const handleKakaoLogin = async () => {
     if (isLoggingIn) return;
+    trackEvent('kakao_login_click');
 
     if (IS_MOCK) {
       setUserId(1);
@@ -99,6 +102,8 @@ export default function LoginScreen() {
         // "비로그인"으로 오판해 데이터를 잘못 캐싱하는 레이스 컨디션이 생긴다.
         // 여기서 이미 확보한 userId를 바로 반영해 그 창을 없앤다.
         useAuthStore.getState().setCurrentUserId(userId);
+        setGtmUserId(userId);
+        trackEvent('login', { method: 'kakao' });
         if (Platform.OS === 'web') {
           webPopup?.close();
         } else {

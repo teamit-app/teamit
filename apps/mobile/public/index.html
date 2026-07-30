@@ -24,6 +24,39 @@
       }
     </style>
 
+    <!-- 인플루언서 첫 유입 UTM 캡처 — GTM보다 먼저 실행되어야 GA4 설정 태그가
+         초기화 시점에 dataLayer에서 이 값을 읽어갈 수 있다. -->
+    <script>
+    (function() {
+      try {
+        var utmKeys = ['utm_source', 'utm_medium', 'utm_campaign', 'utm_content'];
+        var params = new URLSearchParams(window.location.search);
+        var firstTouch = {};
+
+        utmKeys.forEach(function(key) {
+          var storageKey = 'first_touch_' + key;
+          var value = params.get(key);
+
+          if (!localStorage.getItem(storageKey) && value) {
+            localStorage.setItem(storageKey, value);
+          }
+          // SPA라 이 스크립트는 세션당(첫 진입 시) 한 번만 실행된다 — 이후
+          // 화면 전환은 클라이언트 라우팅이라 URL의 UTM이 사라진다. 그래서
+          // "이번에 가입까지 이어진 세션의 UTM"을 나중에(가입 시점) 꺼내 쓸 수
+          // 있게 sessionStorage에 별도로 남겨둔다(first_touch와 달리 매번 덮어씀).
+          if (value) {
+            sessionStorage.setItem('session_' + key, value);
+          }
+
+          firstTouch['first_touch_' + key.replace('utm_', '')] = localStorage.getItem(storageKey) || '(not set)';
+        });
+
+        window.dataLayer = window.dataLayer || [];
+        window.dataLayer.push(firstTouch);
+      } catch (e) {}
+    })();
+    </script>
+
     <!-- Google Tag Manager -->
     <script>(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
     new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],

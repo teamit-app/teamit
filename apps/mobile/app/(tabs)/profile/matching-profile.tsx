@@ -26,6 +26,7 @@ import {
 import { formatRegionsLabel } from '../../../src/utils/region';
 import { TEAM_VIBE_LABELS, FEEDBACK_LABELS } from '../../../src/constants/matchingLabels';
 import { registerAsParticipant } from '../../../src/services/contestService';
+import { trackEvent } from '../../../src/services/gtm';
 
 // ─── Constants ──────────────────────────────────────────────────────────────
 
@@ -566,7 +567,12 @@ export default function MatchingProfileScreen() {
     onlineOfflinePref !== 'ONLINE' && regions.length === 0;
   const step4Invalid = step === 4 && regionRequiredButMissing;
 
-  const goNext = () => setStep((s) => Math.min(s + 1, totalSteps));
+  const goNext = () => {
+    // isEditMode 화면은 이 함수 자체를 호출하지 않으므로(취소/저장 버튼만 있음),
+    // 여기서 발생하는 이벤트는 항상 "처음부터 순서대로 진행 중"인 경우만 해당한다.
+    trackEvent('profile_step_complete', { step, source: returnTo ?? 'mypage' });
+    setStep((s) => Math.min(s + 1, totalSteps));
+  };
   const goPrev = () => {
     if (isEditMode) {
       navigateAfterAction();
@@ -625,6 +631,13 @@ export default function MatchingProfileScreen() {
           updateMyTalentSkills(currentUserId, skills);
         }
         useMypageStore.getState().reloadProfile();
+      }
+      // isEditMode(단일 스텝 수정)는 위저드를 처음부터 끝까지 마친 게 아니므로 완료가 아니라
+      // 별도의 "수정 저장" 이벤트로 집계한다.
+      if (isEditMode) {
+        trackEvent('profile_edit_save', { step, source: returnTo ?? 'mypage' });
+      } else {
+        trackEvent('profile_final_step_complete', { source: returnTo ?? 'mypage' });
       }
       navigateAfterAction();
     } catch {

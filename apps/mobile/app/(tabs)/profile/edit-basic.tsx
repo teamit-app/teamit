@@ -18,6 +18,7 @@ import { useMypageStore } from '../../../src/store/useMypageStore';
 import { updateMyProfile } from '../../../src/services/mypageService';
 import { Gender, VerificationStatus } from '../../../src/types/mypage';
 import { EDUCATION_STATUS_LABEL } from '../../../src/constants/education';
+import { trackEvent } from '../../../src/services/gtm';
 
 // ──────────────────────────────────────────────────
 // FormField: label 위, 입력/선택 아래
@@ -173,6 +174,7 @@ export default function EditBasicScreen() {
         gender,
         birthDate,
       });
+      trackEvent('profile_basic_info_save', { source: returnTo ?? 'mypage' });
       await reloadProfile();
       if (returnTo === 'participate') {
         router.replace(`/explore/participate?contestId=${contestId}` as never);

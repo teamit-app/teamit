@@ -18,6 +18,7 @@ import {
   cancelPostApplication,
 } from '../../../src/services/mypageService';
 import { ContestRegistration, PostApplication } from '../../../src/types/mypage';
+import { trackEvent } from '../../../src/services/gtm';
 import { unmarkContestParticipant } from '../../../src/hooks/useExploreData';
 
 type Tab = 'contest' | 'post';
@@ -77,6 +78,11 @@ export default function MyApplicationsScreen() {
   const [postApps, setPostApps] = useState<PostApplication[]>([]);
   const [loading, setLoading] = useState(true);
 
+  const handleTabPress = (key: Tab) => {
+    trackEvent('tab_select', { tab_group: 'my_applications_menu', tab_name: key, from_tab: tab });
+    setTab(key);
+  };
+
   useEffect(() => {
     Promise.all([getContestRegistrations(), getPostApplications()])
       .then(([regs, apps]) => {
@@ -97,6 +103,7 @@ export default function MyApplicationsScreen() {
           style: 'destructive',
           onPress: async () => {
             await cancelContestRegistration(reg.contestId);
+            trackEvent('participate_cancel', { contest_id: reg.contestId });
             unmarkContestParticipant(reg.contestId);
             setRegistrations((prev) =>
               prev.filter((r) => r.registrationId !== reg.registrationId),
@@ -118,6 +125,7 @@ export default function MyApplicationsScreen() {
           style: 'destructive',
           onPress: async () => {
             await cancelPostApplication(app.applicationId);
+            trackEvent('apply_cancel', { post_id: app.postId, source: 'my_applications' });
             setPostApps((prev) =>
               prev.filter((a) => a.applicationId !== app.applicationId),
             );
@@ -209,7 +217,7 @@ export default function MyApplicationsScreen() {
       <View style={styles.tabRow}>
         <TouchableOpacity
           style={[styles.tab, tab === 'contest' && styles.tabActive]}
-          onPress={() => setTab('contest')}
+          onPress={() => handleTabPress('contest')}
         >
           <Text style={[styles.tabText, tab === 'contest' && styles.tabTextActive]}>
             공모전 후보 등록 내역
@@ -217,7 +225,7 @@ export default function MyApplicationsScreen() {
         </TouchableOpacity>
         <TouchableOpacity
           style={[styles.tab, tab === 'post' && styles.tabActive]}
-          onPress={() => setTab('post')}
+          onPress={() => handleTabPress('post')}
         >
           <Text style={[styles.tabText, tab === 'post' && styles.tabTextActive]}>
             게시글 지원 내역

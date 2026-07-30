@@ -15,6 +15,7 @@ import { postReview } from '../../../src/services/reviewService';
 import { TeamMemberStatus } from '../../../src/types/message';
 import { getChat } from '../../../src/services/messageService';
 import { useAuthStore } from '../../../src/store/useAuthStore';
+import { trackEvent } from '../../../src/services/gtm';
 import {
   TOTAL_RATING_OPTIONS,
   RESPONSE_SPEED_OPTIONS,
@@ -116,6 +117,12 @@ export default function ReviewWriteScreen() {
   const MY_USER_ID = useAuthStore((state) => state.currentUserId) ?? 0;
   const [reviewableMembers, setReviewableMembers] = useState<TeamMemberStatus[]>([]);
 
+  // 팀채팅방의 리뷰 배너는 이미 다 리뷰했으면 이 화면 대신 review-complete로 보내버려서,
+  // 배너 "클릭"보다 이 화면(누구를 리뷰할까요)에 실제로 도착했는지를 추적하는 게 더 명확하다.
+  useEffect(() => {
+    trackEvent('review_write_open', { chat_id: chatIdNum });
+  }, []);
+
   useEffect(() => {
     getChat(chatIdNum).then((chat) => {
       const members = (chat?.teamInfo?.members ?? []).filter((m) => m.filled && m.id !== MY_USER_ID);
@@ -175,7 +182,19 @@ export default function ReviewWriteScreen() {
   };
 
   const handleNext = async () => {
-    if (step < 5) { setStep((s) => s + 1); return; }
+    if (step < 5) {
+      if (step === 0) {
+        trackEvent('review_start', { chat_id: chatIdNum, target_user_id: selectedMember?.id ?? null });
+      } else {
+        trackEvent('review_step_complete', {
+          chat_id: chatIdNum,
+          target_user_id: selectedMember?.id ?? null,
+          step,
+        });
+      }
+      setStep((s) => s + 1);
+      return;
+    }
 
     // step 5 → 제출
     if (!selectedMember || isSubmitting) return;
@@ -191,6 +210,16 @@ export default function ReviewWriteScreen() {
         comment,
       });
       markSubmitted(chatIdNum, selectedMember.id);
+      trackEvent('review_submit', { chat_id: chatIdNum, target_user_id: selectedMember.id });
+
+      // markSubmitted 직후 스토어에서 다시 읽어야 방금 이 제출까지 반영된 최신 목록으로
+      // "전체 완료"를 정확히 판단할 수 있다 (렌더 시점의 unreviewedMembers는 이 제출 전 값).
+      const latestSubmitted = useReviewStore.getState().getSubmittedReceiverIds(chatIdNum);
+      const allReviewsDone = reviewableMembers.every((m) => latestSubmitted.includes(m.id));
+      if (allReviewsDone) {
+        trackEvent('review_all_complete', { chat_id: chatIdNum });
+      }
+
       router.replace({
         pathname: '/(tabs)/messages/review-complete' as never,
         params: { chatId, memberName: formatMemberName(selectedMember.name, selectedMember.realName) },

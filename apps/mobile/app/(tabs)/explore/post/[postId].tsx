@@ -30,6 +30,8 @@ import { cancelPostApplication } from '../../../../src/services/mypageService';
 import { useAuthStore } from '../../../../src/store/useAuthStore';
 import { requireAuth } from '../../../../src/utils/authGuard';
 import { RecruitPostDetail } from '../../../../src/types/contest';
+import { useScrollDepthTracking } from '../../../../src/hooks/useScrollDepthTracking';
+import { trackEvent } from '../../../../src/services/gtm';
 
 // ── 메인 화면 ─────────────────────────────────────────────────────────────────
 export default function PostDetailScreen() {
@@ -56,6 +58,7 @@ export default function PostDetailScreen() {
   const isOwner = post?.ownerUserId != null && post.ownerUserId === currentUserId;
   const segments = useSegments();
   const sourceTab = (segments[1] as string) ?? 'explore';
+  const scrollTracking = useScrollDepthTracking('post_detail', postId);
 
   const id = Number(postId);
   // URL에 contestId가 안 넘어온 경우를 대비해 조회된 모집글 자체의 contestId로 폴백
@@ -86,6 +89,7 @@ export default function PostDetailScreen() {
     const next = !isHearted;
     setIsHearted(next);
     setLikeCount((c) => c + (next ? 1 : -1));
+    trackEvent(next ? 'like' : 'unlike', { item_type: 'post', item_id: id });
     try {
       if (next) {
         await addPostHeart(id);
@@ -106,6 +110,7 @@ export default function PostDetailScreen() {
     }
     try {
       const res = await applyToPost(id);
+      trackEvent('apply_submit', { post_id: id });
       setHasApplied(true);
       setMyApplicationId(res.applicationId);
     } catch (e) {
@@ -126,6 +131,7 @@ export default function PostDetailScreen() {
           style: 'destructive',
           onPress: async () => {
             await cancelPostApplication(myApplicationId);
+            trackEvent('apply_cancel', { post_id: id, source: 'post_detail' });
             setHasApplied(false);
             setMyApplicationId(null);
           },
@@ -162,6 +168,7 @@ export default function PostDetailScreen() {
         ref={scrollRef}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
+        {...scrollTracking}
       >
 
         <PostDetailContent
@@ -275,6 +282,7 @@ export default function PostDetailScreen() {
                     style: 'destructive',
                     onPress: async () => {
                       await deletePost(id);
+                      trackEvent('post_delete', { post_id: id });
                       router.back();
                     },
                   },
