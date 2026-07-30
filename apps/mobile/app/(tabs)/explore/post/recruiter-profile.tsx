@@ -16,7 +16,7 @@ import { getOrCreateDirectChatRoom } from '../../../../src/services/messageServi
 import { getUserDetail } from '../../../../src/services/talentService';
 import { Alert } from '../../../../src/utils/alert';
 import { useAuthStore } from '../../../../src/store/useAuthStore';
-import { useExploreStore } from '../../../../src/store/useExploreStore';
+import { toggleTalentHeart as toggleTalentHeartInStore } from '../../../../src/hooks/useExploreData';
 import { TalentDetail, TalentRecruitPost } from '../../../../src/types/talent';
 import { StarRating } from '../../../../src/components/common/StarRating';
 import { requireAuthForChat } from '../../../../src/utils/authGuard';
@@ -119,7 +119,6 @@ export default function RecruiterProfileScreen() {
   const [loadError, setLoadError] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
   const currentUserId = useAuthStore((s) => s.currentUserId);
-  const toggleTalentHeartInStore = useExploreStore((s) => s.toggleTalentHeart);
   const isMe = detail?.userId === currentUserId;
   const segments = useSegments();
   const sourceTab = (segments[1] as string) ?? 'explore';

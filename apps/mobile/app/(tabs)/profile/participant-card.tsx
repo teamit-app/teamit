@@ -16,7 +16,7 @@ import { registerAsParticipant } from '../../../src/services/contestService';
 import { getMyPosts } from '../../../src/services/postService';
 import { ContestRegistration } from '../../../src/types/mypage';
 import { formatMatchingCard } from '../../../src/constants/matchingLabels';
-import { useExploreStore } from '../../../src/store/useExploreStore';
+import { unmarkContestParticipant } from '../../../src/hooks/useExploreData';
 
 function DDayBadge({ dDay }: { dDay: number }) {
   if (dDay < 0) {
@@ -68,7 +68,6 @@ export default function ParticipantCardScreen() {
   const [needsResubmit, setNeedsResubmit] = useState(false);
   const [resubmitting, setResubmitting] = useState(false);
   const isMounted = useRef(false);
-  const unmarkContestParticipant = useExploreStore((s) => s.unmarkContestParticipant);
 
   useFocusEffect(
     useCallback(() => {

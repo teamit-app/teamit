@@ -15,7 +15,7 @@ import { EDUCATION_STATUS_LABEL } from '../../../../src/constants/education';
 import { getOrCreateDirectChatRoom } from '../../../../src/services/messageService';
 import { getUserDetail } from '../../../../src/services/talentService';
 import { useAuthStore } from '../../../../src/store/useAuthStore';
-import { useExploreStore } from '../../../../src/store/useExploreStore';
+import { toggleTalentHeart as toggleTalentHeartInStore } from '../../../../src/hooks/useExploreData';
 import { TalentDetail, TalentRecruitPost } from '../../../../src/types/talent';
 import { ReviewStatsCard } from '../../../../src/components/profile/ReviewStatsCard';
 import { requireAuthForChat } from '../../../../src/utils/authGuard';
@@ -111,7 +111,6 @@ export default function TalentDetailScreen() {
   const [loadError, setLoadError] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
   const currentUserId = useAuthStore((s) => s.currentUserId);
-  const toggleTalentHeartInStore = useExploreStore((s) => s.toggleTalentHeart);
   const isMe = detail?.userId === currentUserId;
   const segments = useSegments();
   const sourceTab = (segments[1] as string) ?? 'explore';
@@ -141,8 +140,8 @@ export default function TalentDetailScreen() {
     }
   }, [userId, reloadKey]);
 
-  // useExploreStore를 통해 토글해야 탐색 > 인재풀 목록의 하트 상태도 함께 갱신된다
-  // (그 store가 인재 좋아요의 단일 진실 공급원 역할을 함)
+  // useExploreData의 toggleTalentHeart를 통해 토글해야 탐색 > 인재풀 목록의 하트 상태도 함께 갱신된다
+  // (그 쿼리 캐시가 인재 좋아요의 단일 진실 공급원 역할을 함)
   const handleToggleHeart = async () => {
     if (!detail) return;
     const prev = hearted;

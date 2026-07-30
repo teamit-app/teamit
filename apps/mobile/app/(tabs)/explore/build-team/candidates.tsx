@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   View,
   Text,
@@ -8,6 +8,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
+import { useQuery, useInfiniteQuery } from '@tanstack/react-query';
 import { Colors } from '../../../../src/constants/colors';
 import { Candidate } from '../../../../src/types/team';
 import { PostApplicant } from '../../../../src/types/mypage';
@@ -15,6 +16,7 @@ import { useInvitationStore } from '../../../../src/store/useInvitationStore';
 import { useAuthStore } from '../../../../src/store/useAuthStore';
 import { sendInvitation } from '../../../../src/services/invitationService';
 import { getContestCandidates, getAllContestCandidates } from '../../../../src/services/mypageService';
+import { REALTIME_STALE_TIME } from '../../../../src/services/realtimeEvents';
 
 const IS_MOCK = process.env.EXPO_PUBLIC_API_MODE === 'mock';
 
@@ -180,15 +182,10 @@ function CandidateCard({
 export default function CandidatesScreen() {
   const insets = useSafeAreaInsets();
   const { contestId, postId } = useLocalSearchParams<{ contestId: string; postId?: string }>();
+  const pid = Number(postId);
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
   const [isSending, setIsSending] = useState(false);
-  const [candidates, setCandidates] = useState<Candidate[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [allCandidates, setAllCandidates] = useState<Candidate[]>([]);
-  const [allLoading, setAllLoading] = useState(true);
-  const [allLoadingMore, setAllLoadingMore] = useState(false);
-  const [allPage, setAllPage] = useState(0);
-  const [allTotalPages, setAllTotalPages] = useState(0);
+  const [mockCandidates, setMockCandidates] = useState<Candidate[] | null>(null);
   const { addInvitationMessages } = useInvitationStore();
   const currentUserId = useAuthStore((s) => s.currentUserId);
 
@@ -198,47 +195,51 @@ export default function CandidatesScreen() {
     currentUserId == null ? list : list.filter((c) => c.id !== currentUserId);
 
   useEffect(() => {
-    if (IS_MOCK) {
-      import('../../../../src/data/candidates').then(({ dummyCandidates }) => {
-        setCandidates(excludeSelf(dummyCandidates));
-        setLoading(false);
-        setAllCandidates(excludeSelf(dummyCandidates));
-        setAllLoading(false);
-      });
-    } else {
-      const pid = Number(postId);
-      if (pid) {
-        getContestCandidates(pid)
-          .then((applicants) => setCandidates(excludeSelf(applicants.map(adaptCandidate))))
-          .catch(console.error)
-          .finally(() => setLoading(false));
-        getAllContestCandidates(pid, 0)
-          .then((res) => {
-            setAllCandidates(excludeSelf(res.content.map(adaptCandidate)));
-            setAllPage(res.currentPage);
-            setAllTotalPages(res.totalPages);
-          })
-          .catch(console.error)
-          .finally(() => setAllLoading(false));
-      } else {
-        setLoading(false);
-        setAllLoading(false);
-      }
-    }
-  }, [postId, currentUserId]);
+    if (!IS_MOCK) return;
+    import('../../../../src/data/candidates').then(({ dummyCandidates }) => {
+      setMockCandidates(dummyCandidates);
+    });
+  }, []);
+
+  const { data: matchedRaw, isLoading: matchedLoading } = useQuery({
+    queryKey: ['contestCandidates', pid],
+    queryFn: () => getContestCandidates(pid),
+    enabled: !IS_MOCK && !!pid,
+    staleTime: REALTIME_STALE_TIME,
+  });
+
+  const candidates = useMemo(() => {
+    if (IS_MOCK) return excludeSelf(mockCandidates ?? []);
+    return excludeSelf((matchedRaw ?? []).map(adaptCandidate));
+  }, [mockCandidates, matchedRaw, currentUserId]);
+  const loading = IS_MOCK ? mockCandidates === null : !pid ? false : matchedLoading;
+
+  const {
+    data: allPagesData,
+    isLoading: allQueryLoading,
+    isFetchingNextPage: allLoadingMore,
+    fetchNextPage,
+    hasNextPage,
+  } = useInfiniteQuery({
+    queryKey: ['allContestCandidates', pid],
+    queryFn: ({ pageParam }) => getAllContestCandidates(pid, pageParam),
+    initialPageParam: 0,
+    getNextPageParam: (lastPage) =>
+      lastPage.currentPage + 1 < lastPage.totalPages ? lastPage.currentPage + 1 : undefined,
+    enabled: !IS_MOCK && !!pid,
+    staleTime: REALTIME_STALE_TIME,
+  });
+
+  const allCandidates = useMemo(() => {
+    if (IS_MOCK) return excludeSelf(mockCandidates ?? []);
+    const flat = (allPagesData?.pages ?? []).flatMap((page) => page.content);
+    return excludeSelf(flat.map(adaptCandidate));
+  }, [mockCandidates, allPagesData, currentUserId]);
+  const allLoading = IS_MOCK ? mockCandidates === null : !pid ? false : allQueryLoading;
 
   const loadMoreAllCandidates = () => {
-    const pid = Number(postId);
-    if (!pid || allLoadingMore || allPage + 1 >= allTotalPages) return;
-    setAllLoadingMore(true);
-    getAllContestCandidates(pid, allPage + 1)
-      .then((res) => {
-        setAllCandidates((prev) => [...prev, ...excludeSelf(res.content.map(adaptCandidate))]);
-        setAllPage(res.currentPage);
-        setAllTotalPages(res.totalPages);
-      })
-      .catch(console.error)
-      .finally(() => setAllLoadingMore(false));
+    if (!hasNextPage || allLoadingMore) return;
+    fetchNextPage();
   };
 
   const toggleSelect = (id: number) =>
@@ -376,7 +377,7 @@ export default function CandidatesScreen() {
                 }
               />
             ))}
-            {allPage + 1 < allTotalPages && (
+            {!IS_MOCK && hasNextPage && (
               <TouchableOpacity
                 style={styles.loadMoreBtn}
                 onPress={loadMoreAllCandidates}

@@ -13,7 +13,7 @@ import { Colors } from '../../../src/constants/colors';
 import { ScreenHeader } from '../../../src/components/common/ScreenHeader';
 import { getContestDetail, registerAsParticipant } from '../../../src/services/contestService';
 import { useMypageStore } from '../../../src/store/useMypageStore';
-import { useExploreStore } from '../../../src/store/useExploreStore';
+import { markContestParticipant } from '../../../src/hooks/useExploreData';
 import { MatchingProfileData } from '../../../src/types/mypage';
 import { formatRegionsLabel } from '../../../src/utils/region';
 import { formatMatchingCard } from '../../../src/constants/matchingLabels';
@@ -55,7 +55,6 @@ export default function ParticipateScreen() {
   const [contestTitle, setContestTitle] = useState('');
 
   const { matchingProfile, draftCard, loadMatchingProfile, loadProfile } = useMypageStore();
-  const markContestParticipant = useExploreStore((s) => s.markContestParticipant);
   const [isLoading, setIsLoading] = useState(true);
 
   // 이 화면에서 "수정"으로 고친 내용은 draftCard에만 담기고 라이브 매칭 프로필은

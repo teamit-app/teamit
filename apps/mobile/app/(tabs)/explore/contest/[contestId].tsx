@@ -13,7 +13,7 @@ import { router, useLocalSearchParams, useSegments } from 'expo-router';
 import { Colors } from '../../../../src/constants/colors';
 import { ScreenHeader } from '../../../../src/components/common/ScreenHeader';
 import { SortBottomSheet } from '../../../../src/components/explore/SortBottomSheet';
-import { useExploreStore } from '../../../../src/store/useExploreStore';
+import { useExploreContests, toggleContestHeart } from '../../../../src/hooks/useExploreData';
 import { useAuthStore } from '../../../../src/store/useAuthStore';
 import { getContestDetail, checkIsParticipant } from '../../../../src/services/contestService';
 import { getPostsByContest, PostListItem } from '../../../../src/services/postService';
@@ -137,9 +137,7 @@ export default function ContestDetailScreen() {
   // 포스터 실제 가로세로 비율을 구해서 컨테이너에 꽉 차게(레터박스 없이) 보여준다
   const [posterAspectRatio, setPosterAspectRatio] = useState<number | null>(null);
 
-  const contests = useExploreStore((s) => s.contests);
-  const toggleContestHeart = useExploreStore((s) => s.toggleContestHeart);
-  const markContestParticipant = useExploreStore((s) => s.markContestParticipant);
+  const { data: contests = [] } = useExploreContests();
   const currentUserId = useAuthStore((s) => s.currentUserId);
 
   const id = Number(contestId);
