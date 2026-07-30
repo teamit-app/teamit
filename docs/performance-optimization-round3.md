@@ -40,9 +40,11 @@
 
 ### docker-compose 메모리 예산
 ```
-mysql 400m + app 1000m + redis 220m = 1620m / 2048m(t3.small)
+mysql 500m + app 850m + redis 220m = 1570m / 2048m(t3.small)
 ```
-1라운드 예산(1400m)에서 220m 늘었고, OS/nginx에 약 428m 여유가 남는다. Redis는 순수 캐시 용도라 영속성이 필요 없어 RDB 스냅샷/AOF를 모두 껐다(`--save "" --appendonly no`) — 재시작 시 캐시가 비는 건 정상이고 DB에서 다시 채워진다.
+Redis는 순수 캐시 용도라 영속성이 필요 없어 RDB 스냅샷/AOF를 모두 껐다(`--save "" --appendonly no`) — 재시작 시 캐시가 비는 건 정상이고 DB에서 다시 채워진다.
+
+**실배포 후 `docker stats`로 확인해보니 mysql이 트래픽이 거의 없는데도 400m 한도의 97%(388MiB)를 쓰고 있었다.** MySQL 8.0은 기본적으로 Performance Schema(내부 진단용 계측)가 켜져 있는데, 이게 트래픽과 무관하게 100MB+를 잡아먹는 경우가 흔하다. 앱 레벨 모니터링(Actuator/CloudWatch)이 이미 있어 DB 내부 계측까지는 필요 없어서 `--performance_schema=OFF`로 껐다. 동시에 app은 1000m 중 432MiB(43%)만 쓰고 있는 걸 확인해서, 그 여유를 mysql 쪽으로 옮겼다(mysql 400→500m, app 1000→850m). 베타 트래픽이 실제로 붙으면 다시 `docker stats`로 확인 필요.
 
 **`maxmemory` 필수.** `mem_limit`(도커가 "넘으면 컨테이너를 죽인다"는 한도)과 Redis `maxmemory`(Redis 자신에게 "여기까지만 써라"라고 알려주는 설정)는 별개다. `maxmemory`가 없으면 Redis는 자기 한도를 모른 채 계속 쌓다가 `mem_limit`을 넘는 순간 OOM Kill로 컨테이너 자체가 죽는다. 그래서 `command`에 `--maxmemory 180mb --maxmemory-policy allkeys-lru`를 반드시 같이 넣었다 — `mem_limit`(220m)보다 40m 낮게 잡아서 Redis 프로세스 자체 오버헤드(커넥션 버퍼, 메모리 파편화 등) 여유분을 뒀다. `allkeys-lru`는 한도에 도달하면 "죽는" 대신 오래 안 쓴 키부터 자동으로 버리는 정책이라 순수 캐시 용도에 맞다.
 
