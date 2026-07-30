@@ -212,7 +212,10 @@ export default function ChatDetailScreen() {
     setIsSending(true);
     try {
       const newMessage = await sendMessage(parseInt(chatId as string), text);
-      setMessages((prev) => [...prev, newMessage]);
+      // 서버가 저장 직후 웹소켓으로도 같은 메시지를 broadcast하는데, 그게 이 REST 응답보다
+      // 먼저 도착할 수 있다(순서 보장 안 됨). 그러면 웹소켓 핸들러가 먼저 추가해놓은 걸
+      // 여기서 또 추가해 중복 표시가 생기므로, 같은 id가 이미 있으면 건너뛴다.
+      setMessages((prev) => (prev.some((m) => m.id === newMessage.id) ? prev : [...prev, newMessage]));
       setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 100);
     } catch (e) {
       console.error('Failed to send:', e);
