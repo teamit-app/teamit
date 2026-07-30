@@ -10,6 +10,7 @@ import org.springframework.messaging.MessageChannel;
 import org.springframework.messaging.simp.stomp.StompCommand;
 import org.springframework.messaging.simp.stomp.StompHeaderAccessor;
 import org.springframework.messaging.support.ChannelInterceptor;
+import org.springframework.messaging.support.MessageBuilder;
 import org.springframework.stereotype.Component;
 
 import java.security.Principal;
@@ -55,6 +56,12 @@ public class StompAuthChannelInterceptor implements ChannelInterceptor {
             Long userId = jwtTokenProvider.getUserId(token);
             accessor.setUser((Principal) () -> String.valueOf(userId));
             log.info("[STOMP] CONNECT 성공: userId={}", userId);
+            // Message는 불변 객체라 accessor로 헤더(setUser 포함)를 바꿔도 원본 message에는
+            // 반영되지 않는다 — 바뀐 헤더를 담아 새로 만든 메시지를 반환해야 이후 프레임
+            // (SUBSCRIBE 등)에서 accessor.getUser()가 실제로 채워진다. 이걸 안 해서 CONNECT는
+            // 매번 "성공" 로그가 찍히면서도 바로 다음 SUBSCRIBE에서 Principal이 없다고
+            // 나오는 버그가 있었다(실제 재현 확인됨).
+            return MessageBuilder.createMessage(message.getPayload(), accessor.getMessageHeaders());
 
         } else if (StompCommand.SUBSCRIBE.equals(accessor.getCommand())) {
             Long chatRoomId = extractChatRoomId(accessor.getDestination());
