@@ -2,6 +2,8 @@ services:
   mysql:
     image: mysql:8.0
     restart: unless-stopped
+    mem_limit: 400m
+    command: ["--innodb-buffer-pool-size=200M", "--max-connections=50"]
     environment:
       MYSQL_DATABASE: teamit
       MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD}
@@ -13,14 +15,33 @@ services:
       timeout: 5s
       retries: 10
 
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    mem_limit: 220m
+    # 순수 캐시 용도라 영속성이 필요 없다 — RDB 스냅샷/AOF를 꺼서 디스크 I/O와 재시작 시
+    # 로딩 시간을 없앤다(재시작 시 캐시가 비는 건 정상, DB에서 다시 채워진다).
+    command: ["redis-server", "--maxmemory", "180mb", "--maxmemory-policy", "allkeys-lru", "--save", "", "--appendonly", "no"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
   app:
     image: ${DOCKERHUB_USERNAME}/teamit-server:${IMAGE_TAG:-latest}
     restart: unless-stopped
+    mem_limit: 1000m
     depends_on:
       mysql:
         condition: service_healthy
+      redis:
+        condition: service_healthy
     ports:
       - "8080:8080"
+      # actuator(관리용 메트릭) 전용 포트 — 127.0.0.1에만 바인딩해서 EC2 내부(SSH 후 curl)에서만 접근 가능,
+      # 인터넷/nginx 어디서도 도달 불가능하다.
+      - "127.0.0.1:8081:8081"
     volumes:
       - uploads-data:/app/uploads
     environment:
@@ -33,6 +54,12 @@ services:
       KAKAO_CLIENT_ID: ${KAKAO_CLIENT_ID}
       KAKAO_CLIENT_SECRET: ${KAKAO_CLIENT_SECRET}
       KAKAO_REDIRECT_URI: ${KAKAO_REDIRECT_URI}
+      JAVA_TOOL_OPTIONS: "-XX:MaxRAMPercentage=70.0 -XX:InitialRAMPercentage=50.0"
+      # CloudWatch로 메트릭을 보내는 리전. 자격증명은 EC2 인스턴스 IAM 역할에서 자동으로 가져오므로
+      # 액세스키를 여기 넣지 않는다.
+      AWS_REGION: ${AWS_REGION:-ap-northeast-2}
+      SPRING_DATA_REDIS_HOST: redis
+      SPRING_DATA_REDIS_PORT: 6379
 
 volumes:
   mysql-data:

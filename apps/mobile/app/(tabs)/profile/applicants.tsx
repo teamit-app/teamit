@@ -12,7 +12,7 @@ import { Colors } from '../../../src/constants/colors';
 import { ScreenHeader } from '../../../src/components/common/ScreenHeader';
 import { getPostApplicants, getContestCandidates, getAllContestCandidates } from '../../../src/services/mypageService';
 import { getHeartedTalents } from '../../../src/services/talentService';
-import { useExploreStore } from '../../../src/store/useExploreStore';
+import { toggleTalentHeart as toggleTalentHeartInStore } from '../../../src/hooks/useExploreData';
 import { PostApplicant } from '../../../src/types/mypage';
 
 type Tab = 'applicants' | 'candidates';
@@ -215,7 +215,6 @@ export default function ApplicantsScreen() {
   const { postId, postTitle, contestTitle } =
     useLocalSearchParams<{ postId: string; postTitle: string; contestTitle: string }>();
 
-  const toggleTalentHeartInStore = useExploreStore((s) => s.toggleTalentHeart);
   const [tab, setTab] = useState<Tab>('applicants');
   const [applicants, setApplicants] = useState<PostApplicant[]>([]);
   const [candidates, setCandidates] = useState<PostApplicant[]>([]);
@@ -259,7 +258,7 @@ export default function ApplicantsScreen() {
       .finally(() => setAllLoadingMore(false));
   };
 
-  // 인재풀 하트와 동일한 대상 — useExploreStore를 거쳐야 탐색 > 인재풀 목록/상세정보에도 그대로 반영된다
+  // 인재풀 하트와 동일한 대상 — useExploreData의 toggleTalentHeart를 거쳐야 탐색 > 인재풀 목록/상세정보에도 그대로 반영된다
   const toggleHeart = async (userId: number) => {
     const wasLiked = likedIds.has(userId);
     setLikedIds((prev) => {

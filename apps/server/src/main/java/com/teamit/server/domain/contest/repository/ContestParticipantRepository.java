@@ -15,6 +15,12 @@ public interface ContestParticipantRepository extends JpaRepository<ContestParti
 
     java.util.Optional<ContestParticipant> findByContestIdAndUserId(Long contestId, Long userId);
 
+    // 모집글 목록(getPostsByContest/getMyPosts) 배치 조회용 — 한쪽은 contestId 고정+userId 다양,
+    // 다른 한쪽은 userId 고정+contestId 다양이라 양쪽 IN절을 모두 받아 한 번에 커버한다.
+    @Query("SELECT cp FROM ContestParticipant cp WHERE cp.contest.id IN :contestIds AND cp.user.id IN :userIds")
+    List<ContestParticipant> findAllByContestIdInAndUserIdIn(
+            @Param("contestIds") List<Long> contestIds, @Param("userIds") List<Long> userIds);
+
     java.util.List<ContestParticipant> findAllByUserId(Long userId);
 
     java.util.Optional<ContestParticipant> findTopByUserIdOrderByCreatedAtDesc(Long userId);

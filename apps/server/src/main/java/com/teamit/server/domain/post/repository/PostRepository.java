@@ -2,6 +2,8 @@ package com.teamit.server.domain.post.repository;
 
 import com.teamit.server.domain.post.entity.Post;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 import java.util.List;
 import java.util.Optional;
@@ -10,9 +12,15 @@ public interface PostRepository extends JpaRepository<Post, Long> {
 
     Optional<Post> findByChatRoomId(Long chatRoomId);
 
-    List<Post> findByContestIdOrderByCreatedAtDesc(Long contestId);
+    // owner(LAZY)를 목록 조회 시점에 함께 가져와서, 이후 owner 필드 접근(닉네임/성별 등)이
+    // 게시글 건당 추가 쿼리를 발생시키지 않게 한다.
+    @Query("SELECT p FROM Post p JOIN FETCH p.owner WHERE p.contestId = :contestId ORDER BY p.createdAt DESC")
+    List<Post> findByContestIdOrderByCreatedAtDesc(@Param("contestId") Long contestId);
 
-    List<Post> findByOwnerIdOrderByCreatedAtDesc(Long ownerId);
+    @Query("SELECT p FROM Post p JOIN FETCH p.owner WHERE p.owner.id = :ownerId ORDER BY p.createdAt DESC")
+    List<Post> findByOwnerIdOrderByCreatedAtDesc(@Param("ownerId") Long ownerId);
+
+    List<Post> findByChatRoomIdIn(List<Long> chatRoomIds);
 
     Optional<Post> findByOwnerIdAndContestId(Long ownerId, Long contestId);
 }

@@ -15,7 +15,7 @@ import { Colors } from '../../../src/constants/colors';
 import { ScreenHeader } from '../../../src/components/common/ScreenHeader';
 import { RegionPickerModal } from '../../../src/components/common/RegionPickerModal';
 import { useMypageStore } from '../../../src/store/useMypageStore';
-import { useExploreStore } from '../../../src/store/useExploreStore';
+import { updateMyTalentSkills } from '../../../src/hooks/useExploreData';
 import { useAuthStore } from '../../../src/store/useAuthStore';
 import {
   LeadershipPref,
@@ -622,7 +622,7 @@ export default function MatchingProfileScreen() {
         // 끝내면 상세정보 화면(매번 새로 조회)과 다르게 스킬이 수정 전 상태로 계속 보인다.
         const currentUserId = useAuthStore.getState().currentUserId;
         if (currentUserId) {
-          useExploreStore.getState().updateMyTalentSkills(currentUserId, skills);
+          updateMyTalentSkills(currentUserId, skills);
         }
         useMypageStore.getState().reloadProfile();
       }

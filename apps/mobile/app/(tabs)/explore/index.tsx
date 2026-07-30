@@ -1,7 +1,7 @@
-import React, { useEffect, useState } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, ActivityIndicator, StyleSheet } from 'react-native';
+import React, { useCallback, useRef, useState } from 'react';
+import { View, Text, ScrollView, RefreshControl, TouchableOpacity, ActivityIndicator, StyleSheet } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { router } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import { Colors } from '../../../src/constants/colors';
 import { ScreenHeader } from '../../../src/components/common/ScreenHeader';
 import { SegmentedTabs } from '../../../src/components/explore/SegmentedTabs';
@@ -10,7 +10,7 @@ import { FilterPills } from '../../../src/components/explore/FilterPills';
 import { ContestCard } from '../../../src/components/explore/ContestCard';
 import { TalentCard } from '../../../src/components/explore/TalentCard';
 import { CategoryFilterModal, CategoryFilter } from '../../../src/components/explore/CategoryFilterModal';
-import { useExploreStore } from '../../../src/store/useExploreStore';
+import { useExploreContests, useExploreTalents, toggleTalentHeart, toggleContestHeart, refetchExploreData } from '../../../src/hooks/useExploreData';
 import { useAuthStore } from '../../../src/store/useAuthStore';
 import { getOrCreateDirectChatRoom } from '../../../src/services/messageService';
 import { requireAuthForChat, requireAuthForHeart } from '../../../src/utils/authGuard';
@@ -34,13 +34,24 @@ export default function ExploreScreen() {
   const [categoryFilter, setCategoryFilter] = useState<CategoryFilter>('ALL');
   const [categoryModalVisible, setCategoryModalVisible] = useState(false);
 
-  const talents = useExploreStore((s) => s.talents);
-  const contests = useExploreStore((s) => s.contests);
-  const isLoading = useExploreStore((s) => s.isLoading);
-  const loadData = useExploreStore((s) => s.loadData);
-  const toggleTalentHeart = useExploreStore((s) => s.toggleTalentHeart);
-  const toggleContestHeart = useExploreStore((s) => s.toggleContestHeart);
+  const { data: talents = [], isLoading: talentsLoading, isFetching: talentsFetching } = useExploreTalents();
+  const { data: contests = [], isLoading: contestsLoading, isFetching: contestsFetching } = useExploreContests();
+  const isLoading = talentsLoading || contestsLoading;
+  const isRefreshing = talentsFetching || contestsFetching;
   const currentUserId = useAuthStore((s) => s.currentUserId);
+
+  // 세션 내내 캐시되는 목록이라 다른 탭에 갔다가 돌아와도 자동으로는 안 바뀐다 — 탐색 탭
+  // 재진입/재탭(_layout.tsx)/당겨서 새로고침(아래 RefreshControl) 세 가지 트리거를 모두
+  // refetchExploreData()로 통일한다. 최초 마운트는 useQuery가 이미 처리하므로 건너뛴다.
+  const hasFocusedOnce = useRef(false);
+  useFocusEffect(
+    useCallback(() => {
+      if (hasFocusedOnce.current) {
+        refetchExploreData();
+      }
+      hasFocusedOnce.current = true;
+    }, []),
+  );
 
   const handlePropose = async (targetUserId: number) => {
     if (!requireAuthForChat(`/explore/talent/${targetUserId}`)) return;
@@ -54,10 +65,6 @@ export default function ExploreScreen() {
       Alert.alert('채팅을 시작하지 못했어요', '잠시 후 다시 시도해주세요.');
     }
   };
-
-  useEffect(() => {
-    loadData();
-  }, []);
 
   const filteredTalents = talents.filter((talent) =>
     keyword.trim().length === 0
@@ -127,7 +134,17 @@ export default function ExploreScreen() {
         />
       </View>
 
-      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        contentContainerStyle={styles.content}
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={isRefreshing}
+            onRefresh={refetchExploreData}
+            tintColor={Colors.primary}
+          />
+        }
+      >
         <SearchBar
           placeholder={mainTab === 'POOL' ? '이름, 역할, 스킬로 검색' : '공모전 이름, 주최기관, 분야 검색'}
           value={keyword}

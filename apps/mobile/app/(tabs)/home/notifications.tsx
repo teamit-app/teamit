@@ -1,11 +1,13 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
+import { useQuery } from '@tanstack/react-query';
 import { Colors } from '../../../src/constants/colors';
 import { ScreenHeader } from '../../../src/components/common/ScreenHeader';
 import { getNotifications, markAllNotificationsAsRead } from '../../../src/services/notificationService';
 import { useNotificationStore } from '../../../src/store/useNotificationStore';
+import { REALTIME_STALE_TIME } from '../../../src/services/realtimeEvents';
 import { AppNotification, NotificationType } from '../../../src/types/notification';
 
 const TYPE_ICON: Record<NotificationType, string> = {
@@ -19,13 +21,14 @@ const TYPE_ICON: Record<NotificationType, string> = {
 
 export default function NotificationsScreen() {
   const insets = useSafeAreaInsets();
-  const [notifications, setNotifications] = useState<AppNotification[]>([]);
+  const { data } = useQuery({
+    queryKey: ['notifications'],
+    queryFn: getNotifications,
+    staleTime: REALTIME_STALE_TIME,
+  });
+  const notifications: AppNotification[] = data?.notifications ?? [];
 
   useEffect(() => {
-    getNotifications()
-      .then(({ notifications }) => setNotifications(notifications))
-      .catch((e) => console.error('[Notifications] 알림 로드 실패:', e));
-
     markAllNotificationsAsRead()
       .then(() => useNotificationStore.getState().reset())
       .catch((e) => console.error('[Notifications] 읽음 처리 실패:', e));
