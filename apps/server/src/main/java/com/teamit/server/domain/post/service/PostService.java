@@ -58,9 +58,12 @@ import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 @Service
@@ -86,12 +89,15 @@ public class PostService {
     private final TeamReviewRepository teamReviewRepository;
     private final NotificationService notificationService;
 
-    // 후보/지원자 카드에 표시할 평균 별점 — 온도(temperature) 플레이스홀더를 대체
-    private double averageRatingOf(Long userId) {
-        return teamReviewRepository.findByReceiverId(userId).stream()
-                .mapToInt(com.teamit.server.domain.review.entity.TeamReview::getTotalRating)
-                .average()
-                .orElse(0.0);
+    // 후보/지원자 카드에 표시할 평균 별점 — 온도(temperature) 플레이스홀더를 대체.
+    // 후보/지원자 1명당 개별 조회하던 것을 배치 조회 + Map으로 바꿔서, 목록 크기와 무관하게
+    // 쿼리 수를 고정한다(바로 위/아래 education/skill/region 배치조회와 동일한 패턴).
+    private Map<Long, Double> averageRatingsOf(List<Long> userIds) {
+        if (userIds.isEmpty()) return Map.of();
+        return teamReviewRepository.findByReceiverIdIn(userIds).stream()
+                .collect(Collectors.groupingBy(
+                        r -> r.getReceiver().getId(),
+                        Collectors.averagingInt(com.teamit.server.domain.review.entity.TeamReview::getTotalRating)));
     }
 
     // ──────────────────────────────────────────────────────────────
@@ -136,7 +142,7 @@ public class PostService {
             contestService.registerParticipant(request.getContestId(), userId, null);
         }
 
-        return buildListItem(post);
+        return buildListItems(List.of(post)).get(0);
     }
 
     private void saveRequiredSkills(Post post, List<RequiredSkillRequest> requiredSkills) {
@@ -159,9 +165,7 @@ public class PostService {
     // ──────────────────────────────────────────────────────────────
     @Transactional(readOnly = true)
     public List<PostListItemResponse> getPostsByContest(Long contestId) {
-        return postRepository.findByContestIdOrderByCreatedAtDesc(contestId).stream()
-                .map(this::buildListItem)
-                .collect(Collectors.toList());
+        return buildListItems(postRepository.findByContestIdOrderByCreatedAtDesc(contestId));
     }
 
     // ──────────────────────────────────────────────────────────────
@@ -169,25 +173,67 @@ public class PostService {
     // ──────────────────────────────────────────────────────────────
     @Transactional(readOnly = true)
     public List<PostListItemResponse> getMyPosts(Long userId) {
-        return postRepository.findByOwnerIdOrderByCreatedAtDesc(userId).stream()
-                .map(this::buildListItem)
-                .collect(Collectors.toList());
+        return buildListItems(postRepository.findByOwnerIdOrderByCreatedAtDesc(userId));
     }
 
-    private PostListItemResponse buildListItem(Post post) {
-        List<String> skills = postSkillRepository.findAllByPostIdWithSkill(post.getId()).stream()
-                .map(PostSkill::getEffectiveSkillName)
-                .collect(Collectors.toList());
-        String region = buildOwnerRegionLabel(post.getOwner().getId(), post.getContestId());
-        long likeCount = postHeartRepository.countByPostId(post.getId());
-        long commentCount = postCommentRepository.countByPostId(post.getId());
-        long applicantCount = postApplicationRepository.countByPostId(post.getId());
-        Contest contest = post.getContestId() != null
-                ? contestRepository.findById(post.getContestId()).orElse(null)
-                : null;
-        return PostListItemResponse.from(post, chatService.getCurrentMemberCount(post),
-                skills, region, likeCount, commentCount, applicantCount,
-                contest != null ? contest.getTitle() : null, effectiveStatus(post, contest));
+    // 게시글 건당 개별 쿼리를 날리던 것(스킬/좋아요·댓글·지원자 수/공모전/채팅방 인원/지역 라벨)을
+    // 전부 postIds 기준 배치 조회 + Map 매핑으로 바꿔서, 목록 크기와 무관하게 쿼리 수를 고정한다.
+    private List<PostListItemResponse> buildListItems(List<Post> posts) {
+        if (posts.isEmpty()) return List.of();
+
+        List<Long> postIds = posts.stream().map(Post::getId).toList();
+        List<Long> contestIds = posts.stream().map(Post::getContestId).filter(Objects::nonNull).distinct().toList();
+        List<Long> chatRoomIds = posts.stream().map(Post::getChatRoomId).filter(Objects::nonNull).toList();
+        List<Long> ownerIds = posts.stream().map(p -> p.getOwner().getId()).distinct().toList();
+
+        Map<Long, List<String>> skillsByPostId = postSkillRepository.findAllByPostIdInWithSkill(postIds).stream()
+                .collect(Collectors.groupingBy(ps -> ps.getPost().getId(),
+                        Collectors.mapping(PostSkill::getEffectiveSkillName, Collectors.toList())));
+        Map<Long, Long> likeCountMap = toCountMap(postHeartRepository.countGroupedByPostIdIn(postIds),
+                PostHeartRepository.PostCountProjection::getPostId, PostHeartRepository.PostCountProjection::getCount);
+        Map<Long, Long> commentCountMap = toCountMap(postCommentRepository.countGroupedByPostIdIn(postIds),
+                PostCommentRepository.PostCountProjection::getPostId, PostCommentRepository.PostCountProjection::getCount);
+        Map<Long, Long> applicantCountMap = toCountMap(postApplicationRepository.countGroupedByPostIdIn(postIds),
+                PostApplicationRepository.PostCountProjection::getPostId, PostApplicationRepository.PostCountProjection::getCount);
+        Map<Long, Contest> contestMap = contestIds.isEmpty() ? Map.of()
+                : contestRepository.findAllById(contestIds).stream().collect(Collectors.toMap(Contest::getId, c -> c));
+        Map<Long, Integer> memberCountMap = chatService.getCurrentMemberCounts(chatRoomIds);
+        Map<List<Long>, String> regionLabelByContestAndOwner = buildOwnerRegionLabels(contestIds, ownerIds);
+
+        return posts.stream().map(post -> {
+            Contest contest = post.getContestId() != null ? contestMap.get(post.getContestId()) : null;
+            String region = post.getContestId() != null
+                    ? regionLabelByContestAndOwner.get(List.of(post.getContestId(), post.getOwner().getId()))
+                    : null;
+            return PostListItemResponse.from(post,
+                    memberCountMap.getOrDefault(post.getChatRoomId(), 0),
+                    skillsByPostId.getOrDefault(post.getId(), List.of()),
+                    region,
+                    likeCountMap.getOrDefault(post.getId(), 0L),
+                    commentCountMap.getOrDefault(post.getId(), 0L),
+                    applicantCountMap.getOrDefault(post.getId(), 0L),
+                    contest != null ? contest.getTitle() : null,
+                    effectiveStatus(post, contest));
+        }).toList();
+    }
+
+    private <T> Map<Long, Long> toCountMap(List<T> projections, Function<T, Long> idGetter, Function<T, Long> countGetter) {
+        return projections.stream().collect(Collectors.toMap(idGetter, countGetter));
+    }
+
+    // 모집글에 표시되는 모집자 지역은 라이브 UserRegion이 아니라, 그 모집글이 속한 공모전에
+    // 모집자 본인이 등록한 ContestParticipant 스냅샷 기준이어야 한다. 빈 라벨은 Map에 담지
+    // 않아서 조회 시 없으면(getOrDefault 없이 get) null로 취급된다.
+    private Map<List<Long>, String> buildOwnerRegionLabels(List<Long> contestIds, List<Long> ownerIds) {
+        if (contestIds.isEmpty() || ownerIds.isEmpty()) return Map.of();
+        Map<List<Long>, String> result = new HashMap<>();
+        for (ContestParticipant cp : contestParticipantRepository.findAllByContestIdInAndUserIdIn(contestIds, ownerIds)) {
+            String label = RecruiterProfileInfo.buildRegionLabel(cp.getRegionsSnapshot());
+            if (!label.isEmpty()) {
+                result.put(List.of(cp.getContest().getId(), cp.getUser().getId()), label);
+            }
+        }
+        return result;
     }
 
     // 공모전이 마감(endDate 경과)되면 그 공모전에 속한 모집글도 더 이상 살아있으면 안 되므로,
@@ -208,18 +254,31 @@ public class PostService {
     // ──────────────────────────────────────────────────────────────
     @Transactional(readOnly = true)
     public List<LikedPostResponse> getLikedPosts(Long userId) {
-        return postHeartRepository.findAllByUserId(userId).stream()
-                .map(heart -> buildLikedPost(heart.getPost()))
-                .collect(Collectors.toList());
+        List<PostHeart> hearts = postHeartRepository.findAllByUserId(userId);
+        if (hearts.isEmpty()) return List.of();
+
+        // heart.getPost()는 LAZY 프록시라 getId()만 안전하게 접근 가능(초기화 안 됨) —
+        // title 등 실제 컬럼을 읽으려면 postRepository로 배치 로드해야 하트 건당
+        // 지연로딩 쿼리가 발생하지 않는다.
+        List<Long> postIds = hearts.stream().map(h -> h.getPost().getId()).toList();
+        Map<Long, Post> postMap = postRepository.findAllById(postIds).stream()
+                .collect(Collectors.toMap(Post::getId, p -> p));
+        List<Post> posts = postIds.stream().map(postMap::get).filter(Objects::nonNull).toList();
+
+        List<Long> contestIds = posts.stream().map(Post::getContestId).filter(Objects::nonNull).distinct().toList();
+        Map<Long, List<String>> rolesByPostId = postSkillRepository.findAllByPostIdInWithSkill(postIds).stream()
+                .collect(Collectors.groupingBy(ps -> ps.getPost().getId(),
+                        Collectors.mapping(PostSkill::getEffectiveSkillName, Collectors.toList())));
+        Map<Long, Contest> contestMap = contestIds.isEmpty() ? Map.of()
+                : contestRepository.findAllById(contestIds).stream().collect(Collectors.toMap(Contest::getId, c -> c));
+
+        return posts.stream()
+                .map(post -> buildLikedPost(post, contestMap.get(post.getContestId()),
+                        rolesByPostId.getOrDefault(post.getId(), List.of())))
+                .toList();
     }
 
-    private LikedPostResponse buildLikedPost(Post post) {
-        List<String> roles = postSkillRepository.findAllByPostIdWithSkill(post.getId()).stream()
-                .map(PostSkill::getEffectiveSkillName)
-                .collect(Collectors.toList());
-        Contest contest = post.getContestId() != null
-                ? contestRepository.findById(post.getContestId()).orElse(null)
-                : null;
+    private LikedPostResponse buildLikedPost(Post post, Contest contest, List<String> roles) {
         return LikedPostResponse.builder()
                 .postId(post.getId())
                 .contestId(post.getContestId())
@@ -242,16 +301,6 @@ public class PostService {
         }
     }
 
-    // 모집글에 표시되는 모집자 지역은 라이브 UserRegion이 아니라, 그 모집글이 속한 공모전에
-    // 모집자 본인이 등록한 ContestParticipant 스냅샷 기준이어야 한다(모집자 정보 전체와 동일한 원칙).
-    private String buildOwnerRegionLabel(Long ownerId, Long contestId) {
-        if (contestId == null) return null;
-        String regionsSnapshot = contestParticipantRepository.findByContestIdAndUserId(contestId, ownerId)
-                .map(ContestParticipant::getRegionsSnapshot)
-                .orElse(null);
-        String label = RecruiterProfileInfo.buildRegionLabel(regionsSnapshot);
-        return label.isEmpty() ? null : label;
-    }
 
     // ──────────────────────────────────────────────────────────────
     // 모집글 단건 조회
@@ -368,6 +417,7 @@ public class PostService {
         // 학력만 라이브로 배치 로드 (UI 표시용, 스냅샷 대상이 아님)
         Map<Long, Education> educationMap = educationRepository.findByUserIdIn(candidateIds).stream()
                 .collect(Collectors.toMap(e -> e.getUser().getId(), e -> e));
+        Map<Long, Double> ratingMap = averageRatingsOf(candidateIds);
 
         record ScoredUser(User user, double score) {}
 
@@ -379,7 +429,7 @@ public class PostService {
                         sc.user(),
                         educationMap.get(sc.user().getId()),
                         cpSnapshotMap.get(sc.user().getId()),
-                        averageRatingOf(sc.user().getId()),
+                        ratingMap.getOrDefault(sc.user().getId(), 0.0),
                         (int) Math.round(sc.score())
                 ))
                 .collect(Collectors.toList());
@@ -412,13 +462,14 @@ public class PostService {
                 .collect(Collectors.toMap(User::getId, u -> u));
         Map<Long, Education> educationMap = educationRepository.findByUserIdIn(candidateIds).stream()
                 .collect(Collectors.toMap(e -> e.getUser().getId(), e -> e));
+        Map<Long, Double> ratingMap = averageRatingsOf(candidateIds);
 
         List<PostApplicantResponse> content = cpPage.getContent().stream()
                 .map(cp -> PostApplicantResponse.fromSnapshot(
                         userMap.get(cp.getUser().getId()),
                         educationMap.get(cp.getUser().getId()),
                         cp,
-                        averageRatingOf(cp.getUser().getId())
+                        ratingMap.getOrDefault(cp.getUser().getId(), 0.0)
                 ))
                 .collect(Collectors.toList());
 
@@ -465,6 +516,7 @@ public class PostService {
                 .collect(Collectors.groupingBy(r -> r.getUser().getId()));
         Map<Long, MatchingProfile> profileMap = matchingProfileRepository.findAllByUserIdIn(applicantIds).stream()
                 .collect(Collectors.toMap(mp -> mp.getUser().getId(), mp -> mp));
+        Map<Long, Double> ratingMap = averageRatingsOf(applicantIds);
 
         return applicants.stream()
                 .map(u -> PostApplicantResponse.from(
@@ -473,7 +525,7 @@ public class PostService {
                         skillMap.getOrDefault(u.getId(), List.of()),
                         regionMap.getOrDefault(u.getId(), List.of()),
                         profileMap.get(u.getId()),
-                        averageRatingOf(u.getId())
+                        ratingMap.getOrDefault(u.getId(), 0.0)
                 ))
                 .collect(Collectors.toList());
     }

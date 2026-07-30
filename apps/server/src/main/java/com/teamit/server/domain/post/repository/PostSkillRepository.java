@@ -13,6 +13,9 @@ public interface PostSkillRepository extends JpaRepository<PostSkill, Long> {
     @Query("SELECT ps FROM PostSkill ps LEFT JOIN FETCH ps.skill WHERE ps.post.id = :postId")
     List<PostSkill> findAllByPostIdWithSkill(@Param("postId") Long postId);
 
+    @Query("SELECT ps FROM PostSkill ps LEFT JOIN FETCH ps.skill WHERE ps.post.id IN :postIds")
+    List<PostSkill> findAllByPostIdInWithSkill(@Param("postIds") List<Long> postIds);
+
     @Modifying
     @Query("DELETE FROM PostSkill s WHERE s.post.id = :postId")
     void deleteAllByPostId(@Param("postId") Long postId);

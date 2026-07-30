@@ -26,6 +26,14 @@ public interface PostApplicationRepository extends JpaRepository<PostApplication
 
     long countByPostId(Long postId);
 
+    @Query("SELECT a.post.id AS postId, COUNT(a) AS count FROM PostApplication a WHERE a.post.id IN :postIds GROUP BY a.post.id")
+    List<PostCountProjection> countGroupedByPostIdIn(@Param("postIds") List<Long> postIds);
+
+    interface PostCountProjection {
+        Long getPostId();
+        Long getCount();
+    }
+
     java.util.Optional<PostApplication> findByIdAndApplicantId(Long id, Long applicantId);
 
     Optional<PostApplication> findByPostIdAndApplicantId(Long postId, Long applicantId);
