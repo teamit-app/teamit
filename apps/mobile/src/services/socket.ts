@@ -1,8 +1,8 @@
 import { Client, IMessage, StompSubscription } from '@stomp/stompjs';
 import { tokenStorage } from './tokenStorage';
-import { useNotificationStore } from '../store/useNotificationStore';
 import { BackendNotification } from './notificationService';
 import { BackendChatMessage } from './messageService';
+import { handleServerNotification, invalidateRealtimeCaches } from './realtimeEvents';
 
 const IS_MOCK = process.env.EXPO_PUBLIC_API_MODE === 'mock';
 const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL ?? 'https://api.teamit.kr/api/v1';
@@ -27,9 +27,7 @@ function subscribeAll() {
   client.subscribe('/user/queue/notifications', (message: IMessage) => {
     try {
       const notification: BackendNotification = JSON.parse(message.body);
-      if (!notification.isRead) {
-        useNotificationStore.getState().incrementUnread();
-      }
+      handleServerNotification(notification);
     } catch (e) {
       console.error('[Socket] 알림 메시지 파싱 실패:', e);
     }
@@ -57,7 +55,13 @@ export async function connectSocket(): Promise<void> {
     brokerURL: buildWsUrl(),
     connectHeaders: { Authorization: `Bearer ${token}` },
     reconnectDelay: 5000,
-    onConnect: subscribeAll,
+    // onConnect는 최초 연결뿐 아니라 자동 재연결(reconnectDelay) 때마다도 호출된다 —
+    // 재구독(subscribeAll)과 함께, 끊겨 있던 동안 놓쳤을 수 있는 이벤트를 따라잡기 위해
+    // 이벤트 연동 캐시를 전부 한 번 무효화한다.
+    onConnect: () => {
+      subscribeAll();
+      invalidateRealtimeCaches();
+    },
     onStompError: (frame) => {
       console.error('[Socket] STOMP 오류:', frame.headers['message']);
     },

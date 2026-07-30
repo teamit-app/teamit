@@ -24,6 +24,8 @@ import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
@@ -46,7 +48,23 @@ public class ChatService {
     // ──────────────────────────────────────────────────────────────
     @Transactional(readOnly = true)
     public ChatRoomListResponse getChatRooms(Long userId) {
-        List<ChatRoomMember> memberships = chatRoomMemberRepository.findByUserId(userId);
+        List<ChatRoomMember> memberships = chatRoomMemberRepository.findByUserIdWithChatRoom(userId);
+        List<Long> roomIds = memberships.stream().map(m -> m.getChatRoom().getId()).toList();
+
+        // 방마다 개별적으로 멤버/모집글/공모전을 조회하던 것을 roomIds 기준 배치 조회로 바꿔서,
+        // buildGroupChatRoomResponse와 getTeamMembers가 각각 같은 방의 멤버를 중복으로
+        // 조회하던 문제도 함께 해소한다(둘 다 아래 membersByRoomId를 공유해서 씀).
+        Map<Long, List<ChatRoomMember>> membersByRoomId = roomIds.isEmpty() ? Map.of()
+                : chatRoomMemberRepository.findByChatRoomIdIn(roomIds).stream()
+                        .collect(Collectors.groupingBy(m -> m.getChatRoom().getId()));
+        Map<Long, Post> postByRoomId = roomIds.isEmpty() ? Map.of()
+                : postRepository.findByChatRoomIdIn(roomIds).stream()
+                        .collect(Collectors.toMap(Post::getChatRoomId, p -> p));
+        List<Long> contestIds = postByRoomId.values().stream()
+                .map(Post::getContestId).filter(Objects::nonNull).distinct().toList();
+        Map<Long, Contest> contestByContestId = contestIds.isEmpty() ? Map.of()
+                : contestRepository.findAllById(contestIds).stream()
+                        .collect(Collectors.toMap(Contest::getId, c -> c));
 
         List<GroupChatRoomResponse> groupChats = new ArrayList<>();
         List<DirectChatRoomResponse> directChats = new ArrayList<>();
@@ -55,7 +73,9 @@ public class ChatService {
             ChatRoom room = membership.getChatRoom();
 
             // 나갔다가 재입장하면 joinedAt이 새로 갱신되므로, 그 이전 메시지는 마지막 메시지
-            // 미리보기·안읽음 수 계산에서 전부 제외한다 (이전 대화 내역이 보이면 안 되므로)
+            // 미리보기·안읽음 수 계산에서 전부 제외한다 (이전 대화 내역이 보이면 안 되므로).
+            // 방마다 joinedAt 기준이 달라 배치 그룹핑이 안 되고, 인덱스 기반 단건 쿼리라
+            // 비용이 작아 이번 N+1 정리 범위에서는 그대로 둔다.
             Optional<ChatMessage> lastMessageOpt = chatMessageRepository
                     .findTopByChatRoomIdAndCreatedAtAfterOrderByCreatedAtDesc(room.getId(), membership.getJoinedAt());
             String lastMessage = lastMessageOpt.map(ChatMessage::getContent).orElse(null);
@@ -66,11 +86,17 @@ public class ChatService {
                     : chatMessageRepository.countByChatRoomIdAndIdGreaterThan(
                             room.getId(), membership.getLastReadMessageId());
 
+            List<ChatRoomMember> roomMembers = membersByRoomId.getOrDefault(room.getId(), List.of());
+
             if (room.getRoomType() == RoomType.GROUP) {
-                groupChats.add(buildGroupChatRoomResponse(room, unreadCount, lastMessage, lastMessageAt));
+                Post post = postByRoomId.get(room.getId());
+                Contest contest = post != null && post.getContestId() != null
+                        ? contestByContestId.get(post.getContestId())
+                        : null;
+                groupChats.add(buildGroupChatRoomResponse(
+                        room, unreadCount, lastMessage, lastMessageAt, roomMembers, post, contest));
             } else {
-                Optional<User> opponent = chatRoomMemberRepository.findByChatRoomId(room.getId())
-                        .stream()
+                Optional<User> opponent = roomMembers.stream()
                         .map(ChatRoomMember::getUser)
                         .filter(u -> !u.getId().equals(userId))
                         .findFirst();
@@ -102,14 +128,10 @@ public class ChatService {
     }
 
     private GroupChatRoomResponse buildGroupChatRoomResponse(
-            ChatRoom room, long unreadCount, String lastMessage,
-            java.time.LocalDateTime lastMessageAt) {
+            ChatRoom room, long unreadCount, String lastMessage, java.time.LocalDateTime lastMessageAt,
+            List<ChatRoomMember> members, Post post, Contest contest) {
 
-        List<ChatRoomMember> members = chatRoomMemberRepository.findByChatRoomId(room.getId());
         int currentCount = members.size();
-
-        // Post 조회 → teamInfo 구성
-        Optional<Post> postOpt = postRepository.findByChatRoomId(room.getId());
 
         Long postId = null;
         String postTitle = null;
@@ -122,13 +144,12 @@ public class ChatService {
         List<TeamMemberInfo> memberInfos = new ArrayList<>();
         String statusLabel = "팀원 모집 중";
 
-        if (postOpt.isPresent()) {
-            Post post = postOpt.get();
+        if (post != null) {
             postId = post.getId();
             postTitle = post.getTitle();
             teamConfirmed = post.isTeamConfirmed();
             totalCount = post.getRecruitCount() != null ? post.getRecruitCount() + 1 : currentCount;
-            memberInfos = getTeamMembers(post);
+            memberInfos = buildTeamMemberInfos(post, members);
 
             statusLabel = teamConfirmed
                     ? "팀원 확정"
@@ -136,16 +157,12 @@ public class ChatService {
 
             // 공모전 마감일로 dDay 계산 + 배너용 공모전 정보
             // isExpired(리뷰 작성 개방 조건)는 팀 확정 여부가 아니라 실제 공모전 마감일이 지났는지로 판단
-            if (post.getContestId() != null) {
-                Optional<Contest> contestOpt = contestRepository.findById(post.getContestId());
-                if (contestOpt.isPresent()) {
-                    Contest contest = contestOpt.get();
-                    contestId = contest.getId();
-                    contestTitle = contest.getTitle();
-                    long days = ChronoUnit.DAYS.between(LocalDate.now(), contest.getEndDate());
-                    dDay = (int) days;
-                    isExpired = days < 0;
-                }
+            if (contest != null) {
+                contestId = contest.getId();
+                contestTitle = contest.getTitle();
+                long days = ChronoUnit.DAYS.between(LocalDate.now(), contest.getEndDate());
+                dDay = (int) days;
+                isExpired = days < 0;
             }
         }
 
@@ -179,6 +196,12 @@ public class ChatService {
         List<ChatRoomMember> members = post.getChatRoomId() != null
                 ? chatRoomMemberRepository.findByChatRoomId(post.getChatRoomId())
                 : List.of();
+        return buildTeamMemberInfos(post, members);
+    }
+
+    // getChatRooms(배치 조회로 미리 가져온 members)와 getTeamMembers(단건 조회) 양쪽이 공유하는
+    // 조립 로직 — 실제 멤버 + "모집 중" 빈 슬롯을 채운 TeamMemberInfo 리스트를 만든다.
+    private List<TeamMemberInfo> buildTeamMemberInfos(Post post, List<ChatRoomMember> members) {
         int currentCount = members.size();
         int totalCount = post.getRecruitCount() != null ? post.getRecruitCount() + 1 : currentCount;
 
@@ -210,6 +233,17 @@ public class ChatService {
         return post.getChatRoomId() != null
                 ? (int) chatRoomMemberRepository.countByChatRoomId(post.getChatRoomId())
                 : 0;
+    }
+
+    // getCurrentMemberCount(Post)의 배치 버전 — 게시글 목록 조회 시 방마다 카운트 쿼리를
+    // 따로 날리지 않기 위한 용도(PostService.buildListItems 참고).
+    @Transactional(readOnly = true)
+    public Map<Long, Integer> getCurrentMemberCounts(List<Long> chatRoomIds) {
+        if (chatRoomIds.isEmpty()) return Map.of();
+        return chatRoomMemberRepository.countGroupedByChatRoomIdIn(chatRoomIds).stream()
+                .collect(Collectors.toMap(
+                        ChatRoomMemberRepository.ChatRoomMemberCountProjection::getChatRoomId,
+                        p -> p.getCount().intValue()));
     }
 
     // ──────────────────────────────────────────────────────────────

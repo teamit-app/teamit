@@ -16,6 +16,8 @@ public interface TeamReviewRepository extends JpaRepository<TeamReview, Long> {
 
     List<TeamReview> findByReceiverId(Long receiverId);
 
+    List<TeamReview> findByReceiverIdIn(List<Long> receiverIds);
+
     boolean existsByChatRoomIdAndReviewerIdAndReceiverId(Long chatRoomId, Long reviewerId, Long receiverId);
 
     // 채팅방 하드 삭제 전 참조만 끊는다(리뷰 레코드 자체는 삭제하지 않음) — ChatService.deleteChatRoom 참고.

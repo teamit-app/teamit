@@ -28,6 +28,8 @@ import com.teamit.server.domain.user.repository.UserRepository;
 import com.teamit.server.domain.user.repository.UserSkillRepository;
 import com.teamit.server.global.storage.FileStorageService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -204,6 +206,10 @@ public class UserService {
                 .build();
     }
 
+    // 비개인화 공개 목록이라 Redis에 캐싱. isMatchingActive 토글이 실시간성 요구가 있어
+    // TTL은 5분으로 짧게 두고, setMatchingActive/registerParticipant에서 명시적으로 evict한다.
+    @Cacheable(cacheNames = "userPool",
+            key = "T(String).format('%s-%s-%s-%s-%d-%d', #skillId, #sido, #role, #keyword, #page, #size)")
     @Transactional(readOnly = true)
     public UserPoolPageResponse getUserPool(Long skillId, String sido, String role, String keyword, int page, int size) {
         Pageable pageable = PageRequest.of(page, size);
@@ -358,6 +364,7 @@ public class UserService {
     // ──────────────────────────────────────────────────────────────
     // 매칭 활성화 상태 변경
     // ──────────────────────────────────────────────────────────────
+    @CacheEvict(cacheNames = "userPool", allEntries = true)
     @Transactional
     public void setMatchingActive(Long userId, boolean isMatchingActive) {
         User user = userRepository.findById(userId)

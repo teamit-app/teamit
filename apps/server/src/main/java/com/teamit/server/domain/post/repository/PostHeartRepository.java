@@ -19,7 +19,15 @@ public interface PostHeartRepository extends JpaRepository<PostHeart, Long> {
 
     long countByPostId(Long postId);
 
+    @Query("SELECT h.post.id AS postId, COUNT(h) AS count FROM PostHeart h WHERE h.post.id IN :postIds GROUP BY h.post.id")
+    List<PostCountProjection> countGroupedByPostIdIn(@Param("postIds") List<Long> postIds);
+
     @Modifying
     @Query("DELETE FROM PostHeart h WHERE h.post.id = :postId")
     void deleteAllByPostId(@Param("postId") Long postId);
+
+    interface PostCountProjection {
+        Long getPostId();
+        Long getCount();
+    }
 }

@@ -13,7 +13,7 @@ import { Colors } from '../../../../../src/constants/colors';
 import { EDUCATION_STATUS_LABEL } from '../../../../../src/constants/education';
 import { getUserDetail } from '../../../../../src/services/talentService';
 import { useAuthStore } from '../../../../../src/store/useAuthStore';
-import { useExploreStore } from '../../../../../src/store/useExploreStore';
+import { toggleTalentHeart as toggleTalentHeartInStore } from '../../../../../src/hooks/useExploreData';
 import { TalentDetail } from '../../../../../src/types/talent';
 import { ReviewStatsCard } from '../../../../../src/components/profile/ReviewStatsCard';
 
@@ -52,7 +52,6 @@ export default function CandidateDetailScreen() {
   const [loadError, setLoadError] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
   const currentUserId = useAuthStore((s) => s.currentUserId);
-  const toggleTalentHeartInStore = useExploreStore((s) => s.toggleTalentHeart);
 
   useEffect(() => {
     setLoadError(false);

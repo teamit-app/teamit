@@ -19,6 +19,9 @@ import com.teamit.server.domain.user.repository.MatchingProfileRepository;
 import com.teamit.server.domain.user.repository.UserRepository;
 import com.teamit.server.global.storage.FileStorageService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
+import org.springframework.cache.annotation.Caching;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -46,6 +49,9 @@ public class ContestService {
     private final PostRepository postRepository;
     private final ChatService chatService;
 
+    // 비개인화 공개 목록이라 Redis에 캐싱 — 관리자 CRUD(createContest/updateContest/deleteContest)에서
+    // 무효화한다. 자주 안 바뀌는 데이터라 TTL(30분)을 길게 둠.
+    @Cacheable(cacheNames = "contestsPopular")
     @Transactional(readOnly = true)
     public PopularContestListResponse getPopularContests() {
         LocalDate today = LocalDate.now();
@@ -59,6 +65,9 @@ public class ContestService {
                 .build();
     }
 
+    // 필터 조합이 많아 캐시 항목 수가 커질 수 있어 popular보다 TTL을 짧게(10분) 둠.
+    @Cacheable(cacheNames = "contestsList",
+            key = "T(String).format('%s-%s-%s-%d-%d', #category, #status, #keyword, #page, #size)")
     @Transactional(readOnly = true)
     public ContestPageResponse getContestList(ContestCategory category, ContestStatus status, String keyword, int page, int size) {
         Pageable pageable = PageRequest.of(page, size);
@@ -96,6 +105,9 @@ public class ContestService {
                 .build();
     }
 
+    // 개별 공모전은 더더욱 안 바뀌는 데이터라 TTL을 1시간까지 길게 두고, 수정/삭제 시
+    // 명시적으로 evict해서 즉시 반영되게 한다.
+    @Cacheable(cacheNames = "contestsDetail", key = "#contestId")
     @Transactional(readOnly = true)
     public ContestDetailResponse getContestDetail(Long contestId) {
         Contest contest = contestRepository.findById(contestId)
@@ -120,6 +132,7 @@ public class ContestService {
         return "/files/" + CONTEST_POSTER_SUB_DIR + "/" + storedFileName;
     }
 
+    @CacheEvict(cacheNames = {"contestsPopular", "contestsList"}, allEntries = true)
     @Transactional
     public ContestDetailResponse createContest(ContestRequest request) {
         Contest contest = contestRepository.save(Contest.builder()
@@ -138,6 +151,10 @@ public class ContestService {
         return ContestDetailResponse.from(contest);
     }
 
+    @Caching(evict = {
+            @CacheEvict(cacheNames = {"contestsPopular", "contestsList"}, allEntries = true),
+            @CacheEvict(cacheNames = "contestsDetail", key = "#contestId")
+    })
     @Transactional
     public ContestDetailResponse updateContest(Long contestId, ContestRequest request) {
         Contest contest = contestRepository.findById(contestId)
@@ -150,6 +167,10 @@ public class ContestService {
         return ContestDetailResponse.from(contest);
     }
 
+    @Caching(evict = {
+            @CacheEvict(cacheNames = {"contestsPopular", "contestsList"}, allEntries = true),
+            @CacheEvict(cacheNames = "contestsDetail", key = "#contestId")
+    })
     @Transactional
     public void deleteContest(Long contestId) {
         if (!contestRepository.existsById(contestId)) {
@@ -195,6 +216,9 @@ public class ContestService {
     // 그 값 그대로 스냅샷을 만든다 — 라이브 매칭 프로필은 전혀 조회하지 않는다.
     // override가 없으면(과거 호출 방식) 라이브 매칭 프로필을 읽어서 스냅샷을 만든다.
     // 매칭 프로필 자체는 오직 마이페이지 직접 편집(saveMatchingProfile)에서만 바뀌어야 한다.
+    // 내부에서 user.setMatchingActive(true)를 호출해 인재풀 노출 여부를 바꾸므로,
+    // UserService.setMatchingActive와 동일하게 userPool 캐시를 무효화해야 한다.
+    @CacheEvict(cacheNames = "userPool", allEntries = true)
     @Transactional
     public void registerParticipant(Long contestId, Long userId, MatchingProfileData override) {
         // 이 사람이 이 공모전에 모집글을 올렸고 이미 팀원이 합류했다면 참여 카드(후보 등록)
