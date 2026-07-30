@@ -114,9 +114,14 @@ export default function ChatDetailScreen() {
   const [isRenameModalVisible, setIsRenameModalVisible] = useState(false);
   const [renameText, setRenameText] = useState('');
 
+  // 새로고침 직후엔 currentUserId 조회(fetchCurrentUserId, (tabs)/_layout.tsx)가 아직 안
+  // 끝났을 수 있는데, 그 전에 loadChat이 먼저 끝나버리면 MY_USER_ID가 기본값 0으로 남아
+  // adaptMessage가 내 메시지까지 전부 "상대가 보낸 것"으로 표시했다(실제 재현 확인 — 화면을
+  // 나갔다 들어오면 그때는 currentUserId가 이미 채워져 있어 정상으로 보였던 것도 이 때문).
+  // MY_USER_ID가 채워진 뒤에만 불러오도록 한다(messages/index.tsx, profile/index.tsx와 동일 패턴).
   useEffect(() => {
-    loadChat();
-  }, [chatId]);
+    if (MY_USER_ID) loadChat();
+  }, [chatId, MY_USER_ID]);
 
   // 이 채팅방을 열어둔 동안 실시간으로 새 메시지를 받는다. 내가 보낸 메시지는
   // handleSendMessage에서 이미 로컬에 append했는데 이 구독으로도 다시 돌아오므로,
