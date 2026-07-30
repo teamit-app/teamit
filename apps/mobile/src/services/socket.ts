@@ -53,8 +53,17 @@ export async function connectSocket(): Promise<void> {
 
   client = new Client({
     brokerURL: buildWsUrl(),
-    connectHeaders: { Authorization: `Bearer ${token}` },
     reconnectDelay: 5000,
+    // connectHeaders는 최초 연결 시점의 토큰을 고정값으로 들고 있어서, 재연결(자동
+    // reconnectDelay 포함) 때도 만료된 토큰을 그대로 재사용해 CONNECT가 계속 거부될 수
+    // 있다. beforeConnect에서 매 (재)연결 직전에 최신 토큰을 다시 읽어 갱신한다.
+    beforeConnect: async () => {
+      const latestToken = await tokenStorage.getAccessToken();
+      if (client) client.connectHeaders = { Authorization: `Bearer ${latestToken ?? token}` };
+    },
+    // 프록시/로드밸런서가 유휴 커넥션을 조용히 끊는 경우를 빨리 감지해 재연결하기 위한 하트비트
+    heartbeatIncoming: 10000,
+    heartbeatOutgoing: 10000,
     // onConnect는 최초 연결뿐 아니라 자동 재연결(reconnectDelay) 때마다도 호출된다 —
     // 재구독(subscribeAll)과 함께, 끊겨 있던 동안 놓쳤을 수 있는 이벤트를 따라잡기 위해
     // 이벤트 연동 캐시를 전부 한 번 무효화한다.
@@ -64,6 +73,9 @@ export async function connectSocket(): Promise<void> {
     },
     onStompError: (frame) => {
       console.error('[Socket] STOMP 오류:', frame.headers['message']);
+    },
+    onWebSocketClose: (event) => {
+      console.warn('[Socket] 연결 종료, 재연결 대기 중:', event?.code, event?.reason);
     },
   });
 
