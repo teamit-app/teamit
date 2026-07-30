@@ -7,10 +7,10 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.lang.NonNull;
 import org.springframework.messaging.Message;
 import org.springframework.messaging.MessageChannel;
+import org.springframework.messaging.support.MessageHeaderAccessor;
 import org.springframework.messaging.simp.stomp.StompCommand;
 import org.springframework.messaging.simp.stomp.StompHeaderAccessor;
 import org.springframework.messaging.support.ChannelInterceptor;
-import org.springframework.messaging.support.MessageBuilder;
 import org.springframework.stereotype.Component;
 
 import java.security.Principal;
@@ -41,7 +41,18 @@ public class StompAuthChannelInterceptor implements ChannelInterceptor {
 
     @Override
     public Message<?> preSend(@NonNull Message<?> message, @NonNull MessageChannel channel) {
-        StompHeaderAccessor accessor = StompHeaderAccessor.wrap(message);
+        // StompHeaderAccessor.wrap(message)로 만든 accessor는 메시지에 실제로 붙어있는
+        // mutable 헤더 인스턴스가 아니라 별도 래퍼라서, setUser() 등으로 값을 바꿔도 그
+        // 변경이 message에 반영되지 않는다(CONNECT는 매번 "성공" 로그가 찍히면서도 바로
+        // 다음 SUBSCRIBE에서 Principal이 없다고 나오는 버그의 원인이었다 — 실제 재현 확인,
+        // MessageBuilder로 재조립하는 방식도 시도했으나 동일하게 실패함). 클라이언트 인바운드
+        // 채널의 메시지는 "leave mutable"로 생성되어 있어, 아래처럼 메시지에 이미 붙어있는
+        // 그 accessor 인스턴스를 직접 꺼내 mutate해야 실제로 반영된다(Spring 공식 문서에
+        // 나온 STOMP CONNECT 인증 패턴).
+        StompHeaderAccessor accessor = MessageHeaderAccessor.getAccessor(message, StompHeaderAccessor.class);
+        if (accessor == null) {
+            accessor = StompHeaderAccessor.wrap(message);
+        }
 
         if (StompCommand.CONNECT.equals(accessor.getCommand())) {
             String token = extractToken(accessor.getFirstNativeHeader("Authorization"));
@@ -56,12 +67,6 @@ public class StompAuthChannelInterceptor implements ChannelInterceptor {
             Long userId = jwtTokenProvider.getUserId(token);
             accessor.setUser((Principal) () -> String.valueOf(userId));
             log.info("[STOMP] CONNECT 성공: userId={}", userId);
-            // Message는 불변 객체라 accessor로 헤더(setUser 포함)를 바꿔도 원본 message에는
-            // 반영되지 않는다 — 바뀐 헤더를 담아 새로 만든 메시지를 반환해야 이후 프레임
-            // (SUBSCRIBE 등)에서 accessor.getUser()가 실제로 채워진다. 이걸 안 해서 CONNECT는
-            // 매번 "성공" 로그가 찍히면서도 바로 다음 SUBSCRIBE에서 Principal이 없다고
-            // 나오는 버그가 있었다(실제 재현 확인됨).
-            return MessageBuilder.createMessage(message.getPayload(), accessor.getMessageHeaders());
 
         } else if (StompCommand.SUBSCRIBE.equals(accessor.getCommand())) {
             Long chatRoomId = extractChatRoomId(accessor.getDestination());
