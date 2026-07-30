@@ -12,11 +12,20 @@ spring:
     username: ${DB_USERNAME:}
     password: ${DB_PASSWORD:}
     driver-class-name: com.mysql.cj.jdbc.Driver
+    hikari:
+      maximum-pool-size: 10
+      minimum-idle: 5
+      connection-timeout: 3000
   jpa:
     hibernate:
       ddl-auto: ${JPA_DDL_AUTO:validate}
     show-sql: false
     database-platform: org.hibernate.dialect.MySQLDialect
+  cache:
+    redis:
+      # RedisCache의 히트/미스를 Micrometer cache.gets(태그 result=hit|miss)로 노출시켜서
+      # CloudWatch에서 "캐싱했다"가 아니라 실제 히트율을 확인할 수 있게 한다.
+      enable-statistics: true
 
 server:
   port: 8080
@@ -33,6 +42,32 @@ kakao:
 
 file:
   upload-dir: uploads   # 서버 프로세스 작업 디렉터리(apps/server) 기준 상대경로
+
+management:
+  server:
+    # nginx가 프록시하는 8080과 분리된 내부 전용 포트 — 외부(인터넷)에서는 절대 도달 못 하고
+    # EC2 안에서만(예: SSH 후 curl) 접근 가능하도록 docker-compose에서 127.0.0.1에만 바인딩한다.
+    port: 8081
+  endpoints:
+    web:
+      exposure:
+        include: health, metrics
+  endpoint:
+    health:
+      show-details: never
+  metrics:
+    distribution:
+      percentiles:
+        http.server.requests: 0.5, 0.95, 0.99
+      percentiles-histogram:
+        http.server.requests: true
+  cloudwatch:
+    metrics:
+      export:
+        enabled: true
+        namespace: teamit
+        step: 1m
+        batch-size: 20
 
 # local/prod 프로필별 값(application-local.yml 등)이 위 ${...} 플레이스홀더를 덮어쓴다.
 # 컨테이너 배포 시에는 별도 프로필 yml 없이 환경변수만으로 채워진다 (docker-compose.yml 참고).
