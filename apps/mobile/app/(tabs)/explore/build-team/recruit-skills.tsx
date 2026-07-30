@@ -12,6 +12,7 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { Alert } from '../../../../src/utils/alert';
 import { Colors } from '../../../../src/constants/colors';
 import { useBuildTeamStore } from '../../../../src/store/useBuildTeamStore';
+import { trackEvent } from '../../../../src/services/gtm';
 
 const SKILL_CATEGORIES: Record<string, string[]> = {
   전체: [],
@@ -67,6 +68,7 @@ export default function RecruitSkillsScreen() {
       // confirm → push로 들어온 수정 화면이므로 되돌아갈 땐 replace (사유: recruit-count.tsx 참고)
       router.replace(`/explore/build-team/recruit-confirm?contestId=${contestId}` as never);
     } else {
+      trackEvent('recruit_step_complete', { contest_id: Number(contestId), step: CURRENT_STEP });
       router.push(`/explore/build-team/recruit-conditions?contestId=${contestId}${editSuffix}` as never);
     }
   };

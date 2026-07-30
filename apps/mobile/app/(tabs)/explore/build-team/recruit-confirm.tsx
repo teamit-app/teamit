@@ -15,6 +15,7 @@ import { useExploreStore } from '../../../../src/store/useExploreStore';
 import { useMypageStore } from '../../../../src/store/useMypageStore';
 import { getContestDetail, createPost, registerAsParticipant } from '../../../../src/services/contestService';
 import { formatRegionsLabel } from '../../../../src/utils/region';
+import { trackEvent } from '../../../../src/services/gtm';
 
 const TOTAL_STEPS = 5;
 const CURRENT_STEP = 5;
@@ -119,6 +120,10 @@ export default function RecruitConfirmScreen() {
         experienceCondition,
         purposeCondition,
       });
+
+      // 모집글 작성 성공 = 팀 채팅방도 함께 생성됨(서버가 한 번에 처리) — 이 시점이
+      // 실제 "모집 시작" 완료 지점이라, 버튼 클릭이 아니라 여기서 이벤트를 보낸다.
+      trackEvent('recruit_post_created', { contest_id: id, post_id: result?.postId ?? null });
 
       // 모집글 작성 = 팀 매칭 후보 자동 등록. 서버가 자동 등록할 때는 라이브 매칭
       // 프로필을 읽어서 스냅샷을 만드는데, 이 화면에서 "수정"으로 고친 내용은

@@ -48,6 +48,10 @@ export default function BasicInfoScreen() {
     } catch {
       // 네트워크 오류 등으로 삭제에 실패해도 로그인 화면 이동은 막지 않음
     } finally {
+      // withdraw() API 성공 여부와 무관하게 화면 이동은 항상 진행되므로(위 catch 참고)
+      // 이벤트도 동일하게 무조건 보낸다. 계정 정리를 위한 withdraw API를 재사용할 뿐,
+      // 정착한 유저의 회원 탈퇴(useAuthStore.logout('withdraw'))와는 다른 의미라 이름을 분리한다.
+      trackEvent('sign_up_abandon');
       router.replace(`/(auth)/login${returnTo ? `?returnTo=${encodeURIComponent(returnTo)}` : ''}` as never);
     }
   };

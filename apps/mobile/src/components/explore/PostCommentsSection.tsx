@@ -3,6 +3,7 @@ import { View, Text, TextInput, TouchableOpacity, StyleSheet, Keyboard } from 'r
 import { Colors } from '../../constants/colors';
 import { getPostComments, addPostComment } from '../../services/postService';
 import { PostComment } from '../../types/contest';
+import { trackEvent } from '../../services/gtm';
 
 // 모집글 댓글 섹션 — 모집글 상세(explore/post/[postId].tsx)와 초대장 상세
 // (messages/invitation-detail/[invitationId].tsx)에서 공용으로 사용한다.
@@ -98,6 +99,7 @@ export function PostCommentsSection({ postId, onSectionLayout, onReplyStart }: P
     Keyboard.dismiss();
     try {
       const newComment = await addPostComment(postId, text, parentId);
+      trackEvent('comment_submit', { post_id: postId });
       setComments((prev) => {
         if (!replyTarget) return [...prev, newComment];
         const parentIdx = prev.findIndex((c) => c.commentId === replyTarget.commentId);

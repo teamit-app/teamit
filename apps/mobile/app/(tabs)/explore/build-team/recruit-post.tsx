@@ -14,6 +14,7 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { Colors } from '../../../../src/constants/colors';
 import { useBuildTeamStore } from '../../../../src/store/useBuildTeamStore';
 import { getPostDetail, updatePost } from '../../../../src/services/postService';
+import { trackEvent } from '../../../../src/services/gtm';
 
 const TOTAL_STEPS = 5;
 const CURRENT_STEP = 4;
@@ -186,6 +187,7 @@ export default function RecruitPostScreen() {
               // confirm → push로 들어온 수정 화면이므로 되돌아갈 땐 replace (사유: recruit-count.tsx 참고)
               router.replace(`/explore/build-team/recruit-confirm?contestId=${contestId}` as never);
             } else {
+              trackEvent('recruit_step_complete', { contest_id: Number(contestId), step: CURRENT_STEP });
               router.push(`/explore/build-team/recruit-confirm?contestId=${contestId}` as never);
             }
           }}

@@ -21,6 +21,7 @@ import { TalentDetail, TalentRecruitPost } from '../../../../src/types/talent';
 import { StarRating } from '../../../../src/components/common/StarRating';
 import { requireAuthForChat } from '../../../../src/utils/authGuard';
 import { useScrollDepthTracking } from '../../../../src/hooks/useScrollDepthTracking';
+import { trackEvent } from '../../../../src/services/gtm';
 
 const IS_MOCK = process.env.EXPO_PUBLIC_API_MODE === 'mock';
 
@@ -180,6 +181,7 @@ export default function RecruiterProfileScreen() {
     if (!requireAuthForChat(`/${sourceTab}/post/recruiter-profile?postId=${postId}`)) return;
     try {
       const chatRoomId = await getOrCreateDirectChatRoom(detail.userId);
+      trackEvent('chat_start', { target_user_id: detail.userId });
       const chatPath = sourceTab === 'messages' ? `/messages/${chatRoomId}` : `/${sourceTab}/chat/${chatRoomId}`;
       router.push(chatPath as never);
     } catch (e) {

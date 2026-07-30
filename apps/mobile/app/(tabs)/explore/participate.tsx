@@ -17,6 +17,7 @@ import { useExploreStore } from '../../../src/store/useExploreStore';
 import { MatchingProfileData } from '../../../src/types/mypage';
 import { formatRegionsLabel } from '../../../src/utils/region';
 import { formatMatchingCard } from '../../../src/constants/matchingLabels';
+import { trackEvent } from '../../../src/services/gtm';
 
 function formatCard(p: MatchingProfileData) {
   const region = p.regions.length > 0 ? formatRegionsLabel(p.regions) : '';
@@ -109,6 +110,7 @@ export default function ParticipateScreen() {
   };
 
   const handleSubmit = async () => {
+    trackEvent('participate_submit', { contest_id: id });
     try {
       await registerAsParticipant(id, draftCard ?? undefined);
       markContestParticipant(id); // 스토어 낙관적 업데이트

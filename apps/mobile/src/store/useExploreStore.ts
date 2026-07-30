@@ -153,11 +153,7 @@ export const useExploreStore = create<ExploreState>((set, get) => ({
       ),
     }));
 
-    trackEvent('like', {
-      item_type: 'talent',
-      item_id: targetUserId,
-      action: prevState ? 'unlike' : 'like',
-    });
+    trackEvent(prevState ? 'unlike' : 'like', { item_type: 'talent', item_id: targetUserId });
 
     try {
       if (prevState) {
@@ -192,11 +188,7 @@ export const useExploreStore = create<ExploreState>((set, get) => ({
       ),
     }));
 
-    trackEvent('like', {
-      item_type: 'contest',
-      item_id: contestId,
-      action: prevState ? 'unlike' : 'like',
-    });
+    trackEvent(prevState ? 'unlike' : 'like', { item_type: 'contest', item_id: contestId });
 
     try {
       if (prevState) {

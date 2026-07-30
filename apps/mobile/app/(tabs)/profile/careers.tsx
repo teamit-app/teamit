@@ -13,6 +13,7 @@ import { Colors } from '../../../src/constants/colors';
 import { ScreenHeader } from '../../../src/components/common/ScreenHeader';
 import { useMypageStore } from '../../../src/store/useMypageStore';
 import { ContestCareer, CertificateCareer } from '../../../src/types/mypage';
+import { trackEvent } from '../../../src/services/gtm';
 
 type Tab = 'contest' | 'certificate';
 
@@ -123,6 +124,11 @@ export default function CareersScreen() {
   const { profile, hasLoaded, loadProfile, removeCareer } = useMypageStore();
   const [tab, setTab] = useState<Tab>('contest');
 
+  const handleTabPress = (key: Tab) => {
+    trackEvent('tab_select', { tab_group: 'careers_menu', tab_name: key, from_tab: tab });
+    setTab(key);
+  };
+
   useEffect(() => {
     if (!hasLoaded) loadProfile();
   }, []);
@@ -135,16 +141,16 @@ export default function CareersScreen() {
     (c): c is CertificateCareer => c.careerType === 'CERTIFICATE',
   );
 
-  const handleDelete = (careerItemId: number) => {
+  const handleDelete = (careerItemId: number, careerType: 'contest' | 'certificate') => {
     Alert.alert('삭제', '이 경험을 삭제할까요?', [
       { text: '취소', style: 'cancel' },
       {
         text: '삭제',
         style: 'destructive',
         onPress: () =>
-          removeCareer(careerItemId).catch(() =>
-            Alert.alert('오류', '삭제에 실패했어요.'),
-          ),
+          removeCareer(careerItemId)
+            .then(() => trackEvent('career_delete', { item_type: careerType }))
+            .catch(() => Alert.alert('오류', '삭제에 실패했어요.')),
       },
     ]);
   };
@@ -172,7 +178,7 @@ export default function CareersScreen() {
       <View style={styles.tabRow}>
         <TouchableOpacity
           style={[styles.tab, isContest && styles.tabActive]}
-          onPress={() => setTab('contest')}
+          onPress={() => handleTabPress('contest')}
         >
           <Text
             style={[styles.tabText, isContest && styles.tabTextActive]}
@@ -182,7 +188,7 @@ export default function CareersScreen() {
         </TouchableOpacity>
         <TouchableOpacity
           style={[styles.tab, !isContest && styles.tabActive]}
-          onPress={() => setTab('certificate')}
+          onPress={() => handleTabPress('certificate')}
         >
           <Text
             style={[styles.tabText, !isContest && styles.tabTextActive]}
@@ -238,7 +244,7 @@ export default function CareersScreen() {
                         },
                       } as never)
                     }
-                    onDelete={() => handleDelete(item.careerItemId)}
+                    onDelete={() => handleDelete(item.careerItemId, 'contest')}
                   />
                 ))
               : certificates.map((item) => (
@@ -256,7 +262,7 @@ export default function CareersScreen() {
                         },
                       } as never)
                     }
-                    onDelete={() => handleDelete(item.careerItemId)}
+                    onDelete={() => handleDelete(item.careerItemId, 'certificate')}
                   />
                 ))}
           </View>

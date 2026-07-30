@@ -19,6 +19,7 @@ import { Colors } from '../../../src/constants/colors';
 import { ScreenHeader } from '../../../src/components/common/ScreenHeader';
 import { useMypageStore } from '../../../src/store/useMypageStore';
 import { submitEducationCert } from '../../../src/services/mypageService';
+import { trackEvent } from '../../../src/services/gtm';
 
 // ──────────────────────────────────────────────────
 // Types
@@ -176,6 +177,7 @@ export default function EducationCertScreen() {
     setSubmitting(true);
     try {
       await submitEducationCert(educationId, { docType, fileUri, fileName });
+      trackEvent('education_cert_submit', { item_type: docType.toLowerCase() });
       await reloadProfile();
       setStep(3);
     } catch {

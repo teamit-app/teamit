@@ -45,6 +45,7 @@ export default function LoginScreen() {
   const cancelKakaoPollRef = useRef(false);
 
   useEffect(() => {
+    trackEvent('login_page_view');
     return () => {
       cancelKakaoPollRef.current = true;
     };
@@ -52,6 +53,7 @@ export default function LoginScreen() {
 
   const handleKakaoLogin = async () => {
     if (isLoggingIn) return;
+    trackEvent('kakao_login_click');
 
     if (IS_MOCK) {
       setUserId(1);

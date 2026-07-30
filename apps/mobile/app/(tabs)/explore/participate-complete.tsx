@@ -9,11 +9,17 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
 import { Colors } from '../../../src/constants/colors';
+import { trackEvent } from '../../../src/services/gtm';
 
 export default function ParticipateCompleteScreen() {
   const insets = useSafeAreaInsets();
   const { contestId } = useLocalSearchParams<{ contestId: string }>();
   const [notificationEnabled, setNotificationEnabled] = useState(true);
+
+  const handleBuildTeamCtaPress = () => {
+    trackEvent('build_team_start', { contest_id: Number(contestId), source: 'participate_complete' });
+    router.push(`/explore/build-team/recruit-count?contestId=${contestId}` as never);
+  };
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
@@ -47,7 +53,7 @@ export default function ParticipateCompleteScreen() {
         {/* CTA 카드 */}
         <TouchableOpacity
           style={styles.ctaCard}
-          onPress={() => router.push(`/explore/build-team/recruit-count?contestId=${contestId}` as never)}
+          onPress={handleBuildTeamCtaPress}
           activeOpacity={0.85}
         >
           <Text style={styles.ctaTitle}>직접 팀을 꾸려보시겠어요?</Text>
