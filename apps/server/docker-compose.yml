@@ -2,8 +2,11 @@ services:
   mysql:
     image: mysql:8.0
     restart: unless-stopped
-    mem_limit: 400m
-    command: ["--innodb-buffer-pool-size=200M", "--max-connections=50"]
+    mem_limit: 500m
+    # performance_schema는 MySQL 8.0 기본값(켜짐)인데, 트래픽이 거의 없어도 100MB+를
+    # 잡아먹는 경우가 흔하다(실측: 트래픽 없이도 400m 한도의 97%까지 사용). 앱 레벨
+    # 모니터링(Actuator/CloudWatch)이 이미 있어서 DB 내부 계측까지는 필요 없어 끈다.
+    command: ["--innodb-buffer-pool-size=200M", "--max-connections=50", "--performance_schema=OFF"]
     environment:
       MYSQL_DATABASE: teamit
       MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD}
@@ -31,7 +34,8 @@ services:
   app:
     image: ${DOCKERHUB_USERNAME}/teamit-server:${IMAGE_TAG:-latest}
     restart: unless-stopped
-    mem_limit: 1000m
+    # 실측(docker stats)으로 432MiB/1000m(43%)만 쓰고 있어 여유를 mysql 쪽으로 옮겼다.
+    mem_limit: 850m
     depends_on:
       mysql:
         condition: service_healthy
