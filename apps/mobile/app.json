@@ -25,7 +25,7 @@
       "predictiveBackGestureEnabled": false
     },
     "web": {
-      "favicon": "./assets/teamit_logo.png",
+      "favicon": "./assets/favicon.png",
       "bundler": "metro",
       "output": "single"
     },
