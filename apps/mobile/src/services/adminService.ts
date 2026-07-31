@@ -80,16 +80,24 @@ export interface ContestFormData {
 export const getAdminContests = (): Promise<AdminContest[]> =>
   apiRequest<AdminContest[]>('/admin/contests');
 
+// startDate는 선택 입력이라 폼에서 빈 문자열("")로 남을 수 있는데, 서버는 이 필드를
+// LocalDate로 받아서 ""를 그대로 보내면 파싱 실패로 500이 난다. 비어 있으면 아예
+// 키를 생략(undefined → JSON.stringify가 제외)해서 null로 들어가게 한다.
+const toRequestBody = (data: ContestFormData): ContestFormData => ({
+  ...data,
+  startDate: data.startDate?.trim() ? data.startDate : undefined,
+});
+
 export const createContest = (data: ContestFormData): Promise<AdminContest> =>
   apiRequest<AdminContest>('/admin/contests', {
     method: 'POST',
-    body: JSON.stringify(data),
+    body: JSON.stringify(toRequestBody(data)),
   });
 
 export const updateContest = (contestId: number, data: ContestFormData): Promise<AdminContest> =>
   apiRequest<AdminContest>(`/admin/contests/${contestId}`, {
     method: 'PATCH',
-    body: JSON.stringify(data),
+    body: JSON.stringify(toRequestBody(data)),
   });
 
 export const deleteContest = (contestId: number): Promise<void> =>

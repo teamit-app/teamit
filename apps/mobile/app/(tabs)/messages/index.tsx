@@ -44,6 +44,7 @@ export default function MessagesScreen() {
   const [invitations, setInvitations] = useState<Invitation[]>([]);
   const [sections, setSections] = useState<SectionData[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [lastRefreshedAt, setLastRefreshedAt] = useState<Date | null>(null);
   const { markInvitationAsRead } = useReadStore();
   const currentUserId = useAuthStore((s) => s.currentUserId);
   const currentUserIdReady = useAuthStore((s) => s.currentUserIdReady);
@@ -60,12 +61,20 @@ export default function MessagesScreen() {
       const [rooms, invites] = await Promise.all([getChatRooms(), getInvitations()]);
       setInvitations(invites);
       buildSections(rooms);
+      setLastRefreshedAt(new Date());
     } catch (e) {
       console.error('Failed to load messages:', e);
     } finally {
       setIsLoading(false);
     }
   };
+
+  // 채팅방 목록은 새 메시지가 와도 실시간으로 안 바뀌어서(방에 직접 들어가야만 실시간
+  // 반영됨 — 목록 화면 자체는 그 방들을 구독하지 않음), 화면을 나갔다 들어오지 않고도
+  // 최신 상태를 확인할 수 있도록 수동 새로고침 버튼 + 마지막 새로고침 시각을 보여준다.
+  const formattedLastRefreshedAt = lastRefreshedAt
+    ? lastRefreshedAt.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', hour12: false })
+    : null;
 
   const buildSections = (rooms: ChatRoom[]) => {
     const group = rooms.filter((r) => r.type === 'group');
@@ -162,6 +171,22 @@ export default function MessagesScreen() {
               <Text style={styles.badgeText}>{invitationCount}</Text>
             </View>
           )}
+        </TouchableOpacity>
+      </View>
+
+      {/* ── 마지막 새로고침 시각 + 새로고침 버튼 ── */}
+      <View style={styles.refreshRow}>
+        <Text style={styles.refreshRowText}>
+          {formattedLastRefreshedAt ? `마지막 새로고침: ${formattedLastRefreshedAt}` : ''}
+        </Text>
+        <TouchableOpacity
+          onPress={loadAll}
+          disabled={isLoading}
+          style={styles.refreshBtn}
+          hitSlop={8}
+          activeOpacity={0.7}
+        >
+          <Text style={styles.refreshBtnText}>{isLoading ? '새로고침 중…' : '↻ 새로고침'}</Text>
         </TouchableOpacity>
       </View>
 
@@ -357,6 +382,28 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '700',
     color: Colors.white,
+  },
+
+  // 마지막 새로고침 시각 + 새로고침 버튼
+  refreshRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginHorizontal: 16,
+    marginTop: 10,
+  },
+  refreshRowText: {
+    fontSize: 11,
+    color: Colors.grayMedium,
+  },
+  refreshBtn: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+  },
+  refreshBtnText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: Colors.primary,
   },
 
   // 배너
