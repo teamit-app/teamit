@@ -114,9 +114,14 @@ export default function ChatDetailScreen() {
   const [isRenameModalVisible, setIsRenameModalVisible] = useState(false);
   const [renameText, setRenameText] = useState('');
 
+  // 새로고침 직후엔 currentUserId 조회(fetchCurrentUserId, (tabs)/_layout.tsx)가 아직 안
+  // 끝났을 수 있는데, 그 전에 loadChat이 먼저 끝나버리면 MY_USER_ID가 기본값 0으로 남아
+  // adaptMessage가 내 메시지까지 전부 "상대가 보낸 것"으로 표시했다(실제 재현 확인 — 화면을
+  // 나갔다 들어오면 그때는 currentUserId가 이미 채워져 있어 정상으로 보였던 것도 이 때문).
+  // MY_USER_ID가 채워진 뒤에만 불러오도록 한다(messages/index.tsx, profile/index.tsx와 동일 패턴).
   useEffect(() => {
-    loadChat();
-  }, [chatId]);
+    if (MY_USER_ID) loadChat();
+  }, [chatId, MY_USER_ID]);
 
   // 이 채팅방을 열어둔 동안 실시간으로 새 메시지를 받는다. 내가 보낸 메시지는
   // handleSendMessage에서 이미 로컬에 append했는데 이 구독으로도 다시 돌아오므로,
@@ -212,7 +217,10 @@ export default function ChatDetailScreen() {
     setIsSending(true);
     try {
       const newMessage = await sendMessage(parseInt(chatId as string), text);
-      setMessages((prev) => [...prev, newMessage]);
+      // 서버가 저장 직후 웹소켓으로도 같은 메시지를 broadcast하는데, 그게 이 REST 응답보다
+      // 먼저 도착할 수 있다(순서 보장 안 됨). 그러면 웹소켓 핸들러가 먼저 추가해놓은 걸
+      // 여기서 또 추가해 중복 표시가 생기므로, 같은 id가 이미 있으면 건너뛴다.
+      setMessages((prev) => (prev.some((m) => m.id === newMessage.id) ? prev : [...prev, newMessage]));
       setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 100);
     } catch (e) {
       console.error('Failed to send:', e);
