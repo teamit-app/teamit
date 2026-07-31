@@ -226,7 +226,7 @@ export default function ContestDetailScreen() {
                 ? { width: '100%' as const, aspectRatio: posterAspectRatio }
                 : styles.imagePlaceholder
             }
-            resizeMode="contain"
+            resizeMode="cover"
             onLoad={(e) => {
               const { width, height } = e.nativeEvent.source;
               if (width && height) setPosterAspectRatio(width / height);
