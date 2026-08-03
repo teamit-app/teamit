@@ -412,7 +412,7 @@ export default function ProfileScreen() {
         {/* 문의 안내 */}
         <View style={styles.contactSection}>
           <Text style={styles.contactText}>
-            추가하고 싶은 공모전 및 문의사항이 있으면{'\n'}이메일 : specit.biz@gmail.com 로 보내주세요
+            추가하고 싶으신 공모전 및 문의사항은 아래 이메일로 보내주세요 {'\n'} specit.biz@gmail.com 
           </Text>
         </View>
 
