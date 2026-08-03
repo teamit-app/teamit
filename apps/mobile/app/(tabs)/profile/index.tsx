@@ -409,6 +409,13 @@ export default function ProfileScreen() {
           </TouchableOpacity>
         </View>
 
+        {/* 문의 안내 */}
+        <View style={styles.contactSection}>
+          <Text style={styles.contactText}>
+            추가하고 싶으신 공모전 및 문의사항은 아래 이메일로 보내주세요 {'\n'} specit.biz@gmail.com 
+          </Text>
+        </View>
+
       </ScrollView>
     </View>
   );
@@ -534,4 +541,17 @@ const styles = StyleSheet.create({
   notifSubtitle: { fontSize: 12, color: Colors.grayMedium },
   notifArrow: { fontSize: 22, color: Colors.lightGray },
   withdrawText: { color: Colors.error },
+
+  // 문의 안내
+  contactSection: {
+    paddingHorizontal: 20,
+    paddingVertical: 24,
+    alignItems: 'center',
+  },
+  contactText: {
+    fontSize: 12,
+    color: Colors.grayMedium,
+    textAlign: 'center',
+    lineHeight: 18,
+  },
 });

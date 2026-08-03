@@ -3,12 +3,20 @@ import { Platform } from 'react-native';
 declare global {
   interface Window {
     dataLayer?: Record<string, unknown>[];
+    fbq?: (...args: unknown[]) => void;
   }
 }
 
 export function trackEvent(event: string, params: Record<string, unknown> = {}) {
   if (Platform.OS !== 'web' || typeof window === 'undefined' || !window.dataLayer) return;
   window.dataLayer.push({ event, ...params });
+}
+
+// public/index.html에 삽입된 Meta Pixel 베이스 코드가 초기화한 전역 fbq를 호출.
+// 네이티브(iOS/Android)에는 fbq가 존재하지 않으므로 web에서만 동작.
+export function trackFbq(event: string, params?: Record<string, unknown>) {
+  if (Platform.OS !== 'web' || typeof window === 'undefined' || typeof window.fbq !== 'function') return;
+  window.fbq('track', event, params);
 }
 
 // user_id는 GA4 예약 필드라 이벤트 파라미터로 보내면 안 되고, GTM의 GA4 구성
