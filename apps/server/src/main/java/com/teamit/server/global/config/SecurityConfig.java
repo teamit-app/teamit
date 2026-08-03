@@ -62,6 +62,11 @@ public class SecurityConfig {
                         .requestMatchers("/ws/**").permitAll()
                         // 프로필 사진 등 공개 업로드 파일 정적 서빙 (WebMvcConfig 참고)
                         .requestMatchers("/files/**").permitAll()
+                        // Actuator(health/metrics)는 관리용 포트(8081, docker-compose에서 127.0.0.1에만
+                        // 바인딩)로만 도달 가능해서 외부(인터넷)에서는 애초에 접근 자체가 안 된다.
+                        // 이 규칙이 없으면 anyRequest().authenticated()에 걸려 EC2 안에서 SSH 후
+                        // curl로 확인하려는 것도 403으로 막힌다.
+                        .requestMatchers("/actuator/**").permitAll()
                         // 로그인 없이도 둘러볼 수 있어야 하는 조회 전용 API. 절대 "/api/v1/contests/*"처럼
                         // 한 세그먼트짜리 와일드카드를 쓰지 않는다 — "/contests/my-participations",
                         // "/users/me" 같은 이름이 같은 모양의 비공개 엔드포인트까지 같이 뚫려버리기 때문에,
