@@ -61,13 +61,10 @@ management:
         http.server.requests: 0.5, 0.95, 0.99
       percentiles-histogram:
         http.server.requests: true
-  cloudwatch:
-    metrics:
-      export:
-        enabled: true
-        namespace: teamit
-        step: 1m
-        batch-size: 20
+  # CloudWatch 전송 설정(네임스페이스/주기 등)은 여기가 아니라 Spring Boot 4.0에서
+  # 직접 등록한 CloudWatchMetricsConfig.java(global/config)에 있다 — 4.0부터
+  # management.cloudwatch.metrics.export.* 프로퍼티를 읽는 오토컨피그가 프레임워크에서
+  # 빠져서, 이 프로퍼티들은 실제로는 아무도 안 읽는 죽은 설정이었다(실제 확인함).
 
 # local/prod 프로필별 값(application-local.yml 등)이 위 ${...} 플레이스홀더를 덮어쓴다.
 # 컨테이너 배포 시에는 별도 프로필 yml 없이 환경변수만으로 채워진다 (docker-compose.yml 참고).
