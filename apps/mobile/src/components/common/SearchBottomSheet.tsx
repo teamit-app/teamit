@@ -23,6 +23,7 @@ interface SearchBottomSheetProps {
   allowCustomInput?: boolean;
   customInputLabel?: string;
   customInputPlaceholder?: string;
+  customInputDesc?: string;
 }
 
 export function SearchBottomSheet({
@@ -35,6 +36,7 @@ export function SearchBottomSheet({
   allowCustomInput = false,
   customInputLabel,
   customInputPlaceholder,
+  customInputDesc,
 }: SearchBottomSheetProps) {
   const [keyword, setKeyword] = useState('');
   const [customMode, setCustomMode] = useState(false);
@@ -102,7 +104,7 @@ export function SearchBottomSheet({
               /* ── 직접 입력 모드 ── */
               <View style={styles.customModeWrap}>
                 <Text style={styles.customModeDesc}>
-                  목록에 없는 학과명을 직접 입력하세요
+                  {customInputDesc ?? '목록에 없는 항목을 직접 입력하세요'}
                 </Text>
                 <View style={styles.customInputWrap}>
                   <TextInput

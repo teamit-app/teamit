@@ -13,7 +13,8 @@ import { Colors } from '../../../src/constants/colors';
 import { ScreenHeader } from '../../../src/components/common/ScreenHeader';
 import { SearchBottomSheet } from '../../../src/components/common/SearchBottomSheet';
 import { useMypageStore } from '../../../src/store/useMypageStore';
-import { SCHOOL_LIST, MAJOR_LIST } from '../../../src/data/schools';
+import { SCHOOL_LIST } from '../../../src/data/schools';
+import { MAJOR_LIST } from '../../../src/data/majors';
 import { EducationStatus, VerificationStatus } from '../../../src/types/mypage';
 import { submitEducation } from '../../../src/services/onboardingService';
 import { cancelEducationCert } from '../../../src/services/mypageService';
@@ -440,6 +441,10 @@ export default function EducationScreen() {
           setShowSchoolSearch(false);
         }}
         onClose={() => setShowSchoolSearch(false)}
+        allowCustomInput
+        customInputLabel="직접 입력하기"
+        customInputPlaceholder="학교명을 입력하세요"
+        customInputDesc="목록에 없는 학교명을 직접 입력하세요"
       />
 
       {/* ── 주전공 검색 BottomSheet ── */}
@@ -456,6 +461,7 @@ export default function EducationScreen() {
         allowCustomInput
         customInputLabel="직접 입력하기"
         customInputPlaceholder="학과명을 입력하세요"
+        customInputDesc="목록에 없는 학과명을 직접 입력하세요"
       />
 
       {/* ── 복수전공 검색 BottomSheet ── */}
@@ -472,6 +478,7 @@ export default function EducationScreen() {
         allowCustomInput
         customInputLabel="직접 입력하기"
         customInputPlaceholder="학과명을 입력하세요"
+        customInputDesc="목록에 없는 학과명을 직접 입력하세요"
       />
     </View>
   );
