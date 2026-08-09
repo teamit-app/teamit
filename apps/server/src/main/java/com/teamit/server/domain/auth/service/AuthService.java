@@ -45,7 +45,7 @@ public class AuthService {
                     .kakaoId(kakaoId)
                     .nickname(kakaoUserInfo.getNickname())
                     .profileImageUrl(kakaoUserInfo.getProfileImageUrl())
-                    .isMatchingActive(false)
+                    .isMatchingActive(true)
                     .build());
         }
 
