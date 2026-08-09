@@ -56,7 +56,7 @@ public class User extends BaseTimeEntity {
         this.gender = gender;
         this.birthDate = birthDate;
         this.profileImageUrl = profileImageUrl;
-        this.isMatchingActive = isMatchingActive != null ? isMatchingActive : false;
+        this.isMatchingActive = isMatchingActive != null ? isMatchingActive : true;
         this.role = Role.USER;
     }
 
