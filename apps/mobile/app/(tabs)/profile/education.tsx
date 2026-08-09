@@ -335,27 +335,51 @@ export default function EducationScreen() {
         {/* ── 학과 정보 ── */}
         <View style={styles.card}>
           <Text style={styles.cardLabel}>주전공 (선택)</Text>
-          <TouchableOpacity
-            style={[styles.searchBox, major ? styles.searchBoxSelected : undefined]}
-            onPress={() => setShowMajorSearch(true)}
-            activeOpacity={0.7}
-          >
-            <Text style={[styles.searchBoxText, !major && styles.placeholder]}>
-              {major || '학과 이름을 검색하세요'}
-            </Text>
-            {!major && <Text style={styles.searchIcon}>🔍</Text>}
-          </TouchableOpacity>
+          <View style={styles.searchBoxRow}>
+            <TouchableOpacity
+              style={[
+                styles.searchBox,
+                styles.searchBoxFlex,
+                major ? styles.searchBoxSelected : undefined,
+              ]}
+              onPress={() => setShowMajorSearch(true)}
+              activeOpacity={0.7}
+            >
+              <Text style={[styles.searchBoxText, !major && styles.placeholder]}>
+                {major || '학과 이름을 검색하세요'}
+              </Text>
+              {!major && <Text style={styles.searchIcon}>🔍</Text>}
+            </TouchableOpacity>
+            {major ? (
+              <TouchableOpacity
+                style={styles.removeBtn}
+                onPress={() => setMajor('')}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.removeBtnText}>✕</Text>
+              </TouchableOpacity>
+            ) : null}
+          </View>
 
           {subMajor !== null ? (
             <View style={styles.subMajorSection}>
               <Text style={styles.subMajorLabel}>복수전공 (선택)</Text>
-              <TouchableOpacity
-                style={[styles.searchBox, styles.searchBoxSelected]}
-                onPress={() => setShowSubMajorSearch(true)}
-                activeOpacity={0.7}
-              >
-                <Text style={styles.searchBoxText}>{subMajor}</Text>
-              </TouchableOpacity>
+              <View style={styles.subMajorRow}>
+                <TouchableOpacity
+                  style={[styles.searchBox, styles.searchBoxSelected, styles.searchBoxFlex]}
+                  onPress={() => setShowSubMajorSearch(true)}
+                  activeOpacity={0.7}
+                >
+                  <Text style={styles.searchBoxText}>{subMajor}</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.removeBtn}
+                  onPress={() => setSubMajor(null)}
+                  activeOpacity={0.7}
+                >
+                  <Text style={styles.removeBtnText}>✕</Text>
+                </TouchableOpacity>
+              </View>
             </View>
           ) : (
             <TouchableOpacity
@@ -570,6 +594,16 @@ const styles = StyleSheet.create({
     fontSize: 16,
     marginLeft: 8,
   },
+  searchBoxRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 8,
+  },
+  searchBoxFlex: {
+    flex: 1,
+    marginBottom: 0,
+  },
 
   // ── 재학 상태 탭 ──
   statusRow: {
@@ -612,16 +646,16 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 8,
   },
-  removeSubMajorBtn: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+  removeBtn: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
     backgroundColor: Colors.lightGray,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  removeSubMajorText: {
-    fontSize: 14,
+  removeBtnText: {
+    fontSize: 11,
     color: Colors.gray,
     fontWeight: '600',
   },
