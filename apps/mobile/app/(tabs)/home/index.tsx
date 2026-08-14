@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -11,12 +11,11 @@ import { RecruitPostCard } from '../../../src/components/explore/RecruitPostCard
 import { getPopularContests } from '../../../src/services/contestService';
 import { getMatchingStatus } from '../../../src/services/matchingService';
 import { getPosts, adaptToRecruitPost } from '../../../src/services/postService';
-import { getNotifications } from '../../../src/services/notificationService';
-import { useNotificationStore } from '../../../src/store/useNotificationStore';
 import { REALTIME_STALE_TIME } from '../../../src/services/realtimeEvents';
 import { ContestStatus } from '../../../src/types/contest';
 import { useAuthStore } from '../../../src/store/useAuthStore';
-import { withAuth, requireAuthForNotifications } from '../../../src/utils/authGuard';
+import { withAuth } from '../../../src/utils/authGuard';
+import { Alert } from '../../../src/utils/alert';
 import { trackEvent } from '../../../src/services/gtm';
 
 type StatusFilter = 'ALL' | ContestStatus;
@@ -41,8 +40,6 @@ function KakaoSymbol({ size = 12 }: { size?: number }) {
 export default function HomeScreen() {
   const insets = useSafeAreaInsets();
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('ALL');
-  const unreadCount = useNotificationStore((s) => s.unreadCount);
-  const setUnreadCount = useNotificationStore((s) => s.setUnreadCount);
   const currentUserId = useAuthStore((s) => s.currentUserId);
 
   const { data: contests = [] } = useQuery({
@@ -64,18 +61,6 @@ export default function HomeScreen() {
     staleTime: REALTIME_STALE_TIME,
   });
 
-  // 웹소켓으로 실시간 반영되는 unreadCount의 최초 값 — 소켓 연결 전/중 놓친 알림까지 포함해서 시드한다
-  const { data: notificationsSeed } = useQuery({
-    queryKey: ['notifications'],
-    queryFn: getNotifications,
-    enabled: !!currentUserId,
-    staleTime: REALTIME_STALE_TIME,
-  });
-
-  useEffect(() => {
-    if (notificationsSeed) setUnreadCount(notificationsSeed.unreadCount);
-  }, [notificationsSeed, setUnreadCount]);
-
   const filteredContests = contests.filter(
     (contest) => statusFilter === 'ALL' || contest.status === statusFilter,
   );
@@ -85,12 +70,11 @@ export default function HomeScreen() {
       <View style={styles.header}>
         <Text style={styles.logo}>티밋</Text>
         <TouchableOpacity
-          onPress={() => { if (requireAuthForNotifications()) router.push('/home/notifications'); }}
+          onPress={() => Alert.alert('알림', '베타테스트 기간에는 알림을 제공하지 않아요')}
           hitSlop={8}
           style={styles.bellWrap}
         >
           <Text style={styles.bellIcon}>🔔</Text>
-          {unreadCount > 0 && <View style={styles.bellBadge} />}
         </TouchableOpacity>
       </View>
 
@@ -262,15 +246,6 @@ const styles = StyleSheet.create({
   },
   bellIcon: {
     fontSize: 22,
-  },
-  bellBadge: {
-    position: 'absolute',
-    top: -2,
-    right: -2,
-    width: 9,
-    height: 9,
-    borderRadius: 5,
-    backgroundColor: Colors.error,
   },
   content: {
     paddingHorizontal: 20,
