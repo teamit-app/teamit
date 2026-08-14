@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet } from 'react-native';
+import Svg, { Path } from 'react-native-svg';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
@@ -22,9 +23,20 @@ type StatusFilter = 'ALL' | ContestStatus;
 
 const STATUS_OPTIONS: { key: StatusFilter; label: string }[] = [
   { key: 'ALL', label: '전체' },
-  { key: 'ONGOING', label: '진행중' },
   { key: 'DEADLINE_SOON', label: '마감임박' },
 ];
+
+// 카카오톡 말풍선 심볼 — 노란 배지 위에 올려서 "카카오로 로그인" 느낌을 낸다
+function KakaoSymbol({ size = 12 }: { size?: number }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <Path
+        d="M12 3C6.477 3 2 6.68 2 11.2c0 2.9 1.86 5.44 4.66 6.9-.2.75-.73 2.7-.84 3.12-.13.52.19.51.4.37.16-.1 2.6-1.76 3.66-2.48.68.1 1.38.15 2.12.15 5.523 0 10-3.68 10-8.2S17.523 3 12 3z"
+        fill="#391B1B"
+      />
+    </Svg>
+  );
+}
 
 export default function HomeScreen() {
   const insets = useSafeAreaInsets();
@@ -150,6 +162,9 @@ export default function HomeScreen() {
             activeOpacity={0.85}
             onPress={() => withAuth('/(tabs)/home')}
           >
+            <View style={styles.guestCtaKakaoIcon}>
+              <KakaoSymbol size={16} />
+            </View>
             <Text style={styles.guestCtaText}>간편 로그인하고 팀 매칭하기</Text>
           </TouchableOpacity>
         )}
@@ -338,11 +353,22 @@ const styles = StyleSheet.create({
     color: Colors.primary,
   },
   guestCtaButton: {
+    flexDirection: 'row',
     backgroundColor: Colors.primary,
     borderRadius: 16,
     paddingVertical: 18,
     alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
     marginTop: 20,
+  },
+  guestCtaKakaoIcon: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    backgroundColor: '#FEE500',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   guestCtaText: {
     fontSize: 15,
