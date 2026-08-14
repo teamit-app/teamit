@@ -16,6 +16,8 @@ import com.teamit.server.domain.post.dto.LikedPostResponse;
 import com.teamit.server.domain.post.dto.PostCommentResponse;
 import com.teamit.server.domain.post.dto.PostDetailResponse;
 import com.teamit.server.domain.post.dto.PostListItemResponse;
+import com.teamit.server.domain.post.dto.PostPageResponse;
+import com.teamit.server.domain.post.dto.PostSortOption;
 import com.teamit.server.domain.post.dto.RecruiterProfileInfo;
 import com.teamit.server.domain.post.dto.RequiredSkillRequest;
 import com.teamit.server.domain.post.dto.UpdatePostRequest;
@@ -49,6 +51,8 @@ import com.teamit.server.domain.user.repository.UserSkillRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -174,6 +178,25 @@ public class PostService {
     @Transactional(readOnly = true)
     public List<PostListItemResponse> getMyPosts(Long userId) {
         return buildListItems(postRepository.findByOwnerIdOrderByCreatedAtDesc(userId));
+    }
+
+    // ──────────────────────────────────────────────────────────────
+    // 전체 모집글 목록 조회 (홈 화면 / 탐색 탭 모집글 서브탭)
+    // ──────────────────────────────────────────────────────────────
+    @Transactional(readOnly = true)
+    public PostPageResponse getPostList(PostSortOption sort, int page, int size) {
+        String sortProperty = sort == PostSortOption.POPULAR ? "viewCount" : "createdAt";
+        Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, sortProperty));
+        Page<Post> postPage = postRepository.findAllWithOwner(pageable);
+
+        List<PostListItemResponse> content = buildListItems(postPage.getContent());
+
+        return PostPageResponse.builder()
+                .content(content)
+                .totalElements(postPage.getTotalElements())
+                .totalPages(postPage.getTotalPages())
+                .currentPage(postPage.getNumber())
+                .build();
     }
 
     // 게시글 건당 개별 쿼리를 날리던 것(스킬/좋아요·댓글·지원자 수/공모전/채팅방 인원/지역 라벨)을

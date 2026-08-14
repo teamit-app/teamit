@@ -79,7 +79,7 @@ public class SecurityConfig {
                                 new RegexRequestMatcher("^/api/v1/users/\\d+$", "GET"),
                                 new RegexRequestMatcher("^/api/v1/users/\\d+/careers$", "GET")
                         ).permitAll()
-                        .requestMatchers(HttpMethod.GET, "/api/v1/contests", "/api/v1/contests/popular", "/api/v1/users")
+                        .requestMatchers(HttpMethod.GET, "/api/v1/contests", "/api/v1/contests/popular", "/api/v1/users", "/api/v1/posts")
                         .permitAll()
                         .anyRequest().authenticated()
                 )

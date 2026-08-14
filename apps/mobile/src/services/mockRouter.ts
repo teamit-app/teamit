@@ -41,6 +41,34 @@ const normalizeMeetingTypeForMock = (type: string): string => {
   return 'ONLINE';
 };
 
+// dummyRecruitPosts 원소 → PostListItem(BE 응답 shape) 변환. 내 모집글 목록(/users/posts)과
+// 전체 모집글 목록(GET /posts) 양쪽에서 공유한다.
+const mapRecruitPostToListItem = (p: (typeof dummyRecruitPosts)[number]) => ({
+  postId: p.postId,
+  contestId: p.contestId,
+  chatRoomId: null,
+  title: p.title,
+  description: null,
+  status: 'OPEN',
+  recruitCount: p.totalMembers,
+  deadline: null,
+  onlineOffline: normalizeMeetingTypeForMock(p.meetingType),
+  genderCondition: 'ANY',
+  experienceCondition: p.experienceCondition,
+  purposeCondition: p.purposeCondition,
+  recruiterGender: 'FEMALE',
+  skills: p.skills,
+  region: p.location || null,
+  createdAt: p.createdAt,
+  currentMembers: p.currentMembers,
+  ownerUserId: null,
+  viewCount: p.views,
+  likeCount: p.likeCount + (mockHeartedPostIds.has(p.postId) ? 1 : 0),
+  commentCount: p.chatCount,
+  applicantCount: Math.max(p.currentMembers - 1, 0),
+  contestTitle: dummyContests.find((c) => c.contestId === p.contestId)?.title ?? null,
+});
+
 // ─── 정적 라우트: 정확한 경로 일치 ───────────────────────────────────────────
 
 const staticRoutes: Record<string, () => unknown> = {
@@ -147,15 +175,6 @@ const staticRoutes: Record<string, () => unknown> = {
       })),
   }),
 
-  // POST /posts — 모집글 생성
-  '/posts': () => ({
-    postId: Math.floor(Math.random() * 1000) + 100,
-    chatRoomId: Math.floor(Math.random() * 1000) + 100,
-    title: 'mock 모집글',
-    status: 'OPEN',
-    recruitCount: 4,
-  }),
-
   // POST /users/chat-rooms/direct — @LoginUser 방식
   '/users/chat-rooms/direct': () => {
     const directRoom = dummyChatRooms.find((r) => r.type === 'direct');
@@ -179,32 +198,7 @@ const staticRoutes: Record<string, () => unknown> = {
   '/users/contest-registrations': () => dummyContestRegistrations,
   '/users/my-applications': () => dummyPostApplications,
   '/users/liked-posts': () => dummyLikedPosts,
-  '/users/posts': () =>
-    dummyRecruitPosts.map((p) => ({
-      postId: p.postId,
-      contestId: p.contestId,
-      chatRoomId: null,
-      title: p.title,
-      description: null,
-      status: 'OPEN',
-      recruitCount: p.totalMembers,
-      deadline: null,
-      onlineOffline: normalizeMeetingTypeForMock(p.meetingType),
-      genderCondition: 'ANY',
-      experienceCondition: p.experienceCondition,
-      purposeCondition: p.purposeCondition,
-      recruiterGender: 'FEMALE',
-      skills: p.skills,
-      region: p.location || null,
-      createdAt: p.createdAt,
-      currentMembers: p.currentMembers,
-      ownerUserId: null,
-      viewCount: p.views,
-      likeCount: p.likeCount + (mockHeartedPostIds.has(p.postId) ? 1 : 0),
-      commentCount: p.chatCount,
-      applicantCount: Math.max(p.currentMembers - 1, 0),
-      contestTitle: dummyContests.find((c) => c.contestId === p.contestId)?.title ?? null,
-    })),
+  '/users/posts': () => dummyRecruitPosts.map(mapRecruitPostToListItem),
   '/users/careers/contests': () => ({
     careerItemId: Date.now(),
     careerType: 'CONTEST',
@@ -413,8 +407,23 @@ const dynamicRoutes: Array<[RegExp, (path: string, method: string, body?: unknow
   // POST /users/contest-hearts/{contestId}, DELETE /users/contest-hearts/{contestId}
   [/^\/users\/contest-hearts\/\d+$/, () => null],
 
-  // POST /posts — 모집글 생성
-  [/^\/posts$/, () => ({ postId: Date.now(), title: '팀원을 모집합니다', status: 'OPEN' })],
+  // GET /posts — 전체 모집글 목록 (홈 모집글 섹션 + 탐색 모집글 탭 공용) / POST /posts — 모집글 생성
+  [
+    /^\/posts$/,
+    (path, method) => {
+      if (method === 'POST') {
+        return {
+          postId: Math.floor(Math.random() * 1000) + 100,
+          chatRoomId: Math.floor(Math.random() * 1000) + 100,
+          title: 'mock 모집글',
+          status: 'OPEN',
+          recruitCount: 4,
+        };
+      }
+      const content = dummyRecruitPosts.map(mapRecruitPostToListItem);
+      return { content, totalElements: content.length, totalPages: 1, currentPage: 0 };
+    },
+  ],
 
   // POST /posts/{postId}/applications — 지원하기
   [/^\/posts\/\d+\/applications$/, () => ({ applicationId: Date.now(), status: 'PENDING', chatRoomId: 5 })],

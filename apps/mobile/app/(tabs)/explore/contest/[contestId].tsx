@@ -13,10 +13,11 @@ import { router, useLocalSearchParams, useSegments } from 'expo-router';
 import { Colors } from '../../../../src/constants/colors';
 import { ScreenHeader } from '../../../../src/components/common/ScreenHeader';
 import { SortBottomSheet } from '../../../../src/components/explore/SortBottomSheet';
+import { RecruitPostCard } from '../../../../src/components/explore/RecruitPostCard';
 import { useExploreContests, toggleContestHeart } from '../../../../src/hooks/useExploreData';
 import { useAuthStore } from '../../../../src/store/useAuthStore';
 import { getContestDetail, checkIsParticipant } from '../../../../src/services/contestService';
-import { getPostsByContest, PostListItem } from '../../../../src/services/postService';
+import { getPostsByContest, adaptToRecruitPost } from '../../../../src/services/postService';
 import { SortOption, RecruitPost, ContestDetail } from '../../../../src/types/contest';
 import { formatDDay } from '../../../../src/utils/dday';
 import { withAuth } from '../../../../src/utils/authGuard';
@@ -28,102 +29,6 @@ const SORT_LABEL: Record<SortOption, string> = {
   POPULAR: '인기순',
   DEADLINE: '마감임박순',
 };
-
-const normalizeMeetingType = (type: string) => {
-  if (type === 'MIXED' || type.includes('혼합')) return '온오프라인혼합';
-  if (type === 'OFFLINE' || type.includes('오프라인')) return '오프라인';
-  return '온라인';
-};
-
-const isOfflineOrMixed = (type: string) =>
-  type === 'OFFLINE' || type === 'MIXED' || type.includes('오프라인') || type.includes('혼합');
-
-const genderLabel = (recruiterGender?: string, genderCondition?: string) => {
-  const genderText = recruiterGender === 'MALE' ? '남성' : recruiterGender === 'FEMALE' ? '여성' : '';
-  const conditionText = genderCondition === 'SAME' ? '동성만' : '성별 무관';
-  return [genderText, conditionText].filter(Boolean).join(' · ');
-};
-
-function RecruitPostCard({ post, onPress }: { post: RecruitPost; onPress: () => void }) {
-  const meetingStr = `${normalizeMeetingType(post.meetingType)}${
-    post.location && isOfflineOrMixed(post.meetingType) ? `·${post.location}` : ''
-  }`;
-  // currentMembers는 모집자 본인을 포함한 실제 팀원 수 — 모집자를 제외한 모집된 인원만 표시
-  const recruitedCount = Math.max(post.currentMembers - 1, 0);
-
-  const isClosed = post.status === 'CLOSED';
-
-  return (
-    <TouchableOpacity style={postStyles.card} onPress={onPress} activeOpacity={0.85}>
-      <View style={postStyles.topRow}>
-        <View style={postStyles.topRowLeft}>
-          <Text style={postStyles.views}>조회 {post.views}</Text>
-          {isClosed && (
-            <View style={postStyles.closedBadge}>
-              <Text style={postStyles.closedBadgeText}>마감</Text>
-            </View>
-          )}
-        </View>
-        <Text style={postStyles.date}>{post.createdAt}</Text>
-      </View>
-      <Text style={postStyles.title}>{post.title}</Text>
-      <View style={postStyles.skillRow}>
-        {post.skills.slice(0, 3).map((skill) => (
-          <View key={skill} style={postStyles.skillTag}>
-            <Text style={postStyles.skillText}>{skill}</Text>
-          </View>
-        ))}
-        {post.skills.length > 3 && (
-          <View style={postStyles.skillTag}>
-            <Text style={postStyles.skillText}>+{post.skills.length - 3}</Text>
-          </View>
-        )}
-      </View>
-      <View style={postStyles.metaRow}>
-        <Text style={postStyles.metaText}>{post.experienceCondition}</Text>
-        <Text style={postStyles.metaDot}> · </Text>
-        <Text style={postStyles.metaText}>{meetingStr}</Text>
-        <Text style={postStyles.metaDot}> · </Text>
-        <Text style={postStyles.metaText}>{genderLabel(post.recruiterGender, post.genderCondition)}</Text>
-      </View>
-      <View style={postStyles.bottomRow}>
-        <Text style={postStyles.memberCount}>
-          현재 모집된 팀원 {recruitedCount}/{post.totalMembers}명
-        </Text>
-        <View style={postStyles.statsRow}>
-          <Text style={postStyles.stat}>💬 {post.chatCount}</Text>
-          <Text style={postStyles.stat}>♥ {post.likeCount}</Text>
-        </View>
-      </View>
-    </TouchableOpacity>
-  );
-}
-
-// PostListItem → RecruitPost 변환
-function adaptToRecruitPost(p: PostListItem): RecruitPost {
-  return {
-    postId: p.postId,
-    contestId: p.contestId ?? 0,
-    title: p.title,
-    createdAt: p.createdAt ?? '',
-    views: p.viewCount ?? 0,
-    chatCount: p.commentCount ?? 0,
-    likeCount: p.likeCount ?? 0,
-    skills: p.skills ?? [],
-    experienceCondition: p.experienceCondition ?? '',
-    meetingType: p.onlineOffline ?? '',
-    location: p.region ?? '',
-    // 매칭 프로필 전용 개념이라 모집글에는 해당 데이터가 없음
-    intensity: '',
-    genderCondition: p.genderCondition,
-    recruiterGender: p.recruiterGender,
-    currentMembers: p.currentMembers ?? 1,
-    totalMembers: p.recruitCount ?? 0,
-    isHearted: false,
-    ownerUserId: p.ownerUserId,
-    status: p.status,
-  };
-}
 
 export default function ContestDetailScreen() {
   const insets = useSafeAreaInsets();
@@ -390,17 +295,17 @@ export default function ContestDetailScreen() {
 
           {myPost && (
             <TouchableOpacity
-              style={postStyles.myPostCard}
+              style={myPostStyles.myPostCard}
               activeOpacity={0.85}
               onPress={() => router.push(`/${sourceTab}/post/${myPost.postId}?contestId=${id}` as never)}
             >
-              <View style={postStyles.myPostBadgeRow}>
-                <View style={postStyles.myPostBadge}>
-                  <Text style={postStyles.myPostBadgeText}>내가 올린 모집글</Text>
+              <View style={myPostStyles.myPostBadgeRow}>
+                <View style={myPostStyles.myPostBadge}>
+                  <Text style={myPostStyles.myPostBadgeText}>내가 올린 모집글</Text>
                 </View>
               </View>
-              <Text style={postStyles.title}>{myPost.title}</Text>
-              <Text style={postStyles.memberCount}>
+              <Text style={myPostStyles.title}>{myPost.title}</Text>
+              <Text style={myPostStyles.memberCount}>
                 현재 모집된 팀원 {Math.max(myPost.currentMembers - 1, 0)}/{myPost.totalMembers}명
               </Text>
             </TouchableOpacity>
@@ -732,7 +637,7 @@ const styles = StyleSheet.create({
   },
 });
 
-const postStyles = StyleSheet.create({
+const myPostStyles = StyleSheet.create({
   myPostCard: {
     backgroundColor: Colors.ogTint,
     borderRadius: 14,
@@ -756,62 +661,11 @@ const postStyles = StyleSheet.create({
     fontWeight: '700',
     color: Colors.white,
   },
-  card: {
-    backgroundColor: Colors.white,
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: '#EEEEEE',
-    padding: 14,
-    marginBottom: 10,
-  },
-  topRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 6,
-  },
-  topRowLeft: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  views: { fontSize: 12, color: Colors.grayMedium },
-  date:  { fontSize: 12, color: Colors.grayMedium },
-  closedBadge: {
-    backgroundColor: Colors.lightGray,
-    borderRadius: 8,
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-  },
-  closedBadgeText: { fontSize: 11, fontWeight: '700', color: Colors.grayMedium },
   title: {
     fontSize: 15,
     fontWeight: '700',
     color: Colors.dark,
     marginBottom: 10,
   },
-  skillRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 6,
-    marginBottom: 8,
-  },
-  skillTag: {
-    backgroundColor: Colors.ogTint,
-    borderRadius: 999,
-    paddingHorizontal: 11,
-    paddingVertical: 5,
-  },
-  skillText: { fontSize: 12, color: Colors.primary, fontWeight: '600' },
-  metaRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    alignItems: 'center',
-    marginBottom: 10,
-  },
-  metaText: { fontSize: 12, color: Colors.grayMedium },
-  metaDot:  { fontSize: 12, color: Colors.grayMedium },
-  bottomRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
   memberCount: { fontSize: 12, color: Colors.gray, fontWeight: '500' },
-  statsRow: { flexDirection: 'row', gap: 10 },
-  stat: { fontSize: 12, color: Colors.grayMedium },
 });
