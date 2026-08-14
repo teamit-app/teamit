@@ -20,10 +20,9 @@ import { trackEvent } from '../../../src/services/gtm';
 import { Alert } from '../../../src/utils/alert';
 
 type MainTab = 'POOL' | 'CONTEST' | 'POST';
-type SortFilter = 'ALL' | 'LATEST' | 'POPULAR';
+type SortFilter = 'LATEST' | 'POPULAR';
 
 const SORT_OPTIONS: { key: SortFilter; label: string }[] = [
-  { key: 'ALL', label: '전체' },
   { key: 'LATEST', label: '최신순' },
   { key: 'POPULAR', label: '인기순' },
 ];
@@ -36,7 +35,7 @@ export default function ExploreScreen() {
   const { tab: tabParam, sort: sortParam } = useLocalSearchParams<{ tab?: string; sort?: string }>();
   const [mainTab, setMainTab] = useState<MainTab>((tabParam as MainTab) || 'POOL');
   const [keyword, setKeyword] = useState('');
-  const [sortFilter, setSortFilter] = useState<SortFilter>((sortParam as SortFilter) || 'ALL');
+  const [sortFilter, setSortFilter] = useState<SortFilter>((sortParam as SortFilter) || 'LATEST');
   const [categoryFilter, setCategoryFilter] = useState<CategoryFilter>('ALL');
   const [categoryModalVisible, setCategoryModalVisible] = useState(false);
 
@@ -44,7 +43,7 @@ export default function ExploreScreen() {
     if (tabParam === 'POOL' || tabParam === 'CONTEST' || tabParam === 'POST') setMainTab(tabParam);
   }, [tabParam]);
   useEffect(() => {
-    if (sortParam === 'ALL' || sortParam === 'LATEST' || sortParam === 'POPULAR') setSortFilter(sortParam);
+    if (sortParam === 'LATEST' || sortParam === 'POPULAR') setSortFilter(sortParam);
   }, [sortParam]);
 
   const { data: talents = [], isLoading: talentsLoading, isFetching: talentsFetching } = useExploreTalents();
