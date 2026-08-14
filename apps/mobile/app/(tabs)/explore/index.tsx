@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { View, Text, ScrollView, RefreshControl, TouchableOpacity, ActivityIndicator, StyleSheet } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { router, useFocusEffect } from 'expo-router';
+import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { Colors } from '../../../src/constants/colors';
 import { ScreenHeader } from '../../../src/components/common/ScreenHeader';
 import { SegmentedTabs } from '../../../src/components/explore/SegmentedTabs';
@@ -9,15 +9,17 @@ import { SearchBar } from '../../../src/components/explore/SearchBar';
 import { FilterPills } from '../../../src/components/explore/FilterPills';
 import { ContestCard } from '../../../src/components/explore/ContestCard';
 import { TalentCard } from '../../../src/components/explore/TalentCard';
+import { RecruitPostCard } from '../../../src/components/explore/RecruitPostCard';
 import { CategoryFilterModal, CategoryFilter } from '../../../src/components/explore/CategoryFilterModal';
-import { useExploreContests, useExploreTalents, toggleTalentHeart, toggleContestHeart, refetchExploreData } from '../../../src/hooks/useExploreData';
+import { useExploreContests, useExploreTalents, useExplorePosts, toggleTalentHeart, toggleContestHeart, refetchExploreData } from '../../../src/hooks/useExploreData';
 import { useAuthStore } from '../../../src/store/useAuthStore';
 import { getOrCreateDirectChatRoom } from '../../../src/services/messageService';
+import { adaptToRecruitPost } from '../../../src/services/postService';
 import { requireAuthForChat, requireAuthForHeart } from '../../../src/utils/authGuard';
 import { trackEvent } from '../../../src/services/gtm';
 import { Alert } from '../../../src/utils/alert';
 
-type MainTab = 'POOL' | 'CONTEST';
+type MainTab = 'POOL' | 'CONTEST' | 'POST';
 type SortFilter = 'ALL' | 'LATEST' | 'POPULAR';
 
 const SORT_OPTIONS: { key: SortFilter; label: string }[] = [
@@ -28,16 +30,28 @@ const SORT_OPTIONS: { key: SortFilter; label: string }[] = [
 
 export default function ExploreScreen() {
   const insets = useSafeAreaInsets();
-  const [mainTab, setMainTab] = useState<MainTab>('POOL');
+  // 홈 화면의 "더보기" 버튼에서 특정 서브탭/정렬로 바로 진입시키기 위한 초기값.
+  // 탭 네비게이터는 화면을 언마운트하지 않고 유지하는 경우가 많아 useState 초기값만으로는
+  // 재진입 시 반영이 안 될 수 있어(messages/index.tsx의 initialTab과 동일한 이유) useEffect로 동기화한다.
+  const { tab: tabParam, sort: sortParam } = useLocalSearchParams<{ tab?: string; sort?: string }>();
+  const [mainTab, setMainTab] = useState<MainTab>((tabParam as MainTab) || 'POOL');
   const [keyword, setKeyword] = useState('');
-  const [sortFilter, setSortFilter] = useState<SortFilter>('ALL');
+  const [sortFilter, setSortFilter] = useState<SortFilter>((sortParam as SortFilter) || 'ALL');
   const [categoryFilter, setCategoryFilter] = useState<CategoryFilter>('ALL');
   const [categoryModalVisible, setCategoryModalVisible] = useState(false);
 
+  useEffect(() => {
+    if (tabParam === 'POOL' || tabParam === 'CONTEST' || tabParam === 'POST') setMainTab(tabParam);
+  }, [tabParam]);
+  useEffect(() => {
+    if (sortParam === 'ALL' || sortParam === 'LATEST' || sortParam === 'POPULAR') setSortFilter(sortParam);
+  }, [sortParam]);
+
   const { data: talents = [], isLoading: talentsLoading, isFetching: talentsFetching } = useExploreTalents();
   const { data: contests = [], isLoading: contestsLoading, isFetching: contestsFetching } = useExploreContests();
-  const isLoading = talentsLoading || contestsLoading;
-  const isRefreshing = talentsFetching || contestsFetching;
+  const { data: posts = [], isLoading: postsLoading, isFetching: postsFetching } = useExplorePosts();
+  const isLoading = talentsLoading || contestsLoading || postsLoading;
+  const isRefreshing = talentsFetching || contestsFetching || postsFetching;
   const currentUserId = useAuthStore((s) => s.currentUserId);
 
   // 세션 내내 캐시되는 목록이라 다른 탭에 갔다가 돌아와도 자동으로는 안 바뀐다 — 탐색 탭
@@ -98,7 +112,19 @@ export default function ExploreScreen() {
     return 0;
   });
 
-  if (isLoading && talents.length === 0 && contests.length === 0) {
+  const filteredPosts = posts.filter((post) =>
+    keyword.trim().length === 0
+      ? true
+      : post.title.includes(keyword) ||
+        (post.skills ?? []).some((skill) => skill.toLowerCase().includes(keyword.toLowerCase())),
+  );
+
+  const sortedPosts = [...filteredPosts].sort((a, b) => {
+    if (sortFilter === 'POPULAR') return (b.viewCount ?? 0) - (a.viewCount ?? 0);
+    return 0; // LATEST/ALL은 백엔드가 이미 최신순으로 내려준다
+  });
+
+  if (isLoading && talents.length === 0 && contests.length === 0 && posts.length === 0) {
     return (
       <View style={[styles.container, { paddingTop: insets.top }]}>
         <ScreenHeader
@@ -131,6 +157,7 @@ export default function ExploreScreen() {
           options={[
             { key: 'POOL', label: '인재풀' },
             { key: 'CONTEST', label: '공모전' },
+            { key: 'POST', label: '모집글' },
           ]}
           value={mainTab}
           onChange={(tab) => {
@@ -156,12 +183,18 @@ export default function ExploreScreen() {
         }
       >
         <SearchBar
-          placeholder={mainTab === 'POOL' ? '이름, 역할, 스킬로 검색' : '공모전 이름, 주최기관, 분야 검색'}
+          placeholder={
+            mainTab === 'POOL'
+              ? '이름, 역할, 스킬로 검색'
+              : mainTab === 'CONTEST'
+                ? '공모전 이름, 주최기관, 분야 검색'
+                : '모집글 제목, 스킬로 검색'
+          }
           value={keyword}
           onChangeText={setKeyword}
         />
 
-        {mainTab === 'CONTEST' && (
+        {(mainTab === 'CONTEST' || mainTab === 'POST') && (
           <View style={styles.filterRow}>
             <FilterPills
               options={SORT_OPTIONS}
@@ -170,8 +203,8 @@ export default function ExploreScreen() {
                 trackEvent('explore_filter', { filter_type: 'sort', value: sort.toLowerCase() });
                 setSortFilter(sort);
               }}
-              trailingLabel="분야별"
-              onPressTrailing={() => setCategoryModalVisible(true)}
+              trailingLabel={mainTab === 'CONTEST' ? '분야별' : undefined}
+              onPressTrailing={mainTab === 'CONTEST' ? () => setCategoryModalVisible(true) : undefined}
             />
           </View>
         )}
@@ -188,15 +221,24 @@ export default function ExploreScreen() {
                   onPressPropose={() => handlePropose(talent.userId)}
                 />
               ))
-            : sortedContests.map((contest) => (
-                <ContestCard
-                  key={contest.contestId}
-                  contest={contest}
-                  variant="full"
-                  onPress={() => router.push(`/explore/contest/${contest.contestId}` as never)}
-                  onPressHeart={() => toggleContestHeart(contest.contestId)}
-                />
-              ))}
+            : mainTab === 'CONTEST'
+              ? sortedContests.map((contest) => (
+                  <ContestCard
+                    key={contest.contestId}
+                    contest={contest}
+                    variant="full"
+                    onPress={() => router.push(`/explore/contest/${contest.contestId}` as never)}
+                    onPressHeart={() => toggleContestHeart(contest.contestId)}
+                  />
+                ))
+              : sortedPosts.map((post) => (
+                  <RecruitPostCard
+                    key={post.postId}
+                    post={adaptToRecruitPost(post)}
+                    showContestBadge
+                    onPress={() => router.push(`/explore/post/${post.postId}` as never)}
+                  />
+                ))}
         </View>
 
         <Text style={styles.footerHint}>

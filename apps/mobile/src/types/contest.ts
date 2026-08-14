@@ -77,6 +77,7 @@ export interface RecruitPost {
   isHearted: boolean;
   ownerUserId?: number;
   status?: string;
+  contestTitle?: string;
 }
 
 export interface RecruitPostDetail extends RecruitPost {

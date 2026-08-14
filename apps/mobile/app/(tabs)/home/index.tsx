@@ -6,8 +6,10 @@ import { useQuery } from '@tanstack/react-query';
 import { Colors } from '../../../src/constants/colors';
 import { ContestCard } from '../../../src/components/explore/ContestCard';
 import { FilterPills } from '../../../src/components/explore/FilterPills';
+import { RecruitPostCard } from '../../../src/components/explore/RecruitPostCard';
 import { getPopularContests } from '../../../src/services/contestService';
 import { getMatchingStatus } from '../../../src/services/matchingService';
+import { getPosts, adaptToRecruitPost } from '../../../src/services/postService';
 import { getNotifications } from '../../../src/services/notificationService';
 import { useNotificationStore } from '../../../src/store/useNotificationStore';
 import { REALTIME_STALE_TIME } from '../../../src/services/realtimeEvents';
@@ -34,6 +36,11 @@ export default function HomeScreen() {
   const { data: contests = [] } = useQuery({
     queryKey: ['popularContests'],
     queryFn: getPopularContests,
+  });
+
+  const { data: recentPosts = [] } = useQuery({
+    queryKey: ['homeRecentPosts'],
+    queryFn: () => getPosts({ sort: 'LATEST', size: 5 }),
   });
 
   // 지원/초대/수락거절/팀확정 알림이 오면 realtimeEvents.ts가 즉시 무효화해주므로,
@@ -86,68 +93,66 @@ export default function HomeScreen() {
         </View>
 
         {/* 나의 실시간 매칭 현황 */}
-        <View style={styles.matchingBox}>
-          <View style={styles.matchingTitleRow}>
-            <View style={styles.dot} />
-            <Text style={styles.matchingTitle}>나의 실시간 매칭 현황</Text>
-          </View>
+        {currentUserId ? (
+          <View style={styles.matchingBox}>
+            <View style={styles.matchingTitleRow}>
+              <View style={styles.dot} />
+              <Text style={styles.matchingTitle}>나의 실시간 매칭 현황</Text>
+            </View>
 
-          <View style={styles.matchingColumns}>
-            <TouchableOpacity
-              style={styles.matchingColLeft}
-              activeOpacity={0.75}
-              onPress={() =>
-                currentUserId
-                  ? router.push('/(tabs)/profile/received-applications')
-                  : withAuth('/(tabs)/profile/received-applications')
-              }
-            >
-              <Text style={styles.matchingLabel}>내 모집글에 지원한 사람</Text>
-              <View style={styles.matchingValueRow}>
-                <Text style={styles.matchingValue}>{matchingStatus?.myPostApplicantCount ?? '-'}</Text>
-                <Text style={styles.matchingLinkPrimary}>보기 ›</Text>
-              </View>
-              {!currentUserId && (
-                <Text style={styles.matchingGuestHint}>로그인 후 확인 가능해요</Text>
-              )}
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.matchingColRight}
-              activeOpacity={0.75}
-              onPress={() =>
-                currentUserId
-                  ? router.push({
-                      pathname: '/(tabs)/messages',
-                      params: { initialTab: 'invitations' },
-                    })
-                  : withAuth('/(tabs)/messages')
-              }
-            >
-              <Text style={styles.matchingLabel}>나에게 온 팀 초대</Text>
-              <View style={styles.matchingValueRow}>
-                <Text style={styles.matchingValue}>{matchingStatus?.receivedInvitationCount ?? '-'}</Text>
-                <Text style={styles.matchingLinkGray}>기록 ›</Text>
-              </View>
-              {!currentUserId && (
-                <Text style={styles.matchingGuestHint}>로그인 후 확인 가능해요</Text>
-              )}
-            </TouchableOpacity>
-          </View>
+            <View style={styles.matchingColumns}>
+              <TouchableOpacity
+                style={styles.matchingColLeft}
+                activeOpacity={0.75}
+                onPress={() => router.push('/(tabs)/profile/received-applications')}
+              >
+                <Text style={styles.matchingLabel}>내 모집글에 지원한 사람</Text>
+                <View style={styles.matchingValueRow}>
+                  <Text style={styles.matchingValue}>{matchingStatus?.myPostApplicantCount ?? '-'}</Text>
+                  <Text style={styles.matchingLinkPrimary}>보기 ›</Text>
+                </View>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.matchingColRight}
+                activeOpacity={0.75}
+                onPress={() =>
+                  router.push({
+                    pathname: '/(tabs)/messages',
+                    params: { initialTab: 'invitations' },
+                  })
+                }
+              >
+                <Text style={styles.matchingLabel}>나에게 온 팀 초대</Text>
+                <View style={styles.matchingValueRow}>
+                  <Text style={styles.matchingValue}>{matchingStatus?.receivedInvitationCount ?? '-'}</Text>
+                  <Text style={styles.matchingLinkGray}>기록 ›</Text>
+                </View>
+              </TouchableOpacity>
+            </View>
 
-          {matchingStatus?.recentActivity && (
-            <View style={styles.activityBubble}>
-              <View style={styles.activityLeft}>
-                <Text style={styles.activityIcon}>💬</Text>
-                <Text style={styles.activityText} numberOfLines={2}>
-                  {matchingStatus.recentActivity.message}
+            {matchingStatus?.recentActivity && (
+              <View style={styles.activityBubble}>
+                <View style={styles.activityLeft}>
+                  <Text style={styles.activityIcon}>💬</Text>
+                  <Text style={styles.activityText} numberOfLines={2}>
+                    {matchingStatus.recentActivity.message}
+                  </Text>
+                </View>
+                <Text style={styles.activityTime} numberOfLines={1}>
+                  {matchingStatus.recentActivity.relativeTime}
                 </Text>
               </View>
-              <Text style={styles.activityTime} numberOfLines={1}>
-                {matchingStatus.recentActivity.relativeTime}
-              </Text>
-            </View>
-          )}
-        </View>
+            )}
+          </View>
+        ) : (
+          <TouchableOpacity
+            style={styles.guestCtaButton}
+            activeOpacity={0.85}
+            onPress={() => withAuth('/(tabs)/home')}
+          >
+            <Text style={styles.guestCtaText}>간편 로그인하고 팀 매칭하기</Text>
+          </TouchableOpacity>
+        )}
 
         {/* 금주의 인기 공모전 */}
         <View style={styles.section}>
@@ -170,7 +175,7 @@ export default function HomeScreen() {
           </View>
 
           <View style={styles.list}>
-            {filteredContests.map((contest) => (
+            {filteredContests.slice(0, 5).map((contest) => (
               <ContestCard
                 key={contest.contestId}
                 contest={contest}
@@ -179,6 +184,39 @@ export default function HomeScreen() {
               />
             ))}
           </View>
+
+          <TouchableOpacity
+            style={styles.moreBtn}
+            onPress={() =>
+              router.push({ pathname: '/(tabs)/explore', params: { tab: 'CONTEST', sort: 'POPULAR' } })
+            }
+          >
+            <Text style={styles.moreBtnText}>더보기 ›</Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* 모집글 */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>모집글</Text>
+          <Text style={styles.sectionSubtitle}>지금 팀원을 찾고 있는 모집글이에요</Text>
+
+          <View style={styles.list}>
+            {recentPosts.map((post) => (
+              <RecruitPostCard
+                key={post.postId}
+                post={adaptToRecruitPost(post)}
+                showContestBadge
+                onPress={() => router.push(`/explore/post/${post.postId}` as never)}
+              />
+            ))}
+          </View>
+
+          <TouchableOpacity
+            style={styles.moreBtn}
+            onPress={() => router.push({ pathname: '/(tabs)/explore', params: { tab: 'POST' } })}
+          >
+            <Text style={styles.moreBtnText}>더보기 ›</Text>
+          </TouchableOpacity>
         </View>
       </ScrollView>
     </View>
@@ -299,10 +337,17 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     color: Colors.primary,
   },
-  matchingGuestHint: {
-    fontSize: 11,
-    color: Colors.grayMedium,
-    marginTop: 4,
+  guestCtaButton: {
+    backgroundColor: Colors.primary,
+    borderRadius: 16,
+    paddingVertical: 18,
+    alignItems: 'center',
+    marginTop: 20,
+  },
+  guestCtaText: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: Colors.white,
   },
   matchingLinkPrimary: {
     fontSize: 13,
@@ -364,5 +409,15 @@ const styles = StyleSheet.create({
   },
   list: {
     marginTop: 16,
+  },
+  moreBtn: {
+    alignItems: 'center',
+    paddingVertical: 12,
+    marginTop: 4,
+  },
+  moreBtnText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: Colors.grayMedium,
   },
 });

@@ -15,14 +15,16 @@ import {
   addTalentHeart,
   removeTalentHeart,
 } from '../services/talentService';
+import { getPosts, PostListItem } from '../services/postService';
 import { useAuthStore } from '../store/useAuthStore';
 import { requireAuthForHeart } from '../utils/authGuard';
 import { trackEvent } from '../services/gtm';
 
-// 탐색 탭(인재풀/공모전) 데이터는 여러 화면(탐색, 상세, 좋아요 목록 등)이 공유해서 보고
+// 탐색 탭(인재풀/공모전/모집글) 데이터는 여러 화면(탐색, 상세, 좋아요 목록 등)이 공유해서 보고
 // 서로 갱신해야 하는 "단일 진실 공급원"이라 쿼리 키를 고정해두고 이 파일에서만 접근한다.
 export const EXPLORE_CONTESTS_KEY = ['exploreContests'] as const;
 export const EXPLORE_TALENTS_KEY = ['exploreTalents'] as const;
+export const EXPLORE_POSTS_KEY = ['explorePosts'] as const;
 
 async function fetchContests(): Promise<Contest[]> {
   const contestsPromise = getContests();
@@ -63,6 +65,10 @@ async function fetchTalents(): Promise<PoolUser[]> {
   return talents.map((t) => ({ ...t, isHearted: talentHeartSet.has(t.userId) }));
 }
 
+async function fetchPosts(): Promise<PostListItem[]> {
+  return getPosts({ sort: 'LATEST', size: 100 });
+}
+
 // 세션당 한 번만 로드하고 그 뒤로는 아래 함수들의 낙관적 캐시 패치로만 갱신한다
 // (zustand의 hasLoaded 캐시와 동일한 정책).
 export function useExploreContests() {
@@ -71,6 +77,10 @@ export function useExploreContests() {
 
 export function useExploreTalents() {
   return useQuery({ queryKey: EXPLORE_TALENTS_KEY, queryFn: fetchTalents, staleTime: Infinity });
+}
+
+export function useExplorePosts() {
+  return useQuery({ queryKey: EXPLORE_POSTS_KEY, queryFn: fetchPosts, staleTime: Infinity });
 }
 
 // "제안 받기" 토글 직후 호출 — 세션 캐시와 무관하게 인재풀 목록을 강제로 다시 불러와서,
@@ -85,6 +95,7 @@ export function refreshExploreTalents() {
 export function refetchExploreData() {
   queryClient.invalidateQueries({ queryKey: EXPLORE_CONTESTS_KEY });
   queryClient.invalidateQueries({ queryKey: EXPLORE_TALENTS_KEY });
+  queryClient.invalidateQueries({ queryKey: EXPLORE_POSTS_KEY });
 }
 
 export function markContestParticipant(contestId: number) {

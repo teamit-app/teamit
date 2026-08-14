@@ -6,6 +6,8 @@ import com.teamit.server.domain.post.dto.LikedPostResponse;
 import com.teamit.server.domain.post.dto.PostCommentResponse;
 import com.teamit.server.domain.post.dto.PostDetailResponse;
 import com.teamit.server.domain.post.dto.PostListItemResponse;
+import com.teamit.server.domain.post.dto.PostPageResponse;
+import com.teamit.server.domain.post.dto.PostSortOption;
 import com.teamit.server.domain.post.dto.UpdatePostRequest;
 import com.teamit.server.domain.post.service.PostService;
 import com.teamit.server.domain.user.dto.PostApplicantPageResponse;
@@ -84,6 +86,15 @@ public class PostController {
             @RequestBody AddCommentRequest request) {
         return ApiResponse.success(
                 postService.addComment(postId, userDetails.getUserId(), request), "댓글이 등록되었습니다");
+    }
+
+    @Operation(summary = "전체 모집글 목록 조회", description = "모든 모집글을 최신순 또는 조회수순으로 페이징 조회합니다.")
+    @GetMapping("/posts")
+    public ApiResponse<PostPageResponse> getPostList(
+            @RequestParam(defaultValue = "LATEST") PostSortOption sort,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size) {
+        return ApiResponse.success(postService.getPostList(sort, page, size), "모집글 목록 조회 성공");
     }
 
     @Operation(summary = "공모전별 모집글 목록 조회")
