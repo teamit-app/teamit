@@ -1,13 +1,23 @@
 package com.teamit.server.domain.user.service;
 
+import com.teamit.server.domain.chat.repository.ChatRoomMemberRepository;
+import com.teamit.server.domain.chat.entity.ChatRoomMember;
+import com.teamit.server.domain.chat.entity.RoomType;
+import com.teamit.server.domain.chat.service.ChatService;
 import com.teamit.server.domain.contest.entity.Contest;
+import com.teamit.server.domain.contest.repository.ContestHeartRepository;
 import com.teamit.server.domain.contest.repository.ContestParticipantRepository;
 import com.teamit.server.domain.contest.repository.ContestRepository;
 import com.teamit.server.domain.education.entity.Education;
 import com.teamit.server.domain.matching.entity.PostApplication;
 import com.teamit.server.domain.matching.repository.PostApplicationRepository;
+import com.teamit.server.domain.matching.repository.TeamInvitationRepository;
 import com.teamit.server.domain.education.repository.EducationRepository;
+import com.teamit.server.domain.notification.repository.NotificationRepository;
+import com.teamit.server.domain.notification.repository.NotificationSettingsRepository;
 import com.teamit.server.domain.post.dto.PostListItemResponse;
+import com.teamit.server.domain.post.repository.PostCommentRepository;
+import com.teamit.server.domain.post.repository.PostHeartRepository;
 import com.teamit.server.domain.post.service.PostService;
 import com.teamit.server.domain.region.entity.UserRegion;
 import com.teamit.server.domain.region.repository.UserRegionRepository;
@@ -59,6 +69,14 @@ public class UserService {
     private final PostService postService;
     private final com.teamit.server.domain.review.repository.TeamReviewRepository teamReviewRepository;
     private final FileStorageService fileStorageService;
+    private final ContestHeartRepository contestHeartRepository;
+    private final NotificationRepository notificationRepository;
+    private final NotificationSettingsRepository notificationSettingsRepository;
+    private final PostHeartRepository postHeartRepository;
+    private final PostCommentRepository postCommentRepository;
+    private final TeamInvitationRepository teamInvitationRepository;
+    private final ChatRoomMemberRepository chatRoomMemberRepository;
+    private final ChatService chatService;
 
     private static final String PROFILE_IMAGE_SUB_DIR = "profile-images";
 
@@ -485,5 +503,58 @@ public class UserService {
         return HeartedUserListResponse.builder()
                 .content(content)
                 .build();
+    }
+
+    // ──────────────────────────────────────────────────────────────
+    // 회원 탈퇴 — 본인 소유 데이터(모집글/지원/좋아요/알림/프로필 상세 등)는 하드
+    // 삭제하고, 상대방에게도 속한 데이터(1:1 채팅 메시지, 팀 리뷰)는 User row를 남긴
+    // 채 개인정보만 익명화해 보존한다. AuthService.withdraw()에서 refreshToken 삭제와
+    // 함께 호출된다.
+    // ──────────────────────────────────────────────────────────────
+    @Transactional
+    public void withdraw(Long userId) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new IllegalArgumentException("사용자를 찾을 수 없습니다"));
+
+        // 1) 본인이 작성한 모집글부터 정리 — 소유한 GROUP 채팅방까지 함께 삭제된다
+        postService.deleteAllPostsByOwner(userId);
+
+        // 2) 위에서 지워지지 않고 남아있는 채팅방(다른 사람 소유) 정리 — GROUP은 나가기
+        // 처리(멤버 row 삭제 + 시스템 메시지), DIRECT는 "1:1 채팅방은 나갈 수 없다"는
+        // 기존 정책과 동일하게 그대로 두어 상대방 대화가 끊기지 않게 한다
+        for (ChatRoomMember member : chatRoomMemberRepository.findByUserId(userId)) {
+            if (member.getChatRoom().getRoomType() == RoomType.GROUP) {
+                chatService.leaveChatRoom(member.getChatRoom().getId(), userId);
+            }
+        }
+
+        // 3) 다른 사람 글에 남긴 지원/초대/댓글/좋아요 등 본인 행위 기록 정리
+        postApplicationRepository.deleteAllByApplicantId(userId);
+        teamInvitationRepository.deleteAllBySenderIdOrReceiverId(userId);
+        postCommentRepository.nullifyChildrenOfAuthor(userId); // 자기참조 FK 해제
+        postCommentRepository.deleteAllByAuthorId(userId);
+        postHeartRepository.deleteAllByUserId(userId);
+        contestHeartRepository.deleteAllByUserId(userId);
+        contestParticipantRepository.deleteAllByUserId(userId);
+        userHeartRepository.deleteAllByUserIdOrTargetUserId(userId);
+        notificationRepository.deleteAllByUserId(userId);
+
+        // 4) 프로필 상세 정보(1:N) 정리
+        careerRepository.deleteAllByUserId(userId);
+        educationRepository.deleteByUserId(userId);
+        userSkillRepository.deleteAllByUserId(userId);
+        userRegionRepository.deleteAllByUserId(userId);
+
+        // 5) PK가 곧 user_id인 1:1 테이블 정리 (없을 수도 있어 존재 확인 후 삭제)
+        if (matchingProfileRepository.existsById(userId)) {
+            matchingProfileRepository.deleteById(userId);
+        }
+        if (notificationSettingsRepository.existsById(userId)) {
+            notificationSettingsRepository.deleteById(userId);
+        }
+
+        // 6) team_reviews(영구 평판 데이터)와 남은 DIRECT 채팅 메시지는 삭제하지 않는다 —
+        // User row 자체를 남긴 채 개인정보만 지워서, 상대방 화면에는 "탈퇴한 사용자"로 보이게 한다
+        user.anonymize();
     }
 }

@@ -5,6 +5,7 @@ import com.teamit.server.domain.auth.entity.RefreshToken;
 import com.teamit.server.domain.auth.repository.RefreshTokenRepository;
 import com.teamit.server.domain.user.entity.User;
 import com.teamit.server.domain.user.repository.UserRepository;
+import com.teamit.server.domain.user.service.UserService;
 import com.teamit.server.global.jwt.JwtTokenProvider;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
@@ -22,6 +23,7 @@ public class AuthService {
     private final RefreshTokenRepository refreshTokenRepository;
     private final KakaoOAuthService kakaoOAuthService;
     private final JwtTokenProvider jwtTokenProvider;
+    private final UserService userService;
 
     @Value("${jwt.refresh-token-expiry}")
     private long refreshTokenExpiry;
@@ -102,12 +104,12 @@ public class AuthService {
     }
 
     // ──────────────────────────────────────────────────────────────
-    // 회원 탈퇴 — Refresh Token + User 삭제
+    // 회원 탈퇴 — Refresh Token 삭제 + 연관 데이터 정리(UserService.withdraw 참고)
     // ──────────────────────────────────────────────────────────────
     @Transactional
     public void withdraw(Long userId) {
         refreshTokenRepository.deleteByUserId(userId);
-        userRepository.deleteById(userId);
+        userService.withdraw(userId);
     }
 
     // ──────────────────────────────────────────────────────────────

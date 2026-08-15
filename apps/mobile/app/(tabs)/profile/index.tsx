@@ -224,11 +224,14 @@ export default function ProfileScreen() {
             try {
               await withdrawApi();
             } catch {
+              // 서버에서 탈퇴가 실패했는데도 로컬을 로그아웃 상태로 만들어버리면
+              // 실제로는 탈퇴가 안 됐는데 탈퇴된 것처럼 보이는 문제가 생긴다 —
+              // 실패 시엔 로그인 상태를 그대로 두고 재시도할 수 있게 한다.
               Alert.alert('오류', '탈퇴 처리 중 문제가 발생했어요. 다시 시도해주세요.');
-            } finally {
-              useAuthStore.getState().logout('withdraw');
-              router.replace('/(tabs)/home');
+              return;
             }
+            useAuthStore.getState().logout('withdraw');
+            router.replace('/(tabs)/home');
           },
         },
       ],
