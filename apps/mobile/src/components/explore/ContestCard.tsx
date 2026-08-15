@@ -137,11 +137,11 @@ const styles = StyleSheet.create({
   },
   compactRow: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
   },
   compactThumbnail: {
-    width: 64,
-    height: 64,
+    width: 60,
+    height: 84,
     borderRadius: 12,
     backgroundColor: Colors.ogTint,
     alignItems: 'center',
