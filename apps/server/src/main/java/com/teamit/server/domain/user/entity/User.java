@@ -7,6 +7,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 
 @Getter
 @NoArgsConstructor
@@ -47,6 +48,18 @@ public class User extends BaseTimeEntity {
     @Column(name = "role", nullable = false, length = 20)
     private Role role;
 
+    // 가입 시 필수 동의(이용약관·개인정보 수집이용) 시각과 그 시점의 약관 버전.
+    // 항목별 상세 이력은 남기지 않고, 베타 규모에 맞춰 최소한으로만 기록한다.
+    @Column(name = "terms_agreed_at")
+    private LocalDateTime termsAgreedAt;
+
+    @Column(name = "terms_version", length = 20)
+    private String termsVersion;
+
+    // 서비스 이용기록·기기정보(GA4/GTM/Clarity) 수집 선택 동의 여부
+    @Column(name = "analytics_opt_in", nullable = false)
+    private Boolean analyticsOptIn = false;
+
     @Builder
     public User(Long kakaoId, String nickname, String name, Gender gender, LocalDate birthDate,
                 String profileImageUrl, Boolean isMatchingActive) {
@@ -71,6 +84,13 @@ public class User extends BaseTimeEntity {
     /** 매칭 활성화 상태 변경 */
     public void setMatchingActive(boolean isMatchingActive) {
         this.isMatchingActive = isMatchingActive;
+    }
+
+    /** 가입 시 필수 동의 처리 (온보딩 기본정보 저장과 함께 호출) */
+    public void agreeToTerms(String termsVersion, boolean analyticsOptIn) {
+        this.termsAgreedAt = LocalDateTime.now();
+        this.termsVersion = termsVersion;
+        this.analyticsOptIn = analyticsOptIn;
     }
 
     /** 프로필 사진 등록/변경 */

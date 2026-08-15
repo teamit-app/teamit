@@ -16,4 +16,6 @@ public class OnboardingBasicRequest {
     private String name;
     private Gender gender;
     private LocalDate birthDate;
+    private String termsVersion;
+    private Boolean analyticsOptIn;
 }
