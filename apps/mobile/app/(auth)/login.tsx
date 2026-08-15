@@ -116,6 +116,10 @@ export default function LoginScreen() {
         if (isNewUser) {
           router.replace(onboardingHref as never);
         } else {
+          // setCurrentUserId를 위에서 직접 호출해서 fetchCurrentUserId()의 재조회 가드에
+          // 걸리므로, needsTermsReconsent는 여기서 따로 갱신해야 재동의 화면이 새로고침
+          // 없이 로그인 직후 바로 뜬다.
+          await useAuthStore.getState().refreshNeedsTermsReconsent();
           router.replace(resumeHref as never);
         }
         return;
@@ -156,6 +160,8 @@ export default function LoginScreen() {
       if (meJson.data?.needsOnboarding) {
         router.replace(onboardingHref as never);
       } else {
+        // 이미 위에서 /users/me를 조회했으니 재조회 없이 그대로 반영
+        useAuthStore.getState().setNeedsTermsReconsent(!!meJson.data?.needsTermsReconsent);
         router.replace(resumeHref as never);
       }
     } catch (e) {
