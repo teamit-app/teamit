@@ -62,11 +62,20 @@ public class UserService {
 
     private static final String PROFILE_IMAGE_SUB_DIR = "profile-images";
 
+    // 가입 시 필수 동의 약관의 현재 버전. 프론트엔드 basic-info.tsx/reconsent.tsx의
+    // TERMS_VERSION 상수와 반드시 같은 값으로 맞춰야 한다 — 약관을 개정할 때 이 값을
+    // 올리면, 예전 버전에 동의한 유저는 자동으로 재동의 대상(needsTermsReconsent)이 된다.
+    private static final String CURRENT_TERMS_VERSION = "2026-08-15";
+
     @Transactional(readOnly = true)
     public MyProfileResponse getMyProfile(Long userId) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new IllegalArgumentException("사용자를 찾을 수 없습니다"));
         boolean needsOnboarding = user.getName() == null;
+        // 신규가입 온보딩 중(basic-info)인 유저는 그 화면에서 이미 동의를 받으므로 별도
+        // 재동의 게이트를 씌우지 않는다 — needsOnboarding이면 needsTermsReconsent는 false.
+        boolean needsTermsReconsent = !needsOnboarding
+                && !CURRENT_TERMS_VERSION.equals(user.getTermsVersion());
         List<UserRegion> regions = userRegionRepository.findAllByUserId(userId);
         Education education = educationRepository.findByUserId(userId).orElse(null);
         List<UserSkill> skills = userSkillRepository.findAllByUserIdInWithSkill(List.of(userId));
@@ -78,8 +87,18 @@ public class UserService {
                 .average()
                 .orElse(0.0);
 
-        return MyProfileResponse.of(user, needsOnboarding, regions, education, skills, careers,
+        return MyProfileResponse.of(user, needsOnboarding, needsTermsReconsent, regions, education, skills, careers,
                 Math.round(averageRating * 10) / 10.0);
+    }
+
+    // ──────────────────────────────────────────────────────────────
+    // 기존 가입자 재동의 (약관 개정 후 needsTermsReconsent인 유저 전용)
+    // ──────────────────────────────────────────────────────────────
+    @Transactional
+    public void agreeToTermsReconsent(Long userId, TermsAgreementRequest request) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new IllegalArgumentException("사용자를 찾을 수 없습니다"));
+        user.agreeToTerms(request.getTermsVersion(), Boolean.TRUE.equals(request.getAnalyticsOptIn()));
     }
 
     @Transactional(readOnly = true)

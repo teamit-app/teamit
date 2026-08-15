@@ -32,6 +32,7 @@ export const dummyMyProfile: MyProfile = {
   birthDate: '2002-05-11',
   profileImageUrl: null,
   isMatchingActive: true,
+  needsTermsReconsent: false,
   averageRating: 4.0,
   regions: [{ sido: '서울', sigungu: '강남구' }],
   education: {
