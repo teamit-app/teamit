@@ -201,6 +201,7 @@ const staticRoutes: Record<string, () => unknown> = {
     if (!token) throw new Error('[MOCK] 로그인이 필요합니다');
     return dummyMyProfile;
   },
+  '/users/terms-agreement': () => null,
   '/users/matching-profile': () => dummyMatchingProfile,
   '/users/matching-profile/latest-submission': () => dummyMatchingProfile,
   '/users/matching-status': () => null,
