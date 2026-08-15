@@ -13,6 +13,7 @@ export const dummyContests: Contest[] = [
     isNew: true,
     isHearted: true,
     isRegisteredAsParticipant: false,
+    imageUrl: 'https://placehold.co/200x200/FFA229/FFFFFF?text=Contest',
   },
   {
     contestId: 2,
