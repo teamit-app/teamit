@@ -30,7 +30,13 @@ import java.util.List;
 public class SecurityConfig {
 
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
-    private final ObjectMapper objectMapper;
+
+    // 스프링이 자동 구성하는 ObjectMapper 빈을 주입받으려 했으나, SecurityFilterChain이 매우
+    // 이른 시점에 초기화되도록 강제되면서 그 시점엔 아직 JacksonAutoConfiguration이 ObjectMapper
+    // 빈을 등록하기 전이라 NoSuchBeanDefinitionException으로 컨텍스트 로딩 자체가 실패했다
+    // (CacheConfig.cacheConfiguration()의 ObjectMapper 주입 문제와 동일한 원인 — 그쪽과 같은
+    // 방식으로 직접 생성해서 초기화 순서 문제를 피한다).
+    private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
     // 베타테스트 단계: 웹 프론트가 참가자마다 다른 LAN IP(포트도 다름)에서 접속하므로 전체 허용.
     // 공개 배포 시에는 실제 프론트엔드 도메인으로 좁혀야 한다.
@@ -106,7 +112,7 @@ public class SecurityConfig {
             response.setStatus(HttpStatus.UNAUTHORIZED.value());
             response.setContentType(MediaType.APPLICATION_JSON_VALUE);
             response.setCharacterEncoding("UTF-8");
-            response.getWriter().write(objectMapper.writeValueAsString(
+            response.getWriter().write(OBJECT_MAPPER.writeValueAsString(
                     ApiResponse.error("인증이 만료됐어요. 다시 로그인해주세요.")));
         };
     }
