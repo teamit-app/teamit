@@ -137,16 +137,16 @@ const styles = StyleSheet.create({
   },
   compactRow: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
+    alignItems: 'center',
   },
   compactThumbnail: {
-    width: 60,
-    height: 84,
+    width: 100,
+    height: 140,
     borderRadius: 12,
     backgroundColor: Colors.ogTint,
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 12,
+    marginRight: 14,
   },
   compactThumbnailText: {
     fontSize: 10,
