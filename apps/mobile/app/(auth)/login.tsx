@@ -56,6 +56,9 @@ export default function LoginScreen() {
     trackEvent('kakao_login_click');
 
     if (IS_MOCK) {
+      // mock 토큰을 실제로 심어둬야, 로그아웃(tokenStorage 비움) 후 새로고침 같은
+      // 재조회에서 mockRouter의 /users/me가 "로그인 안 됨"으로 정확히 판단할 수 있다.
+      await tokenStorage.setTokens('mock-access-token', 'mock-refresh-token');
       setUserId(1);
       router.replace(onboardingHref as never);
       return;

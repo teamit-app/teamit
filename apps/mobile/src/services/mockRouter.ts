@@ -25,6 +25,7 @@ import {
   dummyPostApplicants,
   dummyLikedPosts,
 } from '../data/mypage';
+import { tokenStorage } from './tokenStorage';
 
 // 공모전 후보 등록 mock 상태 — 앱 재시작/리로드 시 초기화되는 인메모리 저장소
 const mockParticipantContestIds = new Set<number>();
@@ -191,7 +192,15 @@ const staticRoutes: Record<string, () => unknown> = {
   '/auth/withdraw': () => null,
 
   // ─── 마이페이지 ─────────────────────────────────────────────────────────────
-  '/users/me': () => dummyMyProfile,
+  // mock 모드는 로그인해도 실제 서버 토큰이 없어서, 로그인 여부를 tokenStorage의
+  // mock 토큰 존재 여부로 판단한다(login.tsx의 IS_MOCK 분기에서 심어둠). 그래야
+  // 로그아웃(authService.logout이 항상 tokenStorage를 비움) 후 새로고침/다른 탭
+  // 방문 같은 재조회가 일어나도 다시 로그인된 것처럼 보이지 않는다.
+  '/users/me': async () => {
+    const token = await tokenStorage.getAccessToken();
+    if (!token) throw new Error('[MOCK] 로그인이 필요합니다');
+    return dummyMyProfile;
+  },
   '/users/matching-profile': () => dummyMatchingProfile,
   '/users/matching-profile/latest-submission': () => dummyMatchingProfile,
   '/users/matching-status': () => null,
