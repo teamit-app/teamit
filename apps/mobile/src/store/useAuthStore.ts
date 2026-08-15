@@ -24,6 +24,7 @@ interface AuthState {
   setNeedsTermsReconsent: (v: boolean) => void;
   logout: (reason?: 'logout' | 'withdraw') => void;
   fetchCurrentUserId: () => Promise<void>;
+  refreshNeedsTermsReconsent: () => Promise<void>;
 }
 
 export const useAuthStore = create<AuthState>((set, get) => ({
@@ -67,5 +68,18 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     })();
     set({ currentUserIdReady: promise });
     return promise;
+  },
+  // login.tsx는 레이스컨디션 방지 목적으로 setCurrentUserId(userId)를 직접 호출해서
+  // currentUserId를 곧바로 채우는데, 그러면 fetchCurrentUserId()의 "이미 채워져 있으면
+  // 재조회 안 함" 가드에 걸려 needsTermsReconsent가 영영 갱신이 안 된다(로그인 직후엔
+  // 재동의 화면이 안 뜨고 새로고침해야만 뜨는 버그의 원인). 그 가드와 무관하게 이건
+  // 항상 다시 조회해서 갱신한다 — 기존 가입자 로그인 성공 직후에 호출해야 한다.
+  refreshNeedsTermsReconsent: async () => {
+    try {
+      const profile = await getMyProfile();
+      set({ needsTermsReconsent: profile.needsTermsReconsent });
+    } catch {
+      // 조회 실패해도 로그인 자체는 막지 않는다 — 다음 새로고침 등에서 다시 시도됨
+    }
   },
 }));
