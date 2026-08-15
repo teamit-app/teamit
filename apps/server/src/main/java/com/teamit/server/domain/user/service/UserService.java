@@ -197,6 +197,7 @@ public class UserService {
         ensureNicknameAvailable(userId, request.getNickname());
         user.updateBasicInfo(request.getNickname(), request.getName(),
                 request.getGender(), request.getBirthDate());
+        user.agreeToTerms(request.getTermsVersion(), Boolean.TRUE.equals(request.getAnalyticsOptIn()));
         return OnboardingBasicResponse.builder()
                 .userId(user.getId())
                 .nickname(user.getNickname())

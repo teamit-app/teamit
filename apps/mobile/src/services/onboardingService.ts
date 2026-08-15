@@ -5,6 +5,8 @@ export interface BasicInfoRequest {
   name: string;
   gender: 'MALE' | 'FEMALE';
   birthDate: string; // 'YYYY-MM-DD'
+  termsVersion: string;
+  analyticsOptIn: boolean;
 }
 
 export interface EducationRequest {
