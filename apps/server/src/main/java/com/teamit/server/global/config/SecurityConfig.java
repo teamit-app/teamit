@@ -1,15 +1,20 @@
 package com.teamit.server.global.config;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.teamit.server.global.jwt.JwtAuthenticationFilter;
+import com.teamit.server.global.response.ApiResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
+import org.springframework.security.web.AuthenticationEntryPoint;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.security.web.util.matcher.RegexRequestMatcher;
@@ -25,6 +30,7 @@ import java.util.List;
 public class SecurityConfig {
 
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
+    private final ObjectMapper objectMapper;
 
     // 베타테스트 단계: 웹 프론트가 참가자마다 다른 LAN IP(포트도 다름)에서 접속하므로 전체 허용.
     // 공개 배포 시에는 실제 프론트엔드 도메인으로 좁혀야 한다.
@@ -50,6 +56,12 @@ public class SecurityConfig {
                 .formLogin(AbstractHttpConfigurer::disable)
                 .sessionManagement(session ->
                         session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                // httpBasic/formLogin을 둘 다 꺼두면 AuthenticationEntryPoint가 등록되지 않아
+                // Spring Security가 기본값(Http403ForbiddenEntryPoint)으로 폴백한다 — 그러면
+                // 토큰이 없거나 만료됐을 때도 401이 아니라 403이 나가서, 프론트(api.ts)의
+                // "401이면 재발급 후 재시도" 로직이 아예 안 걸리고 그대로 에러가 튀어나온다.
+                // 명시적으로 401을 내려주는 엔트리포인트를 등록해 이 문제를 막는다.
+                .exceptionHandling(ex -> ex.authenticationEntryPoint(authenticationEntryPoint()))
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/swagger-ui/**", "/v3/api-docs/**").permitAll()
                         .requestMatchers("/api/v1/auth/kakao", "/api/v1/auth/reissue").permitAll()
@@ -86,6 +98,17 @@ public class SecurityConfig {
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
+    }
+
+    @Bean
+    public AuthenticationEntryPoint authenticationEntryPoint() {
+        return (request, response, authException) -> {
+            response.setStatus(HttpStatus.UNAUTHORIZED.value());
+            response.setContentType(MediaType.APPLICATION_JSON_VALUE);
+            response.setCharacterEncoding("UTF-8");
+            response.getWriter().write(objectMapper.writeValueAsString(
+                    ApiResponse.error("인증이 만료됐어요. 다시 로그인해주세요.")));
+        };
     }
 
     /**
