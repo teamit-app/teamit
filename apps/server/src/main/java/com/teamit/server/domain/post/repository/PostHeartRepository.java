@@ -26,6 +26,10 @@ public interface PostHeartRepository extends JpaRepository<PostHeart, Long> {
     @Query("DELETE FROM PostHeart h WHERE h.post.id = :postId")
     void deleteAllByPostId(@Param("postId") Long postId);
 
+    @Modifying
+    @Query("DELETE FROM PostHeart h WHERE h.user.id = :userId")
+    void deleteAllByUserId(@Param("userId") Long userId);
+
     interface PostCountProjection {
         Long getPostId();
         Long getCount();

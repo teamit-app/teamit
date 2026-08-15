@@ -41,4 +41,8 @@ public interface PostApplicationRepository extends JpaRepository<PostApplication
     @Modifying
     @Query("DELETE FROM PostApplication a WHERE a.post.id = :postId")
     void deleteAllByPostId(@Param("postId") Long postId);
+
+    @Modifying
+    @Query("DELETE FROM PostApplication a WHERE a.applicant.id = :userId")
+    void deleteAllByApplicantId(@Param("userId") Long userId);
 }

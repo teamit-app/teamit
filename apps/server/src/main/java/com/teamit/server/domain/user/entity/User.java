@@ -97,4 +97,18 @@ public class User extends BaseTimeEntity {
     public void updateProfileImage(String profileImageUrl) {
         this.profileImageUrl = profileImageUrl;
     }
+
+    // 회원 탈퇴 시 계정 row 자체는 남기고 개인정보만 지운다(하드 삭제 아님) — 1:1 채팅
+    // 메시지, 팀 리뷰처럼 상대방에게도 속한 데이터가 이 유저를 참조하고 있어서, row를
+    // 통째로 지우면 FK 위반이 나거나 상대방 화면의 대화·리뷰 기록이 함께 깨진다.
+    // nickname은 unique 제약이 있어 고정 문자열로는 두 번째 탈퇴자부터 충돌하므로 id를 붙인다.
+    public void anonymize() {
+        this.kakaoId = null;
+        this.nickname = "탈퇴한 사용자" + this.id;
+        this.name = null;
+        this.gender = null;
+        this.birthDate = null;
+        this.profileImageUrl = null;
+        this.isMatchingActive = false;
+    }
 }
