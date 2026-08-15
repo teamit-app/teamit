@@ -16,6 +16,13 @@ import {
 export const getMyProfile = (): Promise<MyProfile> =>
   apiRequest<MyProfile>('/users/me');
 
+// 약관 개정으로 재동의가 필요한(needsTermsReconsent) 기존 가입자 전용
+export const submitTermsReconsent = (data: { termsVersion: string; analyticsOptIn: boolean }): Promise<void> =>
+  apiRequest<void>('/users/terms-agreement', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+
 // 활동 가능 지역은 매칭 프로필(saveMatchingProfile)에서만 편집한다 — 여기서 보내지 않는다.
 export const updateMyProfile = (data: {
   nickname?: string;

@@ -192,6 +192,7 @@ const staticRoutes: Record<string, () => unknown> = {
 
   // ─── 마이페이지 ─────────────────────────────────────────────────────────────
   '/users/me': () => dummyMyProfile,
+  '/users/terms-agreement': () => null,
   '/users/matching-profile': () => dummyMatchingProfile,
   '/users/matching-profile/latest-submission': () => dummyMatchingProfile,
   '/users/matching-status': () => null,

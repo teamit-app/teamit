@@ -11,6 +11,9 @@ interface AuthState {
   user: User | null;
   isLoggedIn: boolean;
   currentUserId: number | null;
+  // 약관이 개정된 후 기존 가입자가 아직 재동의를 안 한 상태인지. true면 (tabs)/_layout.tsx가
+  // 재동의 화면(reconsent)으로 보내서 그 화면을 벗어나지 못하게 한다(소프트락).
+  needsTermsReconsent: boolean;
   // fetchCurrentUserId()가 진행 중인 동안의 Promise. (tabs)/_layout.tsx의 마운트 이펙트와
   // 각 탭 화면의 마운트 이펙트가 동시에 currentUserId를 필요로 할 때, 먼저 시작된 조회를
   // 공유해서 기다리게 하기 위한 용도 — 이게 없으면 아직 조회가 끝나기 전에 currentUserId를
@@ -18,6 +21,7 @@ interface AuthState {
   currentUserIdReady: Promise<void> | null;
   setUser: (user: User) => void;
   setCurrentUserId: (userId: number) => void;
+  setNeedsTermsReconsent: (v: boolean) => void;
   logout: (reason?: 'logout' | 'withdraw') => void;
   fetchCurrentUserId: () => Promise<void>;
 }
@@ -26,9 +30,11 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   user: null,
   isLoggedIn: false,
   currentUserId: null,
+  needsTermsReconsent: false,
   currentUserIdReady: null,
   setUser: (user) => set({ user, isLoggedIn: true }),
   setCurrentUserId: (userId) => set({ currentUserId: userId }),
+  setNeedsTermsReconsent: (v) => set({ needsTermsReconsent: v }),
   logout: (reason = 'logout') => {
     // 다른 유저로 재로그인 시 이전 유저의 캐시가 남지 않도록 유저-스코프 스토어를 함께 초기화.
     // React Query 캐시는 어떤 쿼리 키를 빠뜨렸는지 매번 따질 필요 없이 통째로 비운다 —
@@ -37,7 +43,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     useOnboardingStore.getState().reset();
     useBuildTeamStore.getState().reset();
     queryClient.clear();
-    set({ user: null, isLoggedIn: false, currentUserId: null, currentUserIdReady: null });
+    set({ user: null, isLoggedIn: false, currentUserId: null, needsTermsReconsent: false, currentUserIdReady: null });
     // user_id가 아직 살아있는 상태에서 이벤트를 먼저 보내야 GA4가 이 이벤트를 해당
     // 유저에게 귀속시킬 수 있다. 순서를 바꾸면(clear를 먼저 하면) 이벤트가 트리거를
     // 태우는 시점엔 이미 user_id가 null이라 "누구의" 로그아웃/탈퇴인지 알 수 없게 된다.
@@ -52,7 +58,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     const promise = (async () => {
       try {
         const profile = await getMyProfile();
-        set({ currentUserId: profile.userId });
+        set({ currentUserId: profile.userId, needsTermsReconsent: profile.needsTermsReconsent });
       } catch {
         // 로그인 전이거나 조회 실패 시 무시
       } finally {
