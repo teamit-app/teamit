@@ -18,7 +18,7 @@ import { submitBasicInfo } from '../../../src/services/onboardingService';
 import { withdraw } from '../../../src/services/authService';
 import { useOnboardingStore } from '../../../src/store/useOnboardingStore';
 import { Alert } from '../../../src/utils/alert';
-import { trackEvent, trackFbq, getSessionUtm, setUserId as setGtmUserId } from '../../../src/services/gtm';
+import { trackEvent, trackFbq, getSessionUtm, setUserId as setGtmUserId, setAnalyticsConsent } from '../../../src/services/gtm';
 
 type Gender = 'MALE' | 'FEMALE' | null;
 
@@ -86,6 +86,9 @@ export default function BasicInfoScreen() {
         analyticsOptIn: analyticsAgreed,
       });
       setUserId(userId);
+      // 방금 제출한 동의 상태를 바로 반영해야, 아래 sign_up 이벤트부터 그 선택이 적용된다
+      // (fetchCurrentUserId를 통한 갱신은 tabs 레이아웃 마운트 시점이라 한 박자 늦음).
+      setAnalyticsConsent(analyticsAgreed);
       setGtmUserId(userId);
       trackEvent('sign_up', getSessionUtm());
       trackFbq('CompleteRegistration');

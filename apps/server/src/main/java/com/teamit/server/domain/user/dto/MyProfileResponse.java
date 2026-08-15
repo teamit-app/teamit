@@ -29,6 +29,7 @@ public class MyProfileResponse {
     private boolean isMatchingActive;
     private boolean needsOnboarding;
     private boolean needsTermsReconsent;
+    private boolean analyticsOptIn;
     private double averageRating;
     private List<MatchingProfileData.RegionInfo> regions;
     private EducationInfo education;
@@ -109,6 +110,7 @@ public class MyProfileResponse {
                 .isMatchingActive(Boolean.TRUE.equals(user.getIsMatchingActive()))
                 .needsOnboarding(needsOnboarding)
                 .needsTermsReconsent(needsTermsReconsent)
+                .analyticsOptIn(Boolean.TRUE.equals(user.getAnalyticsOptIn()))
                 .averageRating(averageRating)
                 .regions(regionInfos)
                 .education(education != null ? EducationInfo.from(education) : null)

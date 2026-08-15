@@ -34,6 +34,22 @@
       }
     </style>
 
+    <!-- Consent Mode 기본값 — 분석 목적 수집은 선택 동의 대상이라 기본은 전부 거부.
+         GTM 스니펫보다 먼저 실행돼야 태그들이 초기화 시점부터 이 상태를 인지한다.
+         유저가 분석 동의를 하면 gtm.ts의 setAnalyticsConsent(true)가
+         gtag('consent','update', ...)로 이 상태를 갱신한다. -->
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){ window.dataLayer.push(arguments); }
+      window.gtag = gtag;
+      gtag('consent', 'default', {
+        'analytics_storage': 'denied',
+        'ad_storage': 'denied',
+        'ad_user_data': 'denied',
+        'ad_personalization': 'denied'
+      });
+    </script>
+
     <!-- 인플루언서 첫 유입 UTM 캡처 — GTM보다 먼저 실행되어야 GA4 설정 태그가
          초기화 시점에 dataLayer에서 이 값을 읽어갈 수 있다. -->
     <script>
@@ -75,7 +91,9 @@
     })(window,document,'script','dataLayer','GTM-MHQXSB23');</script>
     <!-- End Google Tag Manager -->
 
-    <!-- Meta Pixel Code -->
+    <!-- Meta Pixel Code — fbq 로더만 심어둔다. init/track('PageView')은 데이터 전송을
+         일으키는 호출이라 분석 동의 없이는 실행하지 않는다 (gtm.ts의
+         setAnalyticsConsent(true)에서 동의 확인 후에만 호출). -->
     <script>
     !function(f,b,e,v,n,t,s){if(f.fbq)return;n=f.fbq=function(){n.callMethod?
     n.callMethod.apply(n,arguments):n.queue.push(arguments)};
@@ -84,12 +102,7 @@
     t.src=v;s=b.getElementsByTagName(e)[0];
     s.parentNode.insertBefore(t,s)}(window, document,'script',
     'https://connect.facebook.net/en_US/fbevents.js');
-    fbq('init', '1768571457666086');
-    fbq('track', 'PageView');
     </script>
-    <noscript><img height="1" width="1" style="display:none"
-    src="https://www.facebook.com/tr?id=1768571457666086&ev=PageView&noscript=1"
-    /></noscript>
     <!-- End Meta Pixel Code -->
   </head>
 

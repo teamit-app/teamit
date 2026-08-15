@@ -33,6 +33,7 @@ export const dummyMyProfile: MyProfile = {
   profileImageUrl: null,
   isMatchingActive: true,
   needsTermsReconsent: false,
+  analyticsOptIn: false,
   averageRating: 4.0,
   regions: [{ sido: '서울', sigungu: '강남구' }],
   education: {

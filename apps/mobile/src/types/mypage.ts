@@ -66,6 +66,7 @@ export interface MyProfile {
   profileImageUrl: string | null;
   isMatchingActive: boolean;
   needsTermsReconsent: boolean;
+  analyticsOptIn: boolean;
   averageRating: number;
   regions: UserRegion[];
   education: UserEducation | null;

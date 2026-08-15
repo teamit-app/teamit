@@ -33,6 +33,9 @@ const mockParticipantContestIds = new Set<number>();
 const mockHeartedPostIds = new Set<number>();
 const mockExtraComments: Record<number, { commentId: number; authorName: string; content: string; createdAt: string; isAuthor: boolean; isReply?: boolean }[]> = {};
 
+// 분석 동의 mock 상태 — 온보딩/재동의 제출 시 반영해서 /users/me가 그대로 반영해 보여준다
+let mockAnalyticsOptIn = false;
+
 // dummy 데이터의 한글 meetingType('온라인'/'오프라인'/'온오프라인 혼합')을
 // 백엔드 raw enum('ONLINE'/'OFFLINE'/'MIXED')으로 변환
 const normalizeMeetingTypeForMock = (type: string): string => {
@@ -71,7 +74,7 @@ const mapRecruitPostToListItem = (p: (typeof dummyRecruitPosts)[number]) => ({
 
 // ─── 정적 라우트: 정확한 경로 일치 ───────────────────────────────────────────
 
-const staticRoutes: Record<string, () => unknown> = {
+const staticRoutes: Record<string, (body?: unknown) => unknown> = {
   // 인재풀 목록 (GET /users?...) — 쿼리스트링은 strip 후 매칭
   '/users': () => ({
     content: dummyTalents.map(({ isHearted: _h, ...rest }) => rest),
@@ -108,13 +111,16 @@ const staticRoutes: Record<string, () => unknown> = {
   }),
 
   // 온보딩
-  '/users/onboarding/basic': () => ({
-    userId: 1,
-    nickname: 'mock유저',
-    name: '테스트',
-    gender: 'MALE',
-    birthDate: '2000-01-01',
-  }),
+  '/users/onboarding/basic': (body) => {
+    mockAnalyticsOptIn = !!(body as { analyticsOptIn?: boolean } | undefined)?.analyticsOptIn;
+    return {
+      userId: 1,
+      nickname: 'mock유저',
+      name: '테스트',
+      gender: 'MALE',
+      birthDate: '2000-01-01',
+    };
+  },
 
   // 온보딩 지역/학력 저장 (@LoginUser 방식 — userId 없는 경로)
   '/users/regions': () => ({ regions: [] }),
@@ -191,8 +197,11 @@ const staticRoutes: Record<string, () => unknown> = {
   '/auth/withdraw': () => null,
 
   // ─── 마이페이지 ─────────────────────────────────────────────────────────────
-  '/users/me': () => dummyMyProfile,
-  '/users/terms-agreement': () => null,
+  '/users/me': () => ({ ...dummyMyProfile, analyticsOptIn: mockAnalyticsOptIn }),
+  '/users/terms-agreement': (body) => {
+    mockAnalyticsOptIn = !!(body as { analyticsOptIn?: boolean } | undefined)?.analyticsOptIn;
+    return null;
+  },
   '/users/matching-profile': () => dummyMatchingProfile,
   '/users/matching-profile/latest-submission': () => dummyMatchingProfile,
   '/users/matching-status': () => null,
@@ -658,7 +667,8 @@ export function getMockResponse<T>(endpoint: string, method: string = 'GET', bod
   // 1. 정적 라우트 우선 탐색
   const staticHandler = staticRoutes[path];
   if (staticHandler) {
-    return Promise.resolve(staticHandler() as T);
+    const parsedBody = typeof body === 'string' ? JSON.parse(body) : body;
+    return Promise.resolve(staticHandler(parsedBody) as T);
   }
 
   // 2. 동적 라우트 패턴 매칭

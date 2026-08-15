@@ -8,7 +8,7 @@ import { submitTermsReconsent } from '../../src/services/mypageService';
 import { logout as logoutApi } from '../../src/services/authService';
 import { useAuthStore } from '../../src/store/useAuthStore';
 import { Alert } from '../../src/utils/alert';
-import { trackEvent } from '../../src/services/gtm';
+import { trackEvent, setAnalyticsConsent } from '../../src/services/gtm';
 
 // 약관이 개정돼서 기존 가입자가 다시 동의해야 하는 화면. needsTermsReconsent인 동안
 // (tabs)/_layout.tsx가 여기로 계속 돌려보내는 소프트락 구조라, 뒤로가기로 못 빠져나가게
@@ -25,6 +25,7 @@ export default function ReconsentScreen() {
     try {
       await submitTermsReconsent({ termsVersion: TERMS_VERSION, analyticsOptIn: analyticsAgreed });
       useAuthStore.getState().setNeedsTermsReconsent(false);
+      setAnalyticsConsent(analyticsAgreed);
       trackEvent('terms_reconsent');
       router.replace('/(tabs)/home');
     } catch (e) {

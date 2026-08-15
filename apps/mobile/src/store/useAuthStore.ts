@@ -4,7 +4,7 @@ import { getMyProfile } from '../services/mypageService';
 import { useMypageStore } from './useMypageStore';
 import { useOnboardingStore } from './useOnboardingStore';
 import { useBuildTeamStore } from './useBuildTeamStore';
-import { setUserId, trackEvent } from '../services/gtm';
+import { setUserId, trackEvent, setAnalyticsConsent } from '../services/gtm';
 import { queryClient } from '../lib/queryClient';
 
 interface AuthState {
@@ -49,6 +49,10 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     // 태우는 시점엔 이미 user_id가 null이라 "누구의" 로그아웃/탈퇴인지 알 수 없게 된다.
     trackEvent(reason);
     setUserId(null);
+    // 다음 세션(다른 유저의 재로그인 또는 게스트)에 이전 유저의 동의 상태가
+    // 새어들어가지 않도록 초기화 — 다시 로그인하면 fetchCurrentUserId가 그 유저의
+    // 실제 동의 상태로 갱신한다.
+    setAnalyticsConsent(false);
   },
   fetchCurrentUserId: () => {
     const inFlight = get().currentUserIdReady;
@@ -59,6 +63,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       try {
         const profile = await getMyProfile();
         set({ currentUserId: profile.userId, needsTermsReconsent: profile.needsTermsReconsent });
+        setAnalyticsConsent(profile.analyticsOptIn);
       } catch {
         // 로그인 전이거나 조회 실패 시 무시
       } finally {
