@@ -117,10 +117,17 @@ export default function LoginScreen() {
           router.replace(onboardingHref as never);
         } else {
           // setCurrentUserId를 위에서 직접 호출해서 fetchCurrentUserId()의 재조회 가드에
-          // 걸리므로, needsTermsReconsent는 여기서 따로 갱신해야 재동의 화면이 새로고침
-          // 없이 로그인 직후 바로 뜬다.
+          // 걸리므로, needsTermsReconsent는 여기서 따로 갱신해야 한다.
           await useAuthStore.getState().refreshNeedsTermsReconsent();
-          router.replace(resumeHref as never);
+          // (tabs)/_layout.tsx의 재동의 체크는 마운트 시 한 번만 도는 useEffect라, 게스트로
+          // 홈을 이미 보고 있다가(= tabs가 이미 마운트된 상태) 로그인한 경우엔 재실행되지
+          // 않아 재동의 화면이 안 뜬다. 그래서 로그인 성공 직후 여기서 직접 필수약관 동의
+          // 여부를 확인해서 바로 보낸다 — 새로고침이나 tabs 재마운트에 의존하지 않는다.
+          if (useAuthStore.getState().needsTermsReconsent) {
+            router.replace('/(auth)/reconsent' as never);
+          } else {
+            router.replace(resumeHref as never);
+          }
         }
         return;
       } catch {
@@ -161,8 +168,14 @@ export default function LoginScreen() {
         router.replace(onboardingHref as never);
       } else {
         // 이미 위에서 /users/me를 조회했으니 재조회 없이 그대로 반영
-        useAuthStore.getState().setNeedsTermsReconsent(!!meJson.data?.needsTermsReconsent);
-        router.replace(resumeHref as never);
+        const needsTermsReconsent = !!meJson.data?.needsTermsReconsent;
+        useAuthStore.getState().setNeedsTermsReconsent(needsTermsReconsent);
+        // tabs 마운트 useEffect에만 의존하지 않고 로그인 직후 바로 판단 (handleKakaoLogin 참고)
+        if (needsTermsReconsent) {
+          router.replace('/(auth)/reconsent' as never);
+        } else {
+          router.replace(resumeHref as never);
+        }
       }
     } catch (e) {
       setIsLoggingIn(false);
