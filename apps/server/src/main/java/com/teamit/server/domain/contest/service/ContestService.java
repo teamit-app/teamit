@@ -31,6 +31,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 @Service
@@ -95,8 +96,19 @@ public class ContestService {
         Page<Contest> contestPage = contestRepository.findContestList(
                 categoryStr, statusEndMin, statusEndMax, statusEndBefore, keyword, pageable);
 
+        // 탐색 탭 "인기순" 정렬(explore/index.tsx)이 좋아요 수 기준으로 클라이언트에서
+        // 정렬할 수 있도록, 목록에 있는 공모전들의 좋아요 수를 배치로 한 번에 조회한다
+        List<Long> contestIds = contestPage.getContent().stream()
+                .map(Contest::getId)
+                .collect(Collectors.toList());
+        Map<Long, Long> heartCountByContestId = contestHeartRepository.countGroupedByContestIdIn(contestIds).stream()
+                .collect(Collectors.toMap(
+                        ContestHeartRepository.ContestHeartCountProjection::getContestId,
+                        ContestHeartRepository.ContestHeartCountProjection::getCount));
+
         List<ContestListItemResponse> content = contestPage.getContent().stream()
-                .map(ContestListItemResponse::from)
+                .map(contest -> ContestListItemResponse.from(
+                        contest, heartCountByContestId.getOrDefault(contest.getId(), 0L)))
                 .collect(Collectors.toList());
 
         return ContestPageResponse.builder()

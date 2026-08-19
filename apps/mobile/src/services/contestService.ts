@@ -13,6 +13,7 @@ interface BackendContest {
   dDay: number;
   isNew: boolean;
   imageUrl?: string;
+  heartCount?: number;
 }
 
 interface BackendContestDetail {
