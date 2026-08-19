@@ -14,6 +14,7 @@ export const dummyContests: Contest[] = [
     isHearted: true,
     isRegisteredAsParticipant: false,
     imageUrl: 'https://placehold.co/200x200/FFA229/FFFFFF?text=Contest',
+    heartCount: 5,
   },
   {
     contestId: 2,
@@ -27,6 +28,7 @@ export const dummyContests: Contest[] = [
     isNew: false,
     isHearted: true,
     isRegisteredAsParticipant: false,
+    heartCount: 2,
   },
   {
     contestId: 3,
@@ -40,6 +42,7 @@ export const dummyContests: Contest[] = [
     isNew: false,
     isHearted: false,
     isRegisteredAsParticipant: false,
+    heartCount: 12,
   },
   {
     contestId: 4,
@@ -53,6 +56,7 @@ export const dummyContests: Contest[] = [
     isNew: false,
     isHearted: false,
     isRegisteredAsParticipant: false,
+    heartCount: 0,
   },
   {
     contestId: 5,
@@ -66,6 +70,7 @@ export const dummyContests: Contest[] = [
     isNew: true,
     isHearted: false,
     isRegisteredAsParticipant: false,
+    heartCount: 8,
   },
   {
     contestId: 6,
@@ -79,5 +84,6 @@ export const dummyContests: Contest[] = [
     isNew: false,
     isHearted: false,
     isRegisteredAsParticipant: false,
+    heartCount: 1,
   },
 ];

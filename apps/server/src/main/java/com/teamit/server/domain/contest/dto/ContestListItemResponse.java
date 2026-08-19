@@ -22,8 +22,15 @@ public class ContestListItemResponse {
     @JsonProperty("isNew")
     private boolean isNew;
     private String imageUrl;
+    // 탐색 탭 "인기순" 정렬은 목록을 한 번만 불러와 클라이언트에서 필터링·정렬하는
+    // 구조라(useExploreData.ts), 정렬에 쓸 좋아요 수를 목록 응답에 같이 내려준다.
+    private long heartCount;
 
     public static ContestListItemResponse from(Contest contest) {
+        return from(contest, 0L);
+    }
+
+    public static ContestListItemResponse from(Contest contest, long heartCount) {
         LocalDate today = LocalDate.now();
         long dDay = ChronoUnit.DAYS.between(today, contest.getEndDate());
         boolean isNew = contest.getCreatedAt() != null &&
@@ -37,6 +44,7 @@ public class ContestListItemResponse {
                 .dDay(dDay)
                 .isNew(isNew)
                 .imageUrl(contest.getImageUrl())
+                .heartCount(heartCount)
                 .build();
     }
 }
