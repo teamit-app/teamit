@@ -12,7 +12,13 @@ import java.util.List;
 
 public interface ContestRepository extends JpaRepository<Contest, Long> {
 
-    List<Contest> findByEndDateGreaterThanEqualOrderByCreatedAtDesc(LocalDate today);
+    // "인기 공모전" 판단 기준 — 좋아요(하트) 많은 순. 하트 수가 같으면 최신순으로 tie-break.
+    // ContestHeart를 LEFT JOIN해서 하트가 하나도 없는 공모전(COUNT(h)=0)도 후보에 포함시킨다.
+    @Query("SELECT c FROM Contest c LEFT JOIN ContestHeart h ON h.contest = c " +
+            "WHERE c.endDate >= :today " +
+            "GROUP BY c " +
+            "ORDER BY COUNT(h) DESC, c.createdAt DESC")
+    List<Contest> findMostHeartedActiveContests(@Param("today") LocalDate today, Pageable pageable);
 
     // 관리자 공모전 관리 화면용 전체 목록
     List<Contest> findAllByOrderByIdDesc();
