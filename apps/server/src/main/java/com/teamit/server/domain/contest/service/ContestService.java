@@ -51,12 +51,14 @@ public class ContestService {
 
     // 비개인화 공개 목록이라 Redis에 캐싱 — 관리자 CRUD(createContest/updateContest/deleteContest)에서
     // 무효화한다. 자주 안 바뀌는 데이터라 TTL(30분)을 길게 둠.
+    // "인기"는 좋아요(하트) 수 기준으로 상위 10개만 뽑는다 — 예전엔 그냥 최신순이라
+    // "인기 공모전"이라는 이름과 실제 정렬 기준이 달랐다.
     @Cacheable(cacheNames = "contestsPopular")
     @Transactional(readOnly = true)
     public PopularContestListResponse getPopularContests() {
         LocalDate today = LocalDate.now();
         List<PopularContestResponse> contests = contestRepository
-                .findByEndDateGreaterThanEqualOrderByCreatedAtDesc(today)
+                .findMostHeartedActiveContests(today, PageRequest.of(0, 10))
                 .stream()
                 .map(PopularContestResponse::from)
                 .collect(Collectors.toList());
