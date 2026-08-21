@@ -26,6 +26,7 @@ import { ReviewStatsCard } from '../../../src/components/profile/ReviewStatsCard
 import { buildReviewStats, buildReviewKeywords } from '../../../src/utils/reviewStats';
 import { useMyReceivedReviews } from '../../../src/hooks/useMyReceivedReviews';
 import { GuestPrompt } from '../../../src/components/common/GuestPrompt';
+import { trackEvent } from '../../../src/services/gtm';
 
 function GridMenuItem({
   icon,
@@ -362,6 +363,7 @@ export default function ProfileScreen() {
               value={profile?.isMatchingActive ?? false}
               onValueChange={async (v) => {
                 await setMatchingActive(v);
+                trackEvent(v ? 'matching_active_enable' : 'matching_active_disable');
                 // 인재풀 목록은 세션 내내 캐시되는 값이라, 여기서 껐다 켰다 해도
                 // 다시 로그인하기 전까지는 탐색 탭에 그대로 남아있던 문제를 고치기 위함
                 refreshExploreTalents();
