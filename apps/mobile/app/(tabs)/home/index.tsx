@@ -179,16 +179,17 @@ export default function HomeScreen() {
                 key={contest.contestId}
                 contest={contest}
                 variant="compact"
-                onPress={() => router.push(`/home/contest/${contest.contestId}` as never)}
+                onPress={() => router.push(`/home/contest/${contest.contestId}?source=home` as never)}
               />
             ))}
           </View>
 
           <TouchableOpacity
             style={styles.moreBtn}
-            onPress={() =>
-              router.push({ pathname: '/(tabs)/explore', params: { tab: 'CONTEST', sort: 'POPULAR' } })
-            }
+            onPress={() => {
+              trackEvent('home_contest_more_click');
+              router.push({ pathname: '/(tabs)/explore', params: { tab: 'CONTEST', sort: 'POPULAR' } });
+            }}
           >
             <Text style={styles.moreBtnText}>더보기 ›</Text>
           </TouchableOpacity>
@@ -212,7 +213,10 @@ export default function HomeScreen() {
 
           <TouchableOpacity
             style={styles.moreBtn}
-            onPress={() => router.push({ pathname: '/(tabs)/explore', params: { tab: 'POST' } })}
+            onPress={() => {
+              trackEvent('home_post_more_click');
+              router.push({ pathname: '/(tabs)/explore', params: { tab: 'POST' } });
+            }}
           >
             <Text style={styles.moreBtnText}>더보기 ›</Text>
           </TouchableOpacity>

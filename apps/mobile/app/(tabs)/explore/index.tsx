@@ -227,7 +227,7 @@ export default function ExploreScreen() {
                     key={contest.contestId}
                     contest={contest}
                     variant="full"
-                    onPress={() => router.push(`/explore/contest/${contest.contestId}` as never)}
+                    onPress={() => router.push(`/explore/contest/${contest.contestId}?source=explore` as never)}
                     onPressHeart={() => toggleContestHeart(contest.contestId)}
                   />
                 ))
