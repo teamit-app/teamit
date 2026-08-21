@@ -287,7 +287,10 @@ export default function ProfileScreen() {
             </View>
             <TouchableOpacity
               style={styles.editBtn}
-              onPress={() => router.push('/(tabs)/profile/edit-basic')}
+              onPress={() => {
+                trackEvent('profile_basic_info_edit_click', { source: 'mypage' });
+                router.push('/(tabs)/profile/edit-basic');
+              }}
             >
               <Text style={styles.editBtnText}>수정</Text>
             </TouchableOpacity>
