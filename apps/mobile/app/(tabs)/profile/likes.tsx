@@ -277,7 +277,7 @@ export default function LikesScreen() {
                   key={contest.contestId}
                   contest={contest}
                   variant="full"
-                  onPress={() => router.push(`/profile/contest/${contest.contestId}` as never)}
+                  onPress={() => router.push(`/profile/contest/${contest.contestId}?source=likes` as never)}
                   onPressHeart={() => removeContestLike(contest.contestId)}
                 />
               ))

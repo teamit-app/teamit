@@ -61,20 +61,3 @@ export function requireAuthForHeart(): boolean {
   ]);
   return false;
 }
-
-// 알림 전용 — 게스트가 종 아이콘을 누르면 로그인을 유도한다.
-export function requireAuthForNotifications(): boolean {
-  const userId = useAuthStore.getState().currentUserId;
-  if (userId) return true;
-  Alert.alert('로그인이 필요해요', '알림을 확인하려면 로그인해주세요', [
-    { text: '취소', style: 'cancel' },
-    {
-      text: '로그인하기',
-      onPress: () => {
-        trackEvent('login_button_click', { source: 'requireAuthForNotifications' });
-        router.push('/(auth)/login' as never);
-      },
-    },
-  ]);
-  return false;
-}

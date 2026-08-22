@@ -66,32 +66,41 @@ export function ContestCard({ contest, variant, onPress, onPressHeart }: Contest
       )}
 
       {variant === 'compact' && (
-        <>
-          <View style={styles.topRow}>
-            <View style={styles.badgeRow}>
-              {contest.isNew && (
-                <View style={styles.newBadge}>
-                  <Text style={styles.newBadgeText}>NEW</Text>
+        <View style={styles.compactRow}>
+          {thumbnailUrl ? (
+            <Image source={{ uri: thumbnailUrl }} style={styles.compactThumbnail} resizeMode="cover" />
+          ) : (
+            <View style={styles.compactThumbnail}>
+              <Text style={styles.compactThumbnailText}>공모전</Text>
+            </View>
+          )}
+          <View style={styles.compactContent}>
+            <View style={styles.topRow}>
+              <View style={styles.badgeRow}>
+                {contest.isNew && (
+                  <View style={styles.newBadge}>
+                    <Text style={styles.newBadgeText}>NEW</Text>
+                  </View>
+                )}
+                <Text style={styles.organizer} numberOfLines={1}>{contest.organizer}</Text>
+              </View>
+              <View style={styles.dDayBadge}>
+                <Text style={styles.dDayText}>{formatDDay(contest.dDay)}</Text>
+              </View>
+            </View>
+
+            <Text style={styles.title} numberOfLines={1}>{contest.title}</Text>
+
+            <View style={styles.bottomRow}>
+              <Text style={styles.deadline}>마감: {formattedDeadline}</Text>
+              {contest.isRegisteredAsParticipant && (
+                <View style={styles.participantBadge}>
+                  <Text style={styles.participantBadgeText}>💌 후보 등록 완료</Text>
                 </View>
               )}
-              <Text style={styles.organizer} numberOfLines={1}>{contest.organizer}</Text>
-            </View>
-            <View style={styles.dDayBadge}>
-              <Text style={styles.dDayText}>{formatDDay(contest.dDay)}</Text>
             </View>
           </View>
-
-          <Text style={styles.title} numberOfLines={1}>{contest.title}</Text>
-
-          <View style={styles.bottomRow}>
-            <Text style={styles.deadline}>마감: {formattedDeadline}</Text>
-            {contest.isRegisteredAsParticipant && (
-              <View style={styles.participantBadge}>
-                <Text style={styles.participantBadgeText}>💌 후보 등록 완료</Text>
-              </View>
-            )}
-          </View>
-        </>
+        </View>
       )}
     </TouchableOpacity>
   );
@@ -124,6 +133,27 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   content: {
+    flex: 1,
+  },
+  compactRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  compactThumbnail: {
+    width: 100,
+    height: 140,
+    borderRadius: 12,
+    backgroundColor: Colors.ogTint,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 14,
+  },
+  compactThumbnailText: {
+    fontSize: 10,
+    color: Colors.grayMedium,
+    textAlign: 'center',
+  },
+  compactContent: {
     flex: 1,
   },
   topRow: {

@@ -87,7 +87,7 @@ export function PostDetailContent({
         style={styles.card}
         activeOpacity={post?.contestId ? 0.7 : 1}
         disabled={!post?.contestId}
-        onPress={() => router.push(`/${sourceTab}/contest/${post?.contestId}` as never)}
+        onPress={() => router.push(`/${sourceTab}/contest/${post?.contestId}?source=post` as never)}
       >
         <Text style={styles.cardLabel}>참가 공모전</Text>
         <View style={styles.contestRow}>

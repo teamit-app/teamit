@@ -192,7 +192,7 @@ export default function ParticipantCardScreen() {
           style={styles.contestInfoCard}
           activeOpacity={0.7}
           onPress={() =>
-            router.push(`/(tabs)/explore/contest/${registration.contestId}` as any)
+            router.push(`/(tabs)/explore/contest/${registration.contestId}?source=my_applications` as any)
           }
         >
           <Text style={styles.contestInfoTitle}>{registration.contestTitle}</Text>

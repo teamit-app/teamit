@@ -31,6 +31,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 @Service
@@ -51,12 +52,14 @@ public class ContestService {
 
     // 비개인화 공개 목록이라 Redis에 캐싱 — 관리자 CRUD(createContest/updateContest/deleteContest)에서
     // 무효화한다. 자주 안 바뀌는 데이터라 TTL(30분)을 길게 둠.
+    // "인기"는 좋아요(하트) 수 기준으로 상위 10개만 뽑는다 — 예전엔 그냥 최신순이라
+    // "인기 공모전"이라는 이름과 실제 정렬 기준이 달랐다.
     @Cacheable(cacheNames = "contestsPopular")
     @Transactional(readOnly = true)
     public PopularContestListResponse getPopularContests() {
         LocalDate today = LocalDate.now();
         List<PopularContestResponse> contests = contestRepository
-                .findByEndDateGreaterThanEqualOrderByCreatedAtDesc(today)
+                .findMostHeartedActiveContests(today, PageRequest.of(0, 10))
                 .stream()
                 .map(PopularContestResponse::from)
                 .collect(Collectors.toList());
@@ -93,8 +96,19 @@ public class ContestService {
         Page<Contest> contestPage = contestRepository.findContestList(
                 categoryStr, statusEndMin, statusEndMax, statusEndBefore, keyword, pageable);
 
+        // 탐색 탭 "인기순" 정렬(explore/index.tsx)이 좋아요 수 기준으로 클라이언트에서
+        // 정렬할 수 있도록, 목록에 있는 공모전들의 좋아요 수를 배치로 한 번에 조회한다
+        List<Long> contestIds = contestPage.getContent().stream()
+                .map(Contest::getId)
+                .collect(Collectors.toList());
+        Map<Long, Long> heartCountByContestId = contestHeartRepository.countGroupedByContestIdIn(contestIds).stream()
+                .collect(Collectors.toMap(
+                        ContestHeartRepository.ContestHeartCountProjection::getContestId,
+                        ContestHeartRepository.ContestHeartCountProjection::getCount));
+
         List<ContestListItemResponse> content = contestPage.getContent().stream()
-                .map(ContestListItemResponse::from)
+                .map(contest -> ContestListItemResponse.from(
+                        contest, heartCountByContestId.getOrDefault(contest.getId(), 0L)))
                 .collect(Collectors.toList());
 
         return ContestPageResponse.builder()

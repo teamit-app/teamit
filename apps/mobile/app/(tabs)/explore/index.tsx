@@ -107,7 +107,8 @@ export default function ExploreScreen() {
   });
 
   const sortedContests = [...filteredContests].sort((a, b) => {
-    if (sortFilter === 'POPULAR') return b.dDay - a.dDay;
+    // 좋아요 많은 순, 동점이면 최신순(홈 화면 "인기 공모전"과 동일한 기준 — ContestService 참고)
+    if (sortFilter === 'POPULAR') return (b.heartCount ?? 0) - (a.heartCount ?? 0);
     return 0;
   });
 
@@ -226,7 +227,7 @@ export default function ExploreScreen() {
                     key={contest.contestId}
                     contest={contest}
                     variant="full"
-                    onPress={() => router.push(`/explore/contest/${contest.contestId}` as never)}
+                    onPress={() => router.push(`/explore/contest/${contest.contestId}?source=explore` as never)}
                     onPressHeart={() => toggleContestHeart(contest.contestId)}
                   />
                 ))

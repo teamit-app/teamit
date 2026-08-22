@@ -32,9 +32,13 @@ const SORT_LABEL: Record<SortOption, string> = {
 
 export default function ContestDetailScreen() {
   const insets = useSafeAreaInsets();
-  const { contestId } = useLocalSearchParams<{ contestId: string }>();
+  const { contestId, source } = useLocalSearchParams<{ contestId: string; source?: string }>();
   const segments = useSegments();
   const sourceTab = (segments[1] as string) ?? 'explore';
+  // 어느 화면에서 진입했는지는 링크를 건 쪽에서 명시적으로 넘겨주는 source 쿼리 파라미터가
+  // 기준이다 — 이 화면 자체는 explore/home/profile/messages 탭에 모두 alias되어 있어서
+  // sourceTab(현재 탭)만으로는 "모집글에서 눌렀는지" 같은 세부 출처를 구분할 수 없다.
+  const contestViewSource = source ?? sourceTab;
   const [sortVisible, setSortVisible] = useState(false);
   const [sortOption, setSortOption] = useState<SortOption>('LATEST');
   const [detail, setDetail] = useState<ContestDetail | null>(null);
@@ -69,6 +73,18 @@ export default function ContestDetailScreen() {
       .then(setIsParticipant)
       .catch(() => {});
   }, [id]);
+
+  // detail.contestId !== id인 동안(다른 공모전에서 넘어오는 과도기)은 아직 이전 공모전의
+  // detail이 남아있는 상태라, 이 조건으로 걸러야 잘못된 category/fields로 잘못 집계되지 않는다.
+  useEffect(() => {
+    if (!detail || detail.contestId !== id) return;
+    trackEvent('contest_view', {
+      source: contestViewSource,
+      contest_id: id,
+      category: detail.category.toLowerCase(),
+      recruit_fields: detail.fields,
+    });
+  }, [detail, id, contestViewSource]);
 
   // 이미지가 바뀌면(다른 공모전으로 이동 등) 이전 비율이 잠깐 남아있지 않도록 초기화
   useEffect(() => {

@@ -46,6 +46,15 @@ public class UserController {
         return ApiResponse.success(null, "프로필이 수정되었습니다");
     }
 
+    @Operation(summary = "약관 재동의", description = "약관이 개정되어 재동의가 필요한(needsTermsReconsent) 기존 가입자 전용.")
+    @PostMapping("/terms-agreement")
+    public ApiResponse<Void> agreeToTermsReconsent(
+            @LoginUser CustomUserDetails userDetails,
+            @RequestBody TermsAgreementRequest request) {
+        userService.agreeToTermsReconsent(userDetails.getUserId(), request);
+        return ApiResponse.success(null, "동의가 저장되었습니다");
+    }
+
     @Operation(summary = "프로필 사진 등록/변경")
     @PostMapping(value = "/me/profile-image", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ApiResponse<Map<String, String>> updateProfileImage(

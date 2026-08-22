@@ -30,4 +30,14 @@ public interface PostCommentRepository extends JpaRepository<PostComment, Long> 
     @Modifying
     @Query("DELETE FROM PostComment c WHERE c.post.id = :postId")
     void deleteAllByPostId(@Param("postId") Long postId);
+
+    // 삭제 대상 댓글(author=X)을 부모로 삼고 있는 다른 댓글의 parent를 먼저 끊는다 —
+    // 대상 범위를 post 단위가 아니라 author 단위로 잡는다는 점만 위 nullifyParentsByPostId와 다르다
+    @Modifying
+    @Query("UPDATE PostComment c SET c.parent = null WHERE c.parent.author.id = :authorId")
+    void nullifyChildrenOfAuthor(@Param("authorId") Long authorId);
+
+    @Modifying
+    @Query("DELETE FROM PostComment c WHERE c.author.id = :authorId")
+    void deleteAllByAuthorId(@Param("authorId") Long authorId);
 }

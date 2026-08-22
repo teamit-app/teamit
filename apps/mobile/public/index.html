@@ -67,6 +67,57 @@
     })();
     </script>
 
+    <!-- 세션 유입 정보(session_entry_*) 캡처 — 위 first_touch_*(최초 1회, 영구 저장)와는
+         별개의 저장소/키를 쓰는 신규 로직이다. 목적: GA4 네이티브 세션 소스/매체는 Expo
+         Router가 GTM 발화보다 먼저 URL을 정리해버려 리퍼러 기반으로 잘못 채워지는 경우가
+         있는데, GA4 예약 필드(campaign_source 등)를 직접 고치는 건 (direct)/(none) 충돌
+         리스크가 커서 채택하지 않는다. 대신 예약어와 겹치지 않는 별도 커스텀 파라미터에
+         진입 시점의 정확한 UTM을 담아 GTM의 GA4 설정 태그 Fields to Set으로 세션 내
+         모든 이벤트에 동일하게 실어보낸다(GA4 기본 리포트는 못 고치고, Looker Studio 등
+         커스텀 리포트용).
+
+         sessionStorage를 쓰므로 "이미 캡처된 값이 있으면 덮어쓰지 않음" 조건으로
+         세션 최초 진입 시 1회만 값을 고정한다 — 같은 세션에서 내부 링크로 다른 페이지로
+         이동해도 최초 진입 값이 세션이 끝날 때까지 유지되어야 하기 때문.
+
+         알려진 한계(별도 보정 없이 감수): sessionStorage의 생명주기(탭/브라우저 종료까지
+         유지)와 GA4의 실제 세션 판정 기준(30분 비활성 시 신규 세션)이 다르다. 즉 30분 이상
+         비활성 후 GA4가 신규 세션으로 판정해도 sessionStorage 값은 그대로 남아있을 수
+         있다 — 나중에 데이터 이상 발생 시 원인 후보로 참고할 것. -->
+    <script>
+    (function() {
+      try {
+        var sessionEntryUtmKeys = ['source', 'medium', 'campaign', 'content', 'term'];
+        var params = new URLSearchParams(window.location.search);
+        var sessionEntryPayload = {};
+        var hasSessionEntryValue = false;
+
+        sessionEntryUtmKeys.forEach(function(key) {
+          var storageKey = 'session_entry_' + key;
+          var urlValue = params.get('utm_' + key);
+
+          if (!sessionStorage.getItem(storageKey) && urlValue) {
+            sessionStorage.setItem(storageKey, urlValue);
+          }
+
+          var storedValue = sessionStorage.getItem(storageKey);
+          if (storedValue) {
+            sessionEntryPayload[storageKey] = storedValue;
+            hasSessionEntryValue = true;
+          }
+        });
+
+        // UTM 없이 진입한 세션(재방문/직접 유입 등)은 캡처된 값이 하나도 없으므로
+        // push 자체를 생략한다 — 빈 문자열로 채우면 "값 없음"과 "미수집"을 구분할 수 없다.
+        if (hasSessionEntryValue) {
+          window.dataLayer = window.dataLayer || [];
+          sessionEntryPayload.event = 'session_entry_ready';
+          window.dataLayer.push(sessionEntryPayload);
+        }
+      } catch (e) {}
+    })();
+    </script>
+
     <!-- Google Tag Manager -->
     <script>(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
     new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],

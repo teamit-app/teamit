@@ -54,7 +54,7 @@ public class DevAuthController {
                     created[0] = true;
                     return userRepository.save(User.builder()
                             .nickname(request.nickname())
-                            .isMatchingActive(false)
+                            .isMatchingActive(true)
                             .build());
                 });
 

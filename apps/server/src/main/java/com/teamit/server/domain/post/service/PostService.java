@@ -789,6 +789,15 @@ public class PostService {
                 .ifPresent(this::deletePostCascade);
     }
 
+    // ──────────────────────────────────────────────────────────────
+    // 회원 탈퇴 시 호출(UserService.withdraw) — 소유한 모집글을 전부 동일한 cascade로 정리
+    // ──────────────────────────────────────────────────────────────
+    @Transactional
+    public void deleteAllPostsByOwner(Long ownerId) {
+        postRepository.findByOwnerIdOrderByCreatedAtDesc(ownerId)
+                .forEach(this::deletePostCascade);
+    }
+
     private void deletePostCascade(Post post) {
         Long postId = post.getId();
         String title = post.getTitle();

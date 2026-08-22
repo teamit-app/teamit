@@ -28,6 +28,7 @@ public class MyProfileResponse {
     @JsonProperty("isMatchingActive")
     private boolean isMatchingActive;
     private boolean needsOnboarding;
+    private boolean needsTermsReconsent;
     private double averageRating;
     private List<MatchingProfileData.RegionInfo> regions;
     private EducationInfo education;
@@ -87,8 +88,8 @@ public class MyProfileResponse {
         }
     }
 
-    public static MyProfileResponse of(User user, boolean needsOnboarding, List<UserRegion> regions,
-                                        Education education, List<UserSkill> skills,
+    public static MyProfileResponse of(User user, boolean needsOnboarding, boolean needsTermsReconsent,
+                                        List<UserRegion> regions, Education education, List<UserSkill> skills,
                                         List<CareerItemResponse> careers, double averageRating) {
         List<MatchingProfileData.RegionInfo> regionInfos = regions.stream()
                 .map(r -> new MatchingProfileData.RegionInfo(r.getSido(), r.getSigungu()))
@@ -107,6 +108,7 @@ public class MyProfileResponse {
                 .profileImageUrl(user.getProfileImageUrl())
                 .isMatchingActive(Boolean.TRUE.equals(user.getIsMatchingActive()))
                 .needsOnboarding(needsOnboarding)
+                .needsTermsReconsent(needsTermsReconsent)
                 .averageRating(averageRating)
                 .regions(regionInfos)
                 .education(education != null ? EducationInfo.from(education) : null)
