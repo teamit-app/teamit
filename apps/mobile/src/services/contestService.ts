@@ -82,16 +82,26 @@ export interface ContestListParams {
   size?: number;
 }
 
-export const getContests = async (params?: ContestListParams): Promise<Contest[]> => {
+export interface ContestPageResult {
+  content: Contest[];
+  currentPage: number;
+  totalPages: number;
+}
+
+export const getContests = async (params?: ContestListParams): Promise<ContestPageResult> => {
   const query = new URLSearchParams();
   if (params?.category) query.set('category', params.category);
   if (params?.status) query.set('status', params.status);
   if (params?.keyword) query.set('keyword', params.keyword);
   query.set('page', String(params?.page ?? 0));
-  query.set('size', String(params?.size ?? 100));
+  query.set('size', String(params?.size ?? 10));
 
   const data = await apiRequest<ContestPageResponse>(`/contests?${query.toString()}`);
-  return data.content.map(adaptContest);
+  return {
+    content: data.content.map(adaptContest),
+    currentPage: data.currentPage,
+    totalPages: data.totalPages,
+  };
 };
 
 export const getPopularContests = async (): Promise<Contest[]> => {
