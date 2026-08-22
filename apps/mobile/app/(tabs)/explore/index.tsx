@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { View, Text, ScrollView, RefreshControl, TouchableOpacity, ActivityIndicator, StyleSheet } from 'react-native';
+import { View, Text, FlatList, RefreshControl, TouchableOpacity, ActivityIndicator, StyleSheet } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { Colors } from '../../../src/constants/colors';
@@ -35,6 +35,9 @@ export default function ExploreScreen() {
   const { tab: tabParam, sort: sortParam } = useLocalSearchParams<{ tab?: string; sort?: string }>();
   const [mainTab, setMainTab] = useState<MainTab>((tabParam as MainTab) || 'POOL');
   const [keyword, setKeyword] = useState('');
+  // 검색어는 서버가 전체 데이터셋에서 필터링해주므로(로드된 페이지 안에서만 찾는 게 아님),
+  // 매 키 입력마다 새 쿼리를 쏘지 않도록 타이핑이 멈춘 뒤(400ms)에만 실제 조회에 반영한다.
+  const [debouncedKeyword, setDebouncedKeyword] = useState('');
   const [sortFilter, setSortFilter] = useState<SortFilter>((sortParam as SortFilter) || 'LATEST');
   const [categoryFilter, setCategoryFilter] = useState<CategoryFilter>('ALL');
   const [categoryModalVisible, setCategoryModalVisible] = useState(false);
@@ -46,11 +49,24 @@ export default function ExploreScreen() {
     if (sortParam === 'LATEST' || sortParam === 'POPULAR') setSortFilter(sortParam);
   }, [sortParam]);
 
-  const { data: talents = [], isLoading: talentsLoading, isFetching: talentsFetching } = useExploreTalents();
-  const { data: contests = [], isLoading: contestsLoading, isFetching: contestsFetching } = useExploreContests();
-  const { data: posts = [], isLoading: postsLoading, isFetching: postsFetching } = useExplorePosts();
-  const isLoading = talentsLoading || contestsLoading || postsLoading;
-  const isRefreshing = talentsFetching || contestsFetching || postsFetching;
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedKeyword(keyword.trim()), 400);
+    return () => clearTimeout(timer);
+  }, [keyword]);
+
+  const talentsQuery = useExploreTalents(debouncedKeyword || undefined);
+  const contestsQuery = useExploreContests(
+    categoryFilter === 'ALL' ? undefined : categoryFilter,
+    debouncedKeyword || undefined,
+  );
+  const postsQuery = useExplorePosts(sortFilter, debouncedKeyword || undefined);
+
+  const talents = talentsQuery.data?.pages.flatMap((p) => p.content) ?? [];
+  const contests = contestsQuery.data?.pages.flatMap((p) => p.content) ?? [];
+  const posts = postsQuery.data?.pages.flatMap((p) => p.content) ?? [];
+
+  const isLoading = talentsQuery.isLoading || contestsQuery.isLoading || postsQuery.isLoading;
+  const isRefreshing = talentsQuery.isFetching || contestsQuery.isFetching || postsQuery.isFetching;
   const currentUserId = useAuthStore((s) => s.currentUserId);
 
   // 세션 내내 캐시되는 목록이라 다른 탭에 갔다가 돌아와도 자동으로는 안 바뀐다 — 탐색 탭
@@ -89,39 +105,14 @@ export default function ExploreScreen() {
     return () => clearTimeout(timer);
   }, [keyword, mainTab]);
 
-  const filteredTalents = talents.filter((talent) =>
-    keyword.trim().length === 0
-      ? true
-      : talent.nickname.includes(keyword) ||
-        talent.skills.some((skill) => skill.skillName.toLowerCase().includes(keyword.toLowerCase())),
-  );
-
-  const filteredContests = contests.filter((contest) => {
-    const matchesKeyword =
-      keyword.trim().length === 0 ||
-      contest.title.includes(keyword) ||
-      contest.organizer.includes(keyword) ||
-      contest.categoryLabel.includes(keyword);
-    const matchesCategory = categoryFilter === 'ALL' || contest.category === categoryFilter;
-    return matchesKeyword && matchesCategory;
-  });
-
-  const sortedContests = [...filteredContests].sort((a, b) => {
-    // 좋아요 많은 순, 동점이면 최신순(홈 화면 "인기 공모전"과 동일한 기준 — ContestService 참고)
+  // 검색어(keyword)/카테고리/모집글 정렬은 전부 서버 쿼리 파라미터로 넘어가서 이미 필터링돼
+  // 오므로 여기서 다시 거를 필요가 없다. 공모전 "인기순"만 서버가 지원하지 않아(항상
+  // 최신순으로만 페이징) 지금까지 로드된 페이지 안에서 좋아요 수 기준으로 클라이언트가
+  // 재정렬한다(홈 화면 "인기 공모전"과 동일한 기준 — ContestService 참고) — 더 불러올수록
+  // 정렬 대상도 늘어난다.
+  const sortedContests = [...contests].sort((a, b) => {
     if (sortFilter === 'POPULAR') return (b.heartCount ?? 0) - (a.heartCount ?? 0);
     return 0;
-  });
-
-  const filteredPosts = posts.filter((post) =>
-    keyword.trim().length === 0
-      ? true
-      : post.title.includes(keyword) ||
-        (post.skills ?? []).some((skill) => skill.toLowerCase().includes(keyword.toLowerCase())),
-  );
-
-  const sortedPosts = [...filteredPosts].sort((a, b) => {
-    if (sortFilter === 'POPULAR') return (b.viewCount ?? 0) - (a.viewCount ?? 0);
-    return 0; // LATEST/ALL은 백엔드가 이미 최신순으로 내려준다
   });
 
   if (isLoading && talents.length === 0 && contests.length === 0 && posts.length === 0) {
@@ -137,6 +128,51 @@ export default function ExploreScreen() {
       </View>
     );
   }
+
+  const header = (
+    <>
+      <SearchBar
+        placeholder={
+          mainTab === 'POOL'
+            ? '이름, 역할, 스킬로 검색'
+            : mainTab === 'CONTEST'
+              ? '공모전 이름, 주최기관, 분야 검색'
+              : '모집글 제목, 스킬로 검색'
+        }
+        value={keyword}
+        onChangeText={setKeyword}
+      />
+
+      {(mainTab === 'CONTEST' || mainTab === 'POST') && (
+        <View style={styles.filterRow}>
+          <FilterPills
+            options={SORT_OPTIONS}
+            value={sortFilter}
+            onChange={(sort) => {
+              trackEvent('explore_filter', { filter_type: 'sort', value: sort.toLowerCase() });
+              setSortFilter(sort);
+            }}
+            trailingLabel={mainTab === 'CONTEST' ? '분야별' : undefined}
+            onPressTrailing={mainTab === 'CONTEST' ? () => setCategoryModalVisible(true) : undefined}
+          />
+        </View>
+      )}
+      <View style={styles.listSpacer} />
+    </>
+  );
+
+  const footerHint = (
+    <Text style={styles.footerHint}>우측 상단 하트에서 좋아요 목록을 확인할 수 있어요</Text>
+  );
+
+  const listFooter = (isFetchingNextPage: boolean) => (
+    <>
+      {isFetchingNextPage && (
+        <ActivityIndicator size="small" color={Colors.primary} style={styles.footerLoading} />
+      )}
+      {footerHint}
+    </>
+  );
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
@@ -171,80 +207,83 @@ export default function ExploreScreen() {
         />
       </View>
 
-      <ScrollView
-        contentContainerStyle={styles.content}
-        showsVerticalScrollIndicator={false}
-        refreshControl={
-          <RefreshControl
-            refreshing={isRefreshing}
-            onRefresh={refetchExploreData}
-            tintColor={Colors.primary}
-          />
-        }
-      >
-        <SearchBar
-          placeholder={
-            mainTab === 'POOL'
-              ? '이름, 역할, 스킬로 검색'
-              : mainTab === 'CONTEST'
-                ? '공모전 이름, 주최기관, 분야 검색'
-                : '모집글 제목, 스킬로 검색'
+      {mainTab === 'POOL' && (
+        <FlatList
+          data={talents}
+          keyExtractor={(talent) => String(talent.userId)}
+          contentContainerStyle={styles.content}
+          showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl refreshing={isRefreshing} onRefresh={refetchExploreData} tintColor={Colors.primary} />
           }
-          value={keyword}
-          onChangeText={setKeyword}
-        />
-
-        {(mainTab === 'CONTEST' || mainTab === 'POST') && (
-          <View style={styles.filterRow}>
-            <FilterPills
-              options={SORT_OPTIONS}
-              value={sortFilter}
-              onChange={(sort) => {
-                trackEvent('explore_filter', { filter_type: 'sort', value: sort.toLowerCase() });
-                setSortFilter(sort);
-              }}
-              trailingLabel={mainTab === 'CONTEST' ? '분야별' : undefined}
-              onPressTrailing={mainTab === 'CONTEST' ? () => setCategoryModalVisible(true) : undefined}
+          ListHeaderComponent={header}
+          ListFooterComponent={listFooter(talentsQuery.isFetchingNextPage)}
+          onEndReachedThreshold={0.5}
+          onEndReached={() => {
+            if (talentsQuery.hasNextPage && !talentsQuery.isFetchingNextPage) talentsQuery.fetchNextPage();
+          }}
+          renderItem={({ item: talent }) => (
+            <TalentCard
+              talent={talent}
+              isMe={talent.userId === currentUserId}
+              onPress={() => router.push(`/explore/talent/${talent.userId}` as never)}
+              onPressHeart={() => toggleTalentHeart(talent.userId, talent.isHearted)}
+              onPressPropose={() => handlePropose(talent.userId)}
             />
-          </View>
-        )}
+          )}
+        />
+      )}
 
-        <View style={styles.list}>
-          {mainTab === 'POOL'
-            ? filteredTalents.map((talent) => (
-                <TalentCard
-                  key={talent.userId}
-                  talent={talent}
-                  isMe={talent.userId === currentUserId}
-                  onPress={() => router.push(`/explore/talent/${talent.userId}` as never)}
-                  onPressHeart={() => toggleTalentHeart(talent.userId, talent.isHearted)}
-                  onPressPropose={() => handlePropose(talent.userId)}
-                />
-              ))
-            : mainTab === 'CONTEST'
-              ? sortedContests.map((contest) => (
-                  <ContestCard
-                    key={contest.contestId}
-                    contest={contest}
-                    variant="full"
-                    onPress={() => router.push(`/explore/contest/${contest.contestId}?source=explore` as never)}
-                    onPressHeart={() => toggleContestHeart(contest.contestId)}
-                  />
-                ))
-              : sortedPosts.map((post) => (
-                  <RecruitPostCard
-                    key={post.postId}
-                    post={adaptToRecruitPost(post)}
-                    showContestBadge
-                    onPress={() => router.push(`/explore/post/${post.postId}` as never)}
-                  />
-                ))}
-        </View>
+      {mainTab === 'CONTEST' && (
+        <FlatList
+          data={sortedContests}
+          keyExtractor={(contest) => String(contest.contestId)}
+          contentContainerStyle={styles.content}
+          showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl refreshing={isRefreshing} onRefresh={refetchExploreData} tintColor={Colors.primary} />
+          }
+          ListHeaderComponent={header}
+          ListFooterComponent={listFooter(contestsQuery.isFetchingNextPage)}
+          onEndReachedThreshold={0.5}
+          onEndReached={() => {
+            if (contestsQuery.hasNextPage && !contestsQuery.isFetchingNextPage) contestsQuery.fetchNextPage();
+          }}
+          renderItem={({ item: contest }) => (
+            <ContestCard
+              contest={contest}
+              variant="full"
+              onPress={() => router.push(`/explore/contest/${contest.contestId}?source=explore` as never)}
+              onPressHeart={() => toggleContestHeart(contest.contestId)}
+            />
+          )}
+        />
+      )}
 
-        <Text style={styles.footerHint}>
-          우측 상단 하트에서 좋아요 목록을 확인할 수 있어요
-        </Text>
-      </ScrollView>
+      {mainTab === 'POST' && (
+        <FlatList
+          data={posts}
+          keyExtractor={(post) => String(post.postId)}
+          contentContainerStyle={styles.content}
+          showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl refreshing={isRefreshing} onRefresh={refetchExploreData} tintColor={Colors.primary} />
+          }
+          ListHeaderComponent={header}
+          ListFooterComponent={listFooter(postsQuery.isFetchingNextPage)}
+          onEndReachedThreshold={0.5}
+          onEndReached={() => {
+            if (postsQuery.hasNextPage && !postsQuery.isFetchingNextPage) postsQuery.fetchNextPage();
+          }}
+          renderItem={({ item: post }) => (
+            <RecruitPostCard
+              post={adaptToRecruitPost(post)}
+              showContestBadge
+              onPress={() => router.push(`/explore/post/${post.postId}` as never)}
+            />
+          )}
+        />
+      )}
 
       <CategoryFilterModal
         visible={categoryModalVisible}
@@ -282,14 +321,17 @@ const styles = StyleSheet.create({
   filterRow: {
     marginTop: 14,
   },
-  list: {
-    marginTop: 16,
+  listSpacer: {
+    height: 16,
   },
   footerHint: {
     fontSize: 12,
     color: Colors.grayLight,
     textAlign: 'center',
     marginTop: 4,
+  },
+  footerLoading: {
+    marginBottom: 12,
   },
   loadingWrap: {
     flex: 1,

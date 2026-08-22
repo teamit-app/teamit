@@ -47,7 +47,8 @@ export default function ContestDetailScreen() {
   // 포스터 실제 가로세로 비율을 구해서 컨테이너에 꽉 차게(레터박스 없이) 보여준다
   const [posterAspectRatio, setPosterAspectRatio] = useState<number | null>(null);
 
-  const { data: contests = [] } = useExploreContests();
+  const { data: contestsData } = useExploreContests();
+  const contests = contestsData?.pages.flatMap((p) => p.content) ?? [];
   const currentUserId = useAuthStore((s) => s.currentUserId);
 
   const id = Number(contestId);

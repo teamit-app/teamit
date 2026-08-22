@@ -107,6 +107,7 @@ export const getMyPosts = async (): Promise<PostListItem[]> => {
 
 export interface PostListParams {
   sort?: 'LATEST' | 'POPULAR';
+  keyword?: string;
   page?: number;
   size?: number;
 }
@@ -121,10 +122,29 @@ interface PostPageResponse {
 export const getPosts = async (params?: PostListParams): Promise<PostListItem[]> => {
   const query = new URLSearchParams();
   query.set('sort', params?.sort ?? 'LATEST');
+  if (params?.keyword) query.set('keyword', params.keyword);
   query.set('page', String(params?.page ?? 0));
   query.set('size', String(params?.size ?? 20));
   const data = await apiRequest<PostPageResponse>(`/posts?${query.toString()}`);
   return data.content;
+};
+
+export interface PostPageResult {
+  content: PostListItem[];
+  currentPage: number;
+  totalPages: number;
+}
+
+// 탐색 탭 무한스크롤 전용 — getPosts와 달리 totalPages/currentPage까지 그대로 반환한다
+// (getPosts는 홈 화면처럼 배열만 필요한 곳에서 계속 쓰이므로 반환 타입을 바꾸지 않는다)
+export const getPostsPage = async (params?: PostListParams): Promise<PostPageResult> => {
+  const query = new URLSearchParams();
+  query.set('sort', params?.sort ?? 'LATEST');
+  if (params?.keyword) query.set('keyword', params.keyword);
+  query.set('page', String(params?.page ?? 0));
+  query.set('size', String(params?.size ?? 10));
+  const data = await apiRequest<PostPageResponse>(`/posts?${query.toString()}`);
+  return { content: data.content, currentPage: data.currentPage, totalPages: data.totalPages };
 };
 
 // PostListItem → RecruitPost 변환
