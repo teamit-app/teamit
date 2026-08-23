@@ -47,11 +47,9 @@ export const logout = async (): Promise<void> => {
 
 /**
  * 회원 탈퇴: 서버에 계정 삭제 요청 후 로컬 토큰 삭제.
+ * 실패 시에는 계정이 그대로 남아있으므로 토큰을 지우지 않고 로그인 상태를 유지한다.
  */
 export const withdraw = async (): Promise<void> => {
-  try {
-    await apiRequest<null>('/auth/withdraw', { method: 'DELETE' });
-  } finally {
-    await tokenStorage.clearTokens();
-  }
+  await apiRequest<null>('/auth/withdraw', { method: 'DELETE' });
+  await tokenStorage.clearTokens();
 };
