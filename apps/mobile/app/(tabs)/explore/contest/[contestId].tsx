@@ -180,7 +180,12 @@ export default function ContestDetailScreen() {
               >
                 <Text style={styles.infoLabel}>{row.label}</Text>
                 {row.isLink ? (
-                  <TouchableOpacity onPress={() => Linking.openURL(row.value)}>
+                  <TouchableOpacity
+                    onPress={() => {
+                      trackEvent('registration_url_click', { contest_id: id });
+                      Linking.openURL(row.value);
+                    }}
+                  >
                     <Text style={[styles.infoValue, styles.infoLink]}>{row.value}</Text>
                   </TouchableOpacity>
                 ) : (

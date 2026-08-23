@@ -149,7 +149,7 @@ export default function ExploreScreen() {
             options={SORT_OPTIONS}
             value={sortFilter}
             onChange={(sort) => {
-              trackEvent('explore_filter', { filter_type: 'sort', value: sort.toLowerCase() });
+              trackEvent('explore_filter', { filter_type: 'sort', item_type: sort.toLowerCase() });
               setSortFilter(sort);
             }}
             trailingLabel={mainTab === 'CONTEST' ? '분야별' : undefined}
@@ -289,7 +289,7 @@ export default function ExploreScreen() {
         visible={categoryModalVisible}
         selectedCategory={categoryFilter}
         onApply={(cat) => {
-          trackEvent('explore_filter', { filter_type: 'category', value: cat.toLowerCase() });
+          trackEvent('explore_filter', { filter_type: 'category', item_type: cat.toLowerCase() });
           setCategoryFilter(cat);
           setCategoryModalVisible(false);
         }}
