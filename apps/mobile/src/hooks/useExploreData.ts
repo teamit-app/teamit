@@ -1,4 +1,4 @@
-import { useInfiniteQuery, InfiniteData } from '@tanstack/react-query';
+import { useInfiniteQuery, InfiniteData, keepPreviousData } from '@tanstack/react-query';
 import { queryClient } from '../lib/queryClient';
 import { Contest, ContestCategory } from '../types/contest';
 import { PoolUser } from '../types/talent';
@@ -102,6 +102,11 @@ export function useExploreContests(category?: ContestCategory, keyword?: string)
     initialPageParam: 0,
     getNextPageParam,
     staleTime: Infinity,
+    // 검색어/카테고리가 바뀌어 쿼리 키가 달라지면 새 쿼리로 취급되어 data가 순간적으로
+    // undefined가 되는데, 그 틈에 explore/index.tsx의 "로딩 중이고 전부 0개" 분기가 걸려
+    // 검색창을 포함한 화면 전체가 스피너로 교체되면서 입력 포커스가 날아간다 — 이전 데이터를
+    // 화면에 유지한 채 백그라운드에서 새로 불러오게 해서 그 틈을 없앤다.
+    placeholderData: keepPreviousData,
   });
 }
 
@@ -112,6 +117,7 @@ export function useExploreTalents(keyword?: string) {
     initialPageParam: 0,
     getNextPageParam,
     staleTime: Infinity,
+    placeholderData: keepPreviousData,
   });
 }
 
@@ -122,6 +128,7 @@ export function useExplorePosts(sort: 'LATEST' | 'POPULAR', keyword?: string) {
     initialPageParam: 0,
     getNextPageParam,
     staleTime: Infinity,
+    placeholderData: keepPreviousData,
   });
 }
 
@@ -143,7 +150,7 @@ export function refetchExploreData() {
 
 // 무한스크롤 도입 후 데이터가 InfiniteData<Page> 형태(pages[].content[])로 바뀌어서,
 // 낙관적 캐시 패치도 모든 페이지를 순회하며 적용해야 한다. prefix 키로 setQueriesData를
-// 쓰면 카테고리/검색어별로 갈라진 쿼리들도 한 번에 같이 갱신된다.
+// 쓰면 카테고리별로 갈라진 공모전 쿼리들도 한 번에 같이 갱신된다.
 function patchContestInAllPages(contestId: number, updater: (c: Contest) => Contest) {
   queryClient.setQueriesData<InfiniteData<ContestPage>>(
     { queryKey: EXPLORE_CONTESTS_BASE_KEY },
