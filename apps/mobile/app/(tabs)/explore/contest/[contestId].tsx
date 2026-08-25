@@ -82,7 +82,7 @@ export default function ContestDetailScreen() {
     trackEvent('contest_view', {
       source: contestViewSource,
       contest_id: id,
-      category: detail.category.toLowerCase(),
+      category: detail.categories.join(',').toLowerCase(),
       recruit_fields: detail.fields,
     });
   }, [detail, id, contestViewSource]);

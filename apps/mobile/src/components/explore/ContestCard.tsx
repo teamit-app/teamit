@@ -45,9 +45,11 @@ export function ContestCard({ contest, variant, onPress, onPressHeart }: Contest
             <Text style={styles.title} numberOfLines={2}>{contest.title}</Text>
 
             <View style={styles.tagRow}>
-              <View style={styles.categoryTag}>
-                <Text style={styles.categoryTagText}>{contest.categoryLabel}</Text>
-              </View>
+              {contest.categoryLabels.map((label) => (
+                <View key={label} style={styles.categoryTag}>
+                  <Text style={styles.categoryTagText}>{label}</Text>
+                </View>
+              ))}
               <View style={styles.dDayBadge}>
                 <Text style={styles.dDayText}>{formatDDay(contest.dDay)}</Text>
               </View>
@@ -195,6 +197,7 @@ const styles = StyleSheet.create({
   },
   tagRow: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     gap: 8,
     marginTop: 10,
   },

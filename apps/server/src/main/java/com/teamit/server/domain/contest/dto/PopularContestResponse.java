@@ -7,6 +7,7 @@ import lombok.Getter;
 
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
+import java.util.Set;
 
 @Getter
 @Builder
@@ -15,7 +16,7 @@ public class PopularContestResponse {
     private Long contestId;
     private String title;
     private String organizer;
-    private ContestCategory category;
+    private Set<ContestCategory> categories;
     private LocalDate endDate;
     private long dDay;
     private String imageUrl;
@@ -26,7 +27,7 @@ public class PopularContestResponse {
                 .contestId(contest.getId())
                 .title(contest.getTitle())
                 .organizer(contest.getOrganizer())
-                .category(contest.getCategory())
+                .categories(contest.getCategories())
                 .endDate(contest.getEndDate())
                 .dDay(dDay)
                 .imageUrl(contest.getImageUrl())

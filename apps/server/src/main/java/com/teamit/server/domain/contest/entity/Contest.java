@@ -7,6 +7,8 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 
 import java.time.LocalDate;
+import java.util.LinkedHashSet;
+import java.util.Set;
 
 @Getter
 @NoArgsConstructor
@@ -28,9 +30,13 @@ public class Contest extends BaseTimeEntity {
     // varchar로 명시하지 않으면 MySQL에서 Hibernate가 네이티브 ENUM(...) 컬럼을 만들어서,
     // 나중에 카테고리를 추가할 때마다 DB 컬럼 자체를 ALTER해야 하는 문제가 있었다(MARKETING
     // 추가 시 재현됨). varchar로 고정해서 이후 카테고리 추가는 코드만 바꾸면 되게 한다.
+    // 공모전 하나가 카테고리를 여러 개 가질 수 있어(예: 디자인+사회·환경) 별도 조인 테이블
+    // (contest_categories)로 저장한다 — DB에 이 테이블을 먼저 만들어야 한다(수동 마이그레이션).
+    @ElementCollection(fetch = FetchType.EAGER)
+    @CollectionTable(name = "contest_categories", joinColumns = @JoinColumn(name = "contest_id"))
     @Enumerated(EnumType.STRING)
     @Column(name = "category", nullable = false, length = 20)
-    private ContestCategory category;
+    private Set<ContestCategory> categories = new LinkedHashSet<>();
 
     @Column(name = "target")
     private String target;
@@ -62,13 +68,13 @@ public class Contest extends BaseTimeEntity {
     private String imageUrl;
 
     @Builder
-    public Contest(String title, String organizer, ContestCategory category,
+    public Contest(String title, String organizer, Set<ContestCategory> categories,
                    String target, String recruitField, String prize,
                    LocalDate startDate, LocalDate endDate, String linkUrl,
                    String content, String imageUrl) {
         this.title = title;
         this.organizer = organizer;
-        this.category = category;
+        this.categories = new LinkedHashSet<>(categories);
         this.target = target;
         this.recruitField = recruitField;
         this.prize = prize;
@@ -79,13 +85,16 @@ public class Contest extends BaseTimeEntity {
         this.imageUrl = imageUrl;
     }
 
-    public void update(String title, String organizer, ContestCategory category,
+    public void update(String title, String organizer, Set<ContestCategory> categories,
                         String target, String recruitField, String prize,
                         LocalDate startDate, LocalDate endDate, String linkUrl,
                         String content, String imageUrl) {
         this.title = title;
         this.organizer = organizer;
-        this.category = category;
+        // 컬렉션 필드는 재할당하지 않고 내용만 교체해야 Hibernate가 조인 테이블 변경을
+        // 정상적으로 dirty-check해서 반영한다.
+        this.categories.clear();
+        this.categories.addAll(categories);
         this.target = target;
         this.recruitField = recruitField;
         this.prize = prize;

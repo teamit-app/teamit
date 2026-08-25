@@ -25,25 +25,13 @@ import {
   AdminContest,
   ContestFormData,
 } from '../../src/services/adminService';
-import { ContestCategory } from '../../src/types/contest';
 import { resolveImageUrl } from '../../src/utils/imageUrl';
-
-const CATEGORIES: ContestCategory[] = ['IT', 'STARTUP', 'DESIGN', 'SOCIAL', 'ENGINEERING', 'ARTS', 'MARKETING', 'ETC'];
-const CATEGORY_LABEL: Record<ContestCategory, string> = {
-  IT: 'IT·개발',
-  STARTUP: '창업·아이디어',
-  DESIGN: '디자인',
-  SOCIAL: '사회혁신',
-  ENGINEERING: '공학',
-  ARTS: '예술',
-  MARKETING: '마케팅',
-  ETC: '기타',
-};
+import { CONTEST_CATEGORY_ORDER, CONTEST_CATEGORY_LABEL } from '../../src/constants/contestCategory';
 
 const EMPTY_FORM: ContestFormData = {
   title: '',
   organizer: '',
-  category: 'IT',
+  categories: [],
   target: '',
   recruitField: '',
   prize: '',
@@ -88,7 +76,7 @@ export default function AdminContestsScreen() {
     setForm({
       title: item.title,
       organizer: item.organizer,
-      category: item.category,
+      categories: item.categories,
       target: item.target ?? '',
       recruitField: item.recruitField ?? '',
       prize: item.prize ?? '',
@@ -131,6 +119,10 @@ export default function AdminContestsScreen() {
   const handleSubmit = async () => {
     if (!form.title.trim() || !form.organizer.trim() || !form.endDate.trim()) {
       Alert.alert('입력 확인', '공모전명, 주최기관, 모집마감일은 필수예요.');
+      return;
+    }
+    if (form.categories.length === 0) {
+      Alert.alert('입력 확인', '카테고리를 1개 이상 선택해주세요.');
       return;
     }
     if (submitting) return;
@@ -201,7 +193,9 @@ export default function AdminContestsScreen() {
               onPress={() => openEdit(item)}
               activeOpacity={0.8}
             >
-              <Text style={s.cardCategory}>{CATEGORY_LABEL[item.category]}</Text>
+              <Text style={s.cardCategory}>
+                {item.categories.map((c) => CONTEST_CATEGORY_LABEL[c]).join(' · ')}
+              </Text>
               <Text style={s.cardTitle}>{item.title}</Text>
               <Text style={s.meta}>{item.organizer} · 마감 {item.endDate} (D{item.dDay >= 0 ? `-${item.dDay}` : `+${-item.dDay}`})</Text>
             </TouchableOpacity>
@@ -216,19 +210,29 @@ export default function AdminContestsScreen() {
             <FormField label="공모전명 *" value={form.title} onChangeText={(v) => setForm((f) => ({ ...f, title: v }))} />
             <FormField label="주최기관 *" value={form.organizer} onChangeText={(v) => setForm((f) => ({ ...f, organizer: v }))} />
 
-            <Text style={s.label}>카테고리 *</Text>
+            <Text style={s.label}>카테고리 * (복수 선택 가능)</Text>
             <View style={s.catRow}>
-              {CATEGORIES.map((cat) => (
-                <TouchableOpacity
-                  key={cat}
-                  style={[s.catChip, form.category === cat && s.catChipActive]}
-                  onPress={() => setForm((f) => ({ ...f, category: cat }))}
-                >
-                  <Text style={[s.catChipText, form.category === cat && s.catChipTextActive]}>
-                    {CATEGORY_LABEL[cat]}
-                  </Text>
-                </TouchableOpacity>
-              ))}
+              {CONTEST_CATEGORY_ORDER.map((cat) => {
+                const active = form.categories.includes(cat);
+                return (
+                  <TouchableOpacity
+                    key={cat}
+                    style={[s.catChip, active && s.catChipActive]}
+                    onPress={() =>
+                      setForm((f) => ({
+                        ...f,
+                        categories: active
+                          ? f.categories.filter((c) => c !== cat)
+                          : [...f.categories, cat],
+                      }))
+                    }
+                  >
+                    <Text style={[s.catChipText, active && s.catChipTextActive]}>
+                      {CONTEST_CATEGORY_LABEL[cat]}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
             </View>
 
             <FormField label="모집 대상" value={form.target ?? ''} onChangeText={(v) => setForm((f) => ({ ...f, target: v }))} />

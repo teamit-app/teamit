@@ -51,7 +51,7 @@ export interface AdminContest {
   contestId: number;
   title: string;
   organizer: string;
-  category: ContestCategory;
+  categories: ContestCategory[];
   target?: string;
   recruitField?: string;
   prize?: string;
@@ -66,7 +66,7 @@ export interface AdminContest {
 export interface ContestFormData {
   title: string;
   organizer: string;
-  category: ContestCategory;
+  categories: ContestCategory[];
   target?: string;
   recruitField?: string;
   prize?: string;
