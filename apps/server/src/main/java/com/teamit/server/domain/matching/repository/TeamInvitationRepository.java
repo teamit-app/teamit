@@ -17,4 +17,8 @@ public interface TeamInvitationRepository extends JpaRepository<TeamInvitation, 
     @Modifying
     @Query("DELETE FROM TeamInvitation i WHERE i.post.id = :postId")
     void deleteAllByPostId(@Param("postId") Long postId);
+
+    @Modifying
+    @Query("DELETE FROM TeamInvitation i WHERE i.sender.id = :userId OR i.receiver.id = :userId")
+    void deleteAllBySenderIdOrReceiverId(@Param("userId") Long userId);
 }

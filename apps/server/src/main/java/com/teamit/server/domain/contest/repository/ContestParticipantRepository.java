@@ -4,6 +4,7 @@ import com.teamit.server.domain.contest.entity.ContestParticipant;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -28,6 +29,10 @@ public interface ContestParticipantRepository extends JpaRepository<ContestParti
     long countByContestIdAndUserIdNot(Long contestId, Long userId);
 
     void deleteByContestIdAndUserId(Long contestId, Long userId);
+
+    @Modifying
+    @Query("DELETE FROM ContestParticipant cp WHERE cp.user.id = :userId")
+    void deleteAllByUserId(@Param("userId") Long userId);
 
     @Query("SELECT cp FROM ContestParticipant cp WHERE cp.contest.id = :contestId AND cp.user.id <> :excludeUserId")
     List<ContestParticipant> findCandidates(@Param("contestId") Long contestId, @Param("excludeUserId") Long excludeUserId);

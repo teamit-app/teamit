@@ -13,10 +13,11 @@ import { router, useLocalSearchParams, useSegments } from 'expo-router';
 import { Colors } from '../../../../src/constants/colors';
 import { ScreenHeader } from '../../../../src/components/common/ScreenHeader';
 import { SortBottomSheet } from '../../../../src/components/explore/SortBottomSheet';
+import { RecruitPostCard } from '../../../../src/components/explore/RecruitPostCard';
 import { useExploreContests, toggleContestHeart } from '../../../../src/hooks/useExploreData';
 import { useAuthStore } from '../../../../src/store/useAuthStore';
 import { getContestDetail, checkIsParticipant } from '../../../../src/services/contestService';
-import { getPostsByContest, PostListItem } from '../../../../src/services/postService';
+import { getPostsByContest, adaptToRecruitPost } from '../../../../src/services/postService';
 import { SortOption, RecruitPost, ContestDetail } from '../../../../src/types/contest';
 import { formatDDay } from '../../../../src/utils/dday';
 import { withAuth } from '../../../../src/utils/authGuard';
@@ -29,107 +30,15 @@ const SORT_LABEL: Record<SortOption, string> = {
   DEADLINE: '마감임박순',
 };
 
-const normalizeMeetingType = (type: string) => {
-  if (type === 'MIXED' || type.includes('혼합')) return '온오프라인혼합';
-  if (type === 'OFFLINE' || type.includes('오프라인')) return '오프라인';
-  return '온라인';
-};
-
-const isOfflineOrMixed = (type: string) =>
-  type === 'OFFLINE' || type === 'MIXED' || type.includes('오프라인') || type.includes('혼합');
-
-const genderLabel = (recruiterGender?: string, genderCondition?: string) => {
-  const genderText = recruiterGender === 'MALE' ? '남성' : recruiterGender === 'FEMALE' ? '여성' : '';
-  const conditionText = genderCondition === 'SAME' ? '동성만' : '성별 무관';
-  return [genderText, conditionText].filter(Boolean).join(' · ');
-};
-
-function RecruitPostCard({ post, onPress }: { post: RecruitPost; onPress: () => void }) {
-  const meetingStr = `${normalizeMeetingType(post.meetingType)}${
-    post.location && isOfflineOrMixed(post.meetingType) ? `·${post.location}` : ''
-  }`;
-  // currentMembers는 모집자 본인을 포함한 실제 팀원 수 — 모집자를 제외한 모집된 인원만 표시
-  const recruitedCount = Math.max(post.currentMembers - 1, 0);
-
-  const isClosed = post.status === 'CLOSED';
-
-  return (
-    <TouchableOpacity style={postStyles.card} onPress={onPress} activeOpacity={0.85}>
-      <View style={postStyles.topRow}>
-        <View style={postStyles.topRowLeft}>
-          <Text style={postStyles.views}>조회 {post.views}</Text>
-          {isClosed && (
-            <View style={postStyles.closedBadge}>
-              <Text style={postStyles.closedBadgeText}>마감</Text>
-            </View>
-          )}
-        </View>
-        <Text style={postStyles.date}>{post.createdAt}</Text>
-      </View>
-      <Text style={postStyles.title}>{post.title}</Text>
-      <View style={postStyles.skillRow}>
-        {post.skills.slice(0, 3).map((skill) => (
-          <View key={skill} style={postStyles.skillTag}>
-            <Text style={postStyles.skillText}>{skill}</Text>
-          </View>
-        ))}
-        {post.skills.length > 3 && (
-          <View style={postStyles.skillTag}>
-            <Text style={postStyles.skillText}>+{post.skills.length - 3}</Text>
-          </View>
-        )}
-      </View>
-      <View style={postStyles.metaRow}>
-        <Text style={postStyles.metaText}>{post.experienceCondition}</Text>
-        <Text style={postStyles.metaDot}> · </Text>
-        <Text style={postStyles.metaText}>{meetingStr}</Text>
-        <Text style={postStyles.metaDot}> · </Text>
-        <Text style={postStyles.metaText}>{genderLabel(post.recruiterGender, post.genderCondition)}</Text>
-      </View>
-      <View style={postStyles.bottomRow}>
-        <Text style={postStyles.memberCount}>
-          현재 모집된 팀원 {recruitedCount}/{post.totalMembers}명
-        </Text>
-        <View style={postStyles.statsRow}>
-          <Text style={postStyles.stat}>💬 {post.chatCount}</Text>
-          <Text style={postStyles.stat}>♥ {post.likeCount}</Text>
-        </View>
-      </View>
-    </TouchableOpacity>
-  );
-}
-
-// PostListItem → RecruitPost 변환
-function adaptToRecruitPost(p: PostListItem): RecruitPost {
-  return {
-    postId: p.postId,
-    contestId: p.contestId ?? 0,
-    title: p.title,
-    createdAt: p.createdAt ?? '',
-    views: p.viewCount ?? 0,
-    chatCount: p.commentCount ?? 0,
-    likeCount: p.likeCount ?? 0,
-    skills: p.skills ?? [],
-    experienceCondition: p.experienceCondition ?? '',
-    meetingType: p.onlineOffline ?? '',
-    location: p.region ?? '',
-    // 매칭 프로필 전용 개념이라 모집글에는 해당 데이터가 없음
-    intensity: '',
-    genderCondition: p.genderCondition,
-    recruiterGender: p.recruiterGender,
-    currentMembers: p.currentMembers ?? 1,
-    totalMembers: p.recruitCount ?? 0,
-    isHearted: false,
-    ownerUserId: p.ownerUserId,
-    status: p.status,
-  };
-}
-
 export default function ContestDetailScreen() {
   const insets = useSafeAreaInsets();
-  const { contestId } = useLocalSearchParams<{ contestId: string }>();
+  const { contestId, source } = useLocalSearchParams<{ contestId: string; source?: string }>();
   const segments = useSegments();
   const sourceTab = (segments[1] as string) ?? 'explore';
+  // 어느 화면에서 진입했는지는 링크를 건 쪽에서 명시적으로 넘겨주는 source 쿼리 파라미터가
+  // 기준이다 — 이 화면 자체는 explore/home/profile/messages 탭에 모두 alias되어 있어서
+  // sourceTab(현재 탭)만으로는 "모집글에서 눌렀는지" 같은 세부 출처를 구분할 수 없다.
+  const contestViewSource = source ?? sourceTab;
   const [sortVisible, setSortVisible] = useState(false);
   const [sortOption, setSortOption] = useState<SortOption>('LATEST');
   const [detail, setDetail] = useState<ContestDetail | null>(null);
@@ -138,7 +47,8 @@ export default function ContestDetailScreen() {
   // 포스터 실제 가로세로 비율을 구해서 컨테이너에 꽉 차게(레터박스 없이) 보여준다
   const [posterAspectRatio, setPosterAspectRatio] = useState<number | null>(null);
 
-  const { data: contests = [] } = useExploreContests();
+  const { data: contestsData } = useExploreContests();
+  const contests = contestsData?.pages.flatMap((p) => p.content) ?? [];
   const currentUserId = useAuthStore((s) => s.currentUserId);
 
   const id = Number(contestId);
@@ -164,6 +74,18 @@ export default function ContestDetailScreen() {
       .then(setIsParticipant)
       .catch(() => {});
   }, [id]);
+
+  // detail.contestId !== id인 동안(다른 공모전에서 넘어오는 과도기)은 아직 이전 공모전의
+  // detail이 남아있는 상태라, 이 조건으로 걸러야 잘못된 category/fields로 잘못 집계되지 않는다.
+  useEffect(() => {
+    if (!detail || detail.contestId !== id) return;
+    trackEvent('contest_view', {
+      source: contestViewSource,
+      contest_id: id,
+      category: detail.categories.join(',').toLowerCase(),
+      recruit_fields: detail.fields,
+    });
+  }, [detail, id, contestViewSource]);
 
   // 이미지가 바뀌면(다른 공모전으로 이동 등) 이전 비율이 잠깐 남아있지 않도록 초기화
   useEffect(() => {
@@ -258,7 +180,12 @@ export default function ContestDetailScreen() {
               >
                 <Text style={styles.infoLabel}>{row.label}</Text>
                 {row.isLink ? (
-                  <TouchableOpacity onPress={() => Linking.openURL(row.value)}>
+                  <TouchableOpacity
+                    onPress={() => {
+                      trackEvent('registration_url_click', { contest_id: id });
+                      Linking.openURL(row.value);
+                    }}
+                  >
                     <Text style={[styles.infoValue, styles.infoLink]}>{row.value}</Text>
                   </TouchableOpacity>
                 ) : (
@@ -390,17 +317,17 @@ export default function ContestDetailScreen() {
 
           {myPost && (
             <TouchableOpacity
-              style={postStyles.myPostCard}
+              style={myPostStyles.myPostCard}
               activeOpacity={0.85}
               onPress={() => router.push(`/${sourceTab}/post/${myPost.postId}?contestId=${id}` as never)}
             >
-              <View style={postStyles.myPostBadgeRow}>
-                <View style={postStyles.myPostBadge}>
-                  <Text style={postStyles.myPostBadgeText}>내가 올린 모집글</Text>
+              <View style={myPostStyles.myPostBadgeRow}>
+                <View style={myPostStyles.myPostBadge}>
+                  <Text style={myPostStyles.myPostBadgeText}>내가 올린 모집글</Text>
                 </View>
               </View>
-              <Text style={postStyles.title}>{myPost.title}</Text>
-              <Text style={postStyles.memberCount}>
+              <Text style={myPostStyles.title}>{myPost.title}</Text>
+              <Text style={myPostStyles.memberCount}>
                 현재 모집된 팀원 {Math.max(myPost.currentMembers - 1, 0)}/{myPost.totalMembers}명
               </Text>
             </TouchableOpacity>
@@ -732,7 +659,7 @@ const styles = StyleSheet.create({
   },
 });
 
-const postStyles = StyleSheet.create({
+const myPostStyles = StyleSheet.create({
   myPostCard: {
     backgroundColor: Colors.ogTint,
     borderRadius: 14,
@@ -756,62 +683,11 @@ const postStyles = StyleSheet.create({
     fontWeight: '700',
     color: Colors.white,
   },
-  card: {
-    backgroundColor: Colors.white,
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: '#EEEEEE',
-    padding: 14,
-    marginBottom: 10,
-  },
-  topRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 6,
-  },
-  topRowLeft: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  views: { fontSize: 12, color: Colors.grayMedium },
-  date:  { fontSize: 12, color: Colors.grayMedium },
-  closedBadge: {
-    backgroundColor: Colors.lightGray,
-    borderRadius: 8,
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-  },
-  closedBadgeText: { fontSize: 11, fontWeight: '700', color: Colors.grayMedium },
   title: {
     fontSize: 15,
     fontWeight: '700',
     color: Colors.dark,
     marginBottom: 10,
   },
-  skillRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 6,
-    marginBottom: 8,
-  },
-  skillTag: {
-    backgroundColor: Colors.ogTint,
-    borderRadius: 999,
-    paddingHorizontal: 11,
-    paddingVertical: 5,
-  },
-  skillText: { fontSize: 12, color: Colors.primary, fontWeight: '600' },
-  metaRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    alignItems: 'center',
-    marginBottom: 10,
-  },
-  metaText: { fontSize: 12, color: Colors.grayMedium },
-  metaDot:  { fontSize: 12, color: Colors.grayMedium },
-  bottomRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
   memberCount: { fontSize: 12, color: Colors.gray, fontWeight: '500' },
-  statsRow: { flexDirection: 'row', gap: 10 },
-  stat: { fontSize: 12, color: Colors.grayMedium },
 });

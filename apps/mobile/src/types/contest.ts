@@ -16,8 +16,8 @@ export interface Contest {
   contestId: number;
   title: string;
   organizer: string;
-  category: ContestCategory;
-  categoryLabel: string;
+  categories: ContestCategory[];
+  categoryLabels: string[];
   status: ContestStatus;
   endDate: string;
   dDay: number;
@@ -25,6 +25,7 @@ export interface Contest {
   isHearted: boolean;
   isRegisteredAsParticipant: boolean;
   imageUrl?: string;
+  heartCount?: number;
 }
 
 export interface ContestDetail extends Contest {
@@ -77,6 +78,7 @@ export interface RecruitPost {
   isHearted: boolean;
   ownerUserId?: number;
   status?: string;
+  contestTitle?: string;
 }
 
 export interface RecruitPostDetail extends RecruitPost {

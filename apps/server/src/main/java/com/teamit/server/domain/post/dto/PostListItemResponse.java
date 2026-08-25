@@ -1,6 +1,7 @@
 package com.teamit.server.domain.post.dto;
 
 import com.teamit.server.domain.post.entity.Post;
+import com.teamit.server.domain.user.entity.User;
 import lombok.Builder;
 import lombok.Getter;
 
@@ -33,8 +34,8 @@ public class PostListItemResponse {
     private Integer applicantCount;
     private String contestTitle;
 
-    public static PostListItemResponse from(Post post, int currentMembers, List<String> skills, String region,
-                                              long likeCount, long commentCount, long applicantCount,
+    public static PostListItemResponse from(Post post, User owner, int currentMembers, List<String> skills,
+                                              String region, long likeCount, long commentCount, long applicantCount,
                                               String contestTitle, String effectiveStatus) {
         return PostListItemResponse.builder()
                 .postId(post.getId())
@@ -49,7 +50,7 @@ public class PostListItemResponse {
                 .onlineOffline(post.getOnlineOffline())
                 .genderCondition(post.getGenderCondition())
                 .experienceCondition(post.getExperienceCondition())
-                .recruiterGender(post.getOwner().getGender() != null ? post.getOwner().getGender().name() : null)
+                .recruiterGender(owner.getGender() != null ? owner.getGender().name() : null)
                 .skills(skills)
                 .region(region)
                 .createdAt(post.getCreatedAt() != null

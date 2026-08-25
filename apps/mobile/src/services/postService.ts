@@ -1,5 +1,5 @@
 import { apiRequest } from './api';
-import { PostComment, RecruitPostDetail } from '../types/contest';
+import { PostComment, RecruitPost, RecruitPostDetail } from '../types/contest';
 
 export interface CreatePostRequest {
   title: string;
@@ -104,6 +104,77 @@ export const getPostsByContest = async (contestId: number): Promise<PostListItem
 export const getMyPosts = async (): Promise<PostListItem[]> => {
   return apiRequest<PostListItem[]>('/users/posts');
 };
+
+export interface PostListParams {
+  sort?: 'LATEST' | 'POPULAR';
+  keyword?: string;
+  page?: number;
+  size?: number;
+}
+
+interface PostPageResponse {
+  content: PostListItem[];
+  totalElements: number;
+  totalPages: number;
+  currentPage: number;
+}
+
+export const getPosts = async (params?: PostListParams): Promise<PostListItem[]> => {
+  const query = new URLSearchParams();
+  query.set('sort', params?.sort ?? 'LATEST');
+  if (params?.keyword) query.set('keyword', params.keyword);
+  query.set('page', String(params?.page ?? 0));
+  query.set('size', String(params?.size ?? 20));
+  const data = await apiRequest<PostPageResponse>(`/posts?${query.toString()}`);
+  return data.content;
+};
+
+export interface PostPageResult {
+  content: PostListItem[];
+  currentPage: number;
+  totalPages: number;
+}
+
+// 탐색 탭 무한스크롤 전용 — getPosts와 달리 totalPages/currentPage까지 그대로 반환한다
+// (getPosts는 홈 화면처럼 배열만 필요한 곳에서 계속 쓰이므로 반환 타입을 바꾸지 않는다)
+export const getPostsPage = async (params?: PostListParams): Promise<PostPageResult> => {
+  const query = new URLSearchParams();
+  query.set('sort', params?.sort ?? 'LATEST');
+  if (params?.keyword) query.set('keyword', params.keyword);
+  query.set('page', String(params?.page ?? 0));
+  query.set('size', String(params?.size ?? 10));
+  const data = await apiRequest<PostPageResponse>(`/posts?${query.toString()}`);
+  return { content: data.content, currentPage: data.currentPage, totalPages: data.totalPages };
+};
+
+// PostListItem → RecruitPost 변환
+// 모집글 목록을 카드로 보여주는 화면(홈 모집글 섹션, 탐색 모집글 탭, 공모전 상세)은
+// 전부 이 함수를 통해서만 변환해야 함 — 각자 따로 매핑하면 필드 누락으로 화면끼리 어긋남
+export function adaptToRecruitPost(p: PostListItem): RecruitPost {
+  return {
+    postId: p.postId,
+    contestId: p.contestId ?? 0,
+    title: p.title,
+    createdAt: p.createdAt ?? '',
+    views: p.viewCount ?? 0,
+    chatCount: p.commentCount ?? 0,
+    likeCount: p.likeCount ?? 0,
+    skills: p.skills ?? [],
+    experienceCondition: p.experienceCondition ?? '',
+    meetingType: p.onlineOffline ?? '',
+    location: p.region ?? '',
+    // 매칭 프로필 전용 개념이라 모집글에는 해당 데이터가 없음
+    intensity: '',
+    genderCondition: p.genderCondition,
+    recruiterGender: p.recruiterGender,
+    currentMembers: p.currentMembers ?? 1,
+    totalMembers: p.recruitCount ?? 0,
+    isHearted: false,
+    ownerUserId: p.ownerUserId,
+    status: p.status,
+    contestTitle: p.contestTitle,
+  };
+}
 
 export const getPostDetail = async (postId: number): Promise<PostDetail> => {
   return apiRequest<PostDetail>(`/posts/${postId}`);

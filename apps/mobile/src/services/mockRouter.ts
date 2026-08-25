@@ -25,6 +25,7 @@ import {
   dummyPostApplicants,
   dummyLikedPosts,
 } from '../data/mypage';
+import { tokenStorage } from './tokenStorage';
 
 // 공모전 후보 등록 mock 상태 — 앱 재시작/리로드 시 초기화되는 인메모리 저장소
 const mockParticipantContestIds = new Set<number>();
@@ -41,30 +42,85 @@ const normalizeMeetingTypeForMock = (type: string): string => {
   return 'ONLINE';
 };
 
+// dummyRecruitPosts 원소 → PostListItem(BE 응답 shape) 변환. 내 모집글 목록(/users/posts)과
+// 전체 모집글 목록(GET /posts) 양쪽에서 공유한다.
+const mapRecruitPostToListItem = (p: (typeof dummyRecruitPosts)[number]) => ({
+  postId: p.postId,
+  contestId: p.contestId,
+  chatRoomId: null,
+  title: p.title,
+  description: null,
+  status: 'OPEN',
+  recruitCount: p.totalMembers,
+  deadline: null,
+  onlineOffline: normalizeMeetingTypeForMock(p.meetingType),
+  genderCondition: 'ANY',
+  experienceCondition: p.experienceCondition,
+  purposeCondition: p.purposeCondition,
+  recruiterGender: 'FEMALE',
+  skills: p.skills,
+  region: p.location || null,
+  createdAt: p.createdAt,
+  currentMembers: p.currentMembers,
+  ownerUserId: null,
+  viewCount: p.views,
+  likeCount: p.likeCount + (mockHeartedPostIds.has(p.postId) ? 1 : 0),
+  commentCount: p.chatCount,
+  applicantCount: Math.max(p.currentMembers - 1, 0),
+  contestTitle: dummyContests.find((c) => c.contestId === p.contestId)?.title ?? null,
+});
+
+// 탐색 탭 무한스크롤용 — page/size 쿼리를 실제로 반영해 content를 잘라준다.
+function paginateMock<T>(items: T[], query: URLSearchParams) {
+  const page = Number(query.get('page') ?? '0');
+  const size = Number(query.get('size') ?? '10');
+  const start = page * size;
+  return {
+    content: items.slice(start, start + size),
+    totalElements: items.length,
+    totalPages: Math.max(1, Math.ceil(items.length / size)),
+    currentPage: page,
+  };
+}
+
+// 검색어는 실제 서버처럼 전체 목록에서 필터링한 뒤 페이징한다(로드된 페이지 안에서만 찾는 게
+// 아님) — mock 모드에서도 실제 API와 동작이 같아야 하므로.
+function filterByKeywordMock<T>(items: T[], query: URLSearchParams, matches: (item: T, lowerKeyword: string) => boolean) {
+  const keyword = query.get('keyword')?.trim().toLowerCase();
+  if (!keyword) return items;
+  return items.filter((item) => matches(item, keyword));
+}
+
 // ─── 정적 라우트: 정확한 경로 일치 ───────────────────────────────────────────
 
-const staticRoutes: Record<string, () => unknown> = {
-  // 인재풀 목록 (GET /users?...) — 쿼리스트링은 strip 후 매칭
-  '/users': () => ({
-    content: dummyTalents.map(({ isHearted: _h, ...rest }) => rest),
-    totalElements: dummyTalents.length,
-    totalPages: 1,
-    currentPage: 0,
-  }),
+const staticRoutes: Record<string, (query: URLSearchParams) => unknown> = {
+  // 인재풀 목록 (GET /users?...)
+  '/users': (query) => {
+    const talents = dummyTalents.map(({ isHearted: _h, ...rest }) => rest);
+    const filtered = filterByKeywordMock(talents, query, (t, kw) =>
+      t.nickname.toLowerCase().includes(kw) || t.skills.some((s) => s.skillName.toLowerCase().includes(kw)),
+    );
+    return paginateMock(filtered, query);
+  },
 
   // 공모전 목록 (GET /contests?...)
-  '/contests': () => ({
-    content: dummyContests.map(({ isHearted: _h, categoryLabel: _l, status: _s, ...rest }) => rest),
-    totalElements: dummyContests.length,
-    totalPages: 1,
-    currentPage: 0,
-  }),
+  '/contests': (query) => {
+    const contests = dummyContests.map(({ isHearted: _h, categoryLabels: _l, status: _s, ...rest }) => rest);
+    const category = query.get('category');
+    const byCategory = category
+      ? contests.filter((c) => (c.categories as string[]).includes(category))
+      : contests;
+    const filtered = filterByKeywordMock(byCategory, query, (c, kw) =>
+      c.title.toLowerCase().includes(kw) || c.organizer.toLowerCase().includes(kw),
+    );
+    return paginateMock(filtered, query);
+  },
 
   // 홈 — 인기 공모전 (GET /contests/popular) — 백엔드 응답 포맷 { contests: [...] }
   '/contests/popular': () => ({
     contests: dummyContests
       .slice(0, 3)
-      .map(({ isHearted: _h, categoryLabel: _l, status: _s, ...rest }) => rest),
+      .map(({ isHearted: _h, categoryLabels: _l, status: _s, ...rest }) => rest),
   }),
 
   // GET /users/notifications — @LoginUser 방식 (userId 없는 경로)
@@ -147,15 +203,6 @@ const staticRoutes: Record<string, () => unknown> = {
       })),
   }),
 
-  // POST /posts — 모집글 생성
-  '/posts': () => ({
-    postId: Math.floor(Math.random() * 1000) + 100,
-    chatRoomId: Math.floor(Math.random() * 1000) + 100,
-    title: 'mock 모집글',
-    status: 'OPEN',
-    recruitCount: 4,
-  }),
-
   // POST /users/chat-rooms/direct — @LoginUser 방식
   '/users/chat-rooms/direct': () => {
     const directRoom = dummyChatRooms.find((r) => r.type === 'direct');
@@ -172,39 +219,23 @@ const staticRoutes: Record<string, () => unknown> = {
   '/auth/withdraw': () => null,
 
   // ─── 마이페이지 ─────────────────────────────────────────────────────────────
-  '/users/me': () => dummyMyProfile,
+  // mock 모드는 로그인해도 실제 서버 토큰이 없어서, 로그인 여부를 tokenStorage의
+  // mock 토큰 존재 여부로 판단한다(login.tsx의 IS_MOCK 분기에서 심어둠). 그래야
+  // 로그아웃(authService.logout이 항상 tokenStorage를 비움) 후 새로고침/다른 탭
+  // 방문 같은 재조회가 일어나도 다시 로그인된 것처럼 보이지 않는다.
+  '/users/me': async () => {
+    const token = await tokenStorage.getAccessToken();
+    if (!token) throw new Error('[MOCK] 로그인이 필요합니다');
+    return dummyMyProfile;
+  },
+  '/users/terms-agreement': () => null,
   '/users/matching-profile': () => dummyMatchingProfile,
   '/users/matching-profile/latest-submission': () => dummyMatchingProfile,
   '/users/matching-status': () => null,
   '/users/contest-registrations': () => dummyContestRegistrations,
   '/users/my-applications': () => dummyPostApplications,
   '/users/liked-posts': () => dummyLikedPosts,
-  '/users/posts': () =>
-    dummyRecruitPosts.map((p) => ({
-      postId: p.postId,
-      contestId: p.contestId,
-      chatRoomId: null,
-      title: p.title,
-      description: null,
-      status: 'OPEN',
-      recruitCount: p.totalMembers,
-      deadline: null,
-      onlineOffline: normalizeMeetingTypeForMock(p.meetingType),
-      genderCondition: 'ANY',
-      experienceCondition: p.experienceCondition,
-      purposeCondition: p.purposeCondition,
-      recruiterGender: 'FEMALE',
-      skills: p.skills,
-      region: p.location || null,
-      createdAt: p.createdAt,
-      currentMembers: p.currentMembers,
-      ownerUserId: null,
-      viewCount: p.views,
-      likeCount: p.likeCount + (mockHeartedPostIds.has(p.postId) ? 1 : 0),
-      commentCount: p.chatCount,
-      applicantCount: Math.max(p.currentMembers - 1, 0),
-      contestTitle: dummyContests.find((c) => c.contestId === p.contestId)?.title ?? null,
-    })),
+  '/users/posts': () => dummyRecruitPosts.map(mapRecruitPostToListItem),
   '/users/careers/contests': () => ({
     careerItemId: Date.now(),
     careerType: 'CONTEST',
@@ -255,7 +286,9 @@ const staticRoutes: Record<string, () => unknown> = {
 // ─── 동적 라우트: 경로 파라미터 포함 ──────────────────────────────────────────
 // ※ 순서 중요 — 더 구체적인 패턴이 앞에 와야 함
 
-const dynamicRoutes: Array<[RegExp, (path: string, method: string, body?: unknown) => unknown]> = [
+const dynamicRoutes: Array<
+  [RegExp, (path: string, method: string, body?: unknown, query?: URLSearchParams) => unknown]
+> = [
   // GET/PATCH /users/notification-settings
   [
     /^\/users\/notification-settings$/,
@@ -287,7 +320,7 @@ const dynamicRoutes: Array<[RegExp, (path: string, method: string, body?: unknow
           contestId: detail.contestId,
           title: detail.title,
           organizer: detail.organizer,
-          category: detail.category,
+          categories: detail.categories,
           target: detail.targetAudience,
           recruitField: detail.fields,
           prize: detail.prizeScale,
@@ -413,8 +446,27 @@ const dynamicRoutes: Array<[RegExp, (path: string, method: string, body?: unknow
   // POST /users/contest-hearts/{contestId}, DELETE /users/contest-hearts/{contestId}
   [/^\/users\/contest-hearts\/\d+$/, () => null],
 
-  // POST /posts — 모집글 생성
-  [/^\/posts$/, () => ({ postId: Date.now(), title: '팀원을 모집합니다', status: 'OPEN' })],
+  // GET /posts — 전체 모집글 목록 (홈 모집글 섹션 + 탐색 모집글 탭 공용) / POST /posts — 모집글 생성
+  [
+    /^\/posts$/,
+    (path, method, _body, query) => {
+      if (method === 'POST') {
+        return {
+          postId: Math.floor(Math.random() * 1000) + 100,
+          chatRoomId: Math.floor(Math.random() * 1000) + 100,
+          title: 'mock 모집글',
+          status: 'OPEN',
+          recruitCount: 4,
+        };
+      }
+      const q = query ?? new URLSearchParams();
+      const posts = dummyRecruitPosts.map(mapRecruitPostToListItem);
+      const filtered = filterByKeywordMock(posts, q, (p, kw) =>
+        p.title.toLowerCase().includes(kw) || (p.skills ?? []).some((s) => s.toLowerCase().includes(kw)),
+      );
+      return paginateMock(filtered, q);
+    },
+  ],
 
   // POST /posts/{postId}/applications — 지원하기
   [/^\/posts\/\d+\/applications$/, () => ({ applicationId: Date.now(), status: 'PENDING', chatRoomId: 5 })],
@@ -643,19 +695,20 @@ const dynamicRoutes: Array<[RegExp, (path: string, method: string, body?: unknow
  * 새 API를 추가할 때는 staticRoutes 또는 dynamicRoutes에만 항목을 추가하세요.
  */
 export function getMockResponse<T>(endpoint: string, method: string = 'GET', body?: unknown): Promise<T> {
-  const path = endpoint.split('?')[0];
+  const [path, queryString] = endpoint.split('?');
+  const query = new URLSearchParams(queryString ?? '');
 
   // 1. 정적 라우트 우선 탐색
   const staticHandler = staticRoutes[path];
   if (staticHandler) {
-    return Promise.resolve(staticHandler() as T);
+    return Promise.resolve(staticHandler(query) as T);
   }
 
   // 2. 동적 라우트 패턴 매칭
   for (const [pattern, handler] of dynamicRoutes) {
     if (pattern.test(path)) {
       const parsedBody = typeof body === 'string' ? JSON.parse(body) : body;
-      return Promise.resolve(handler(path, method, parsedBody) as T);
+      return Promise.resolve(handler(path, method, parsedBody, query) as T);
     }
   }
 

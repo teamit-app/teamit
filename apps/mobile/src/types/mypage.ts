@@ -65,6 +65,7 @@ export interface MyProfile {
   birthDate: string;
   profileImageUrl: string | null;
   isMatchingActive: boolean;
+  needsTermsReconsent: boolean;
   averageRating: number;
   regions: UserRegion[];
   education: UserEducation | null;

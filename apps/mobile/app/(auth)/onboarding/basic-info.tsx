@@ -13,6 +13,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
 import { Colors } from '../../../src/constants/colors';
 import { DrumRollPicker } from '../../../src/components/common/DrumRollPicker';
+import { AgreementSection, TERMS_VERSION } from '../../../src/components/common/AgreementSection';
 import { submitBasicInfo } from '../../../src/services/onboardingService';
 import { withdraw } from '../../../src/services/authService';
 import { useOnboardingStore } from '../../../src/store/useOnboardingStore';
@@ -36,7 +37,11 @@ export default function BasicInfoScreen() {
   const [loading, setLoading] = useState(false);
   const [exiting, setExiting] = useState(false);
 
-  const isValid = nickname.trim().length > 0 && name.trim().length > 0 && gender !== null && birthDate !== null;
+  const [requiredAgreed, setRequiredAgreed] = useState(false);
+  const [analyticsAgreed, setAnalyticsAgreed] = useState(false);
+
+  const isValid =
+    nickname.trim().length > 0 && name.trim().length > 0 && gender !== null && birthDate !== null && requiredAgreed;
 
   // 온보딩(기본 정보 입력)을 완료하지 않고 나가면 방금 로그인으로 생성된 미완성 계정을
   // 그대로 남겨두지 않고 삭제한다 — 그래야 다음에 다시 로그인할 때 새로 가입하게 된다.
@@ -77,6 +82,8 @@ export default function BasicInfoScreen() {
         name: name.trim(),
         gender: gender!,
         birthDate: toBirthDateString(),
+        termsVersion: TERMS_VERSION,
+        analyticsOptIn: analyticsAgreed,
       });
       setUserId(userId);
       setGtmUserId(userId);
@@ -172,6 +179,14 @@ export default function BasicInfoScreen() {
               </Text>
             </TouchableOpacity>
           </View>
+
+          {/* 약관 동의 */}
+          <AgreementSection
+            requiredAgreed={requiredAgreed}
+            analyticsAgreed={analyticsAgreed}
+            onChangeRequired={setRequiredAgreed}
+            onChangeAnalytics={setAnalyticsAgreed}
+          />
         </ScrollView>
 
         {/* 시작하기 버튼 */}

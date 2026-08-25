@@ -51,16 +51,26 @@ export interface TalentPoolParams {
   size?: number;
 }
 
-export const getTalentPool = async (params?: TalentPoolParams): Promise<PoolUser[]> => {
+export interface TalentPoolPageResult {
+  content: PoolUser[];
+  currentPage: number;
+  totalPages: number;
+}
+
+export const getTalentPool = async (params?: TalentPoolParams): Promise<TalentPoolPageResult> => {
   const query = new URLSearchParams();
   if (params?.skillId != null) query.set('skillId', String(params.skillId));
   if (params?.sido) query.set('sido', params.sido);
   if (params?.keyword) query.set('keyword', params.keyword);
   query.set('page', String(params?.page ?? 0));
-  query.set('size', String(params?.size ?? 100));
+  query.set('size', String(params?.size ?? 10));
 
   const data = await apiRequest<UserPoolPageResponse>(`/users?${query.toString()}`);
-  return data.content.map(adaptPoolUser);
+  return {
+    content: data.content.map(adaptPoolUser),
+    currentPage: data.currentPage,
+    totalPages: data.totalPages,
+  };
 };
 
 // ─── 관심 팀원 조회 ──────────────────────────────────────────────────────────

@@ -26,6 +26,7 @@ import { ReviewStatsCard } from '../../../src/components/profile/ReviewStatsCard
 import { buildReviewStats, buildReviewKeywords } from '../../../src/utils/reviewStats';
 import { useMyReceivedReviews } from '../../../src/hooks/useMyReceivedReviews';
 import { GuestPrompt } from '../../../src/components/common/GuestPrompt';
+import { trackEvent } from '../../../src/services/gtm';
 
 function GridMenuItem({
   icon,
@@ -224,11 +225,14 @@ export default function ProfileScreen() {
             try {
               await withdrawApi();
             } catch {
+              // 서버에서 탈퇴가 실패했는데도 로컬을 로그아웃 상태로 만들어버리면
+              // 실제로는 탈퇴가 안 됐는데 탈퇴된 것처럼 보이는 문제가 생긴다 —
+              // 실패 시엔 로그인 상태를 그대로 두고 재시도할 수 있게 한다.
               Alert.alert('오류', '탈퇴 처리 중 문제가 발생했어요. 다시 시도해주세요.');
-            } finally {
-              useAuthStore.getState().logout('withdraw');
-              router.replace('/(tabs)/home');
+              return;
             }
+            useAuthStore.getState().logout('withdraw');
+            router.replace('/(tabs)/home');
           },
         },
       ],
@@ -283,7 +287,10 @@ export default function ProfileScreen() {
             </View>
             <TouchableOpacity
               style={styles.editBtn}
-              onPress={() => router.push('/(tabs)/profile/edit-basic')}
+              onPress={() => {
+                trackEvent('profile_basic_info_edit_click', { source: 'mypage' });
+                router.push('/(tabs)/profile/edit-basic');
+              }}
             >
               <Text style={styles.editBtnText}>수정</Text>
             </TouchableOpacity>
@@ -359,6 +366,7 @@ export default function ProfileScreen() {
               value={profile?.isMatchingActive ?? false}
               onValueChange={async (v) => {
                 await setMatchingActive(v);
+                trackEvent(v ? 'pool_active_enable' : 'pool_active_disable');
                 // 인재풀 목록은 세션 내내 캐시되는 값이라, 여기서 껐다 켰다 해도
                 // 다시 로그인하기 전까지는 탐색 탭에 그대로 남아있던 문제를 고치기 위함
                 refreshExploreTalents();

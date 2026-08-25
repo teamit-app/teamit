@@ -16,6 +16,8 @@ import com.teamit.server.domain.post.dto.LikedPostResponse;
 import com.teamit.server.domain.post.dto.PostCommentResponse;
 import com.teamit.server.domain.post.dto.PostDetailResponse;
 import com.teamit.server.domain.post.dto.PostListItemResponse;
+import com.teamit.server.domain.post.dto.PostPageResponse;
+import com.teamit.server.domain.post.dto.PostSortOption;
 import com.teamit.server.domain.post.dto.RecruiterProfileInfo;
 import com.teamit.server.domain.post.dto.RequiredSkillRequest;
 import com.teamit.server.domain.post.dto.UpdatePostRequest;
@@ -33,6 +35,7 @@ import com.teamit.server.domain.post.repository.PostCommentRepository;
 import com.teamit.server.domain.post.repository.PostHeartRepository;
 import com.teamit.server.domain.post.repository.PostRepository;
 import com.teamit.server.domain.post.repository.PostSkillRepository;
+import com.teamit.server.domain.post.repository.PostSpecifications;
 import com.teamit.server.domain.review.repository.TeamReviewRepository;
 import com.teamit.server.domain.region.entity.UserRegion;
 import com.teamit.server.domain.region.repository.UserRegionRepository;
@@ -49,6 +52,9 @@ import com.teamit.server.domain.user.repository.UserSkillRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -176,6 +182,26 @@ public class PostService {
         return buildListItems(postRepository.findByOwnerIdOrderByCreatedAtDesc(userId));
     }
 
+    // ──────────────────────────────────────────────────────────────
+    // 전체 모집글 목록 조회 (홈 화면 / 탐색 탭 모집글 서브탭)
+    // ──────────────────────────────────────────────────────────────
+    @Transactional(readOnly = true)
+    public PostPageResponse getPostList(PostSortOption sort, String keyword, int page, int size) {
+        String sortProperty = sort == PostSortOption.POPULAR ? "viewCount" : "createdAt";
+        Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, sortProperty));
+        Specification<Post> spec = Specification.where(PostSpecifications.keyword(keyword));
+        Page<Post> postPage = postRepository.findAll(spec, pageable);
+
+        List<PostListItemResponse> content = buildListItems(postPage.getContent());
+
+        return PostPageResponse.builder()
+                .content(content)
+                .totalElements(postPage.getTotalElements())
+                .totalPages(postPage.getTotalPages())
+                .currentPage(postPage.getNumber())
+                .build();
+    }
+
     // 게시글 건당 개별 쿼리를 날리던 것(스킬/좋아요·댓글·지원자 수/공모전/채팅방 인원/지역 라벨)을
     // 전부 postIds 기준 배치 조회 + Map 매핑으로 바꿔서, 목록 크기와 무관하게 쿼리 수를 고정한다.
     private List<PostListItemResponse> buildListItems(List<Post> posts) {
@@ -199,13 +225,18 @@ public class PostService {
                 : contestRepository.findAllById(contestIds).stream().collect(Collectors.toMap(Contest::getId, c -> c));
         Map<Long, Integer> memberCountMap = chatService.getCurrentMemberCounts(chatRoomIds);
         Map<List<Long>, String> regionLabelByContestAndOwner = buildOwnerRegionLabels(contestIds, ownerIds);
+        // 목록 조회(getPostList)가 키워드 검색 지원을 위해 Specification 기반으로 바뀌면서
+        // owner를 더 이상 JOIN FETCH하지 않는다 — post.getOwner().getGender() 같은 필드 접근이
+        // 건당 추가 쿼리(N+1)를 내지 않도록, 다른 배치 조회들과 동일하게 한 번에 묶어서 가져온다.
+        Map<Long, User> ownerMap = userRepository.findAllById(ownerIds).stream()
+                .collect(Collectors.toMap(User::getId, u -> u));
 
         return posts.stream().map(post -> {
             Contest contest = post.getContestId() != null ? contestMap.get(post.getContestId()) : null;
             String region = post.getContestId() != null
                     ? regionLabelByContestAndOwner.get(List.of(post.getContestId(), post.getOwner().getId()))
                     : null;
-            return PostListItemResponse.from(post,
+            return PostListItemResponse.from(post, ownerMap.get(post.getOwner().getId()),
                     memberCountMap.getOrDefault(post.getChatRoomId(), 0),
                     skillsByPostId.getOrDefault(post.getId(), List.of()),
                     region,
@@ -764,6 +795,15 @@ public class PostService {
     public void deleteMyPostForContest(Long contestId, Long userId) {
         postRepository.findByOwnerIdAndContestId(userId, contestId)
                 .ifPresent(this::deletePostCascade);
+    }
+
+    // ──────────────────────────────────────────────────────────────
+    // 회원 탈퇴 시 호출(UserService.withdraw) — 소유한 모집글을 전부 동일한 cascade로 정리
+    // ──────────────────────────────────────────────────────────────
+    @Transactional
+    public void deleteAllPostsByOwner(Long ownerId) {
+        postRepository.findByOwnerIdOrderByCreatedAtDesc(ownerId)
+                .forEach(this::deletePostCascade);
     }
 
     private void deletePostCascade(Post post) {

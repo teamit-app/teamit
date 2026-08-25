@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { Tabs } from 'expo-router';
+import { Tabs, router } from 'expo-router';
 import { TabBar } from '../../src/components/common/TabBar';
 import { useAuthStore } from '../../src/store/useAuthStore';
 import { connectSocket, disconnectSocket } from '../../src/services/socket';
@@ -9,7 +9,13 @@ export default function TabLayout() {
   const fetchCurrentUserId = useAuthStore((s) => s.fetchCurrentUserId);
 
   useEffect(() => {
-    fetchCurrentUserId();
+    // 약관 개정으로 재동의가 필요한 기존 가입자는 어느 탭으로 진입했든 재동의 화면으로
+    // 보낸다 — 동의하거나 로그아웃하기 전까지는 이 화면을 벗어날 수 없다(소프트락).
+    fetchCurrentUserId().then(() => {
+      if (useAuthStore.getState().needsTermsReconsent) {
+        router.replace('/(auth)/reconsent' as never);
+      }
+    });
     connectSocket();
     return () => {
       disconnectSocket();

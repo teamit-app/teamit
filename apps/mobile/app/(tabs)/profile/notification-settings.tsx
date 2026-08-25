@@ -20,12 +20,14 @@ const SETTINGS_CONFIG: {
   {
     key: 'matchProposal',
     title: '팀 매칭 제안',
-    desc: '모집자로부터 제안이 올 때 알림을 받아요',
+    desc: '베타테스트 기간에는 제공하지 않아요',
+    disabled: true,
   },
   {
     key: 'proposalResponse',
     title: '제안 답변',
-    desc: '내가 보낸 제안에 응답이 왔을 때',
+    desc: '베타테스트 기간에는 제공하지 않아요',
+    disabled: true,
   },
   {
     key: 'deadlineAlert',
@@ -42,12 +44,14 @@ const SETTINGS_CONFIG: {
   {
     key: 'matchSuccess',
     title: '매칭 성사',
-    desc: '팀 매칭이 성사됐을 때',
+    desc: '베타테스트 기간에는 제공하지 않아요',
+    disabled: true,
   },
   {
     key: 'announcement',
     title: '공지 · 업데이트',
-    desc: '티밋 서비스 공지 및 업데이트',
+    desc: '베타테스트 기간에는 제공하지 않아요',
+    disabled: true,
   },
 ];
 
