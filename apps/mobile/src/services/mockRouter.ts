@@ -336,6 +336,26 @@ const dynamicRoutes: Array<
     },
   ],
 
+  // GET /contests/:contestId/similar — 카테고리가 겹치는 공모전 추천 (겹치는 개수desc, 하트수desc, 최대 3개)
+  [
+    /^\/contests\/(\d+)\/similar$/,
+    (path) => {
+      const id = Number(path.split('/')[2]);
+      const target = dummyContests.find((c) => c.contestId === id);
+      if (!target) return [];
+
+      const overlapCount = (categories: string[]) =>
+        categories.filter((cat) => target.categories.includes(cat as never)).length;
+
+      return dummyContests
+        .filter((c) => c.contestId !== id && c.dDay >= 0 && overlapCount(c.categories) > 0)
+        .sort((a, b) =>
+          overlapCount(b.categories) - overlapCount(a.categories) || (b.heartCount ?? 0) - (a.heartCount ?? 0))
+        .slice(0, 3)
+        .map(({ isHearted: _h, categoryLabels: _l, status: _s, ...rest }) => rest);
+    },
+  ],
+
   // GET /contests/:contestId/posts — 공모전별 모집글 목록
   [
     /^\/contests\/(\d+)\/posts$/,

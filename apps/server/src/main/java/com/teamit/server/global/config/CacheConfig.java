@@ -58,6 +58,7 @@ public class CacheConfig implements CachingConfigurer {
                 .withCacheConfiguration("contestsPopular", cacheConfiguration.entryTtl(Duration.ofMinutes(30)))
                 .withCacheConfiguration("contestsList", cacheConfiguration.entryTtl(Duration.ofMinutes(10)))
                 .withCacheConfiguration("contestsDetail", cacheConfiguration.entryTtl(Duration.ofHours(1)))
+                .withCacheConfiguration("contestsSimilar", cacheConfiguration.entryTtl(Duration.ofMinutes(10)))
                 .withCacheConfiguration("userPool", cacheConfiguration.entryTtl(Duration.ofMinutes(5)));
     }
 

@@ -1,6 +1,7 @@
 package com.teamit.server.domain.contest.controller;
 
 import com.teamit.server.domain.contest.dto.ContestDetailResponse;
+import com.teamit.server.domain.contest.dto.ContestListItemResponse;
 import com.teamit.server.domain.contest.dto.ContestPageResponse;
 import com.teamit.server.domain.contest.dto.PopularContestListResponse;
 import com.teamit.server.domain.contest.entity.ContestCategory;
@@ -17,6 +18,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
 import java.util.Map;
 
 @Tag(name = "Contest", description = "공모전 API")
@@ -40,6 +42,14 @@ public class ContestController {
     public ApiResponse<ContestDetailResponse> getContestDetail(@PathVariable Long contestId) {
         ContestDetailResponse response = contestService.getContestDetail(contestId);
         return ApiResponse.success(response, "공모전 상세 조회 성공");
+    }
+
+    @Operation(summary = "비슷한 공모전 추천",
+            description = "카테고리가 하나라도 겹치는 공모전을 겹치는 카테고리 개수, 좋아요(하트) 수 순으로 최대 3개까지 추천합니다.")
+    @GetMapping("/{contestId}/similar")
+    public ApiResponse<List<ContestListItemResponse>> getSimilarContests(@PathVariable Long contestId) {
+        List<ContestListItemResponse> response = contestService.getSimilarContests(contestId);
+        return ApiResponse.success(response, "비슷한 공모전 조회 성공");
     }
 
     @Operation(summary = "팀 매칭 후보 등록",
