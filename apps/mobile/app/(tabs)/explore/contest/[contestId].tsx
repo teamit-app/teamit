@@ -16,9 +16,9 @@ import { SortBottomSheet } from '../../../../src/components/explore/SortBottomSh
 import { RecruitPostCard } from '../../../../src/components/explore/RecruitPostCard';
 import { useExploreContests, toggleContestHeart } from '../../../../src/hooks/useExploreData';
 import { useAuthStore } from '../../../../src/store/useAuthStore';
-import { getContestDetail, checkIsParticipant } from '../../../../src/services/contestService';
+import { getContestDetail, checkIsParticipant, getSimilarContests } from '../../../../src/services/contestService';
 import { getPostsByContest, adaptToRecruitPost } from '../../../../src/services/postService';
-import { SortOption, RecruitPost, ContestDetail } from '../../../../src/types/contest';
+import { SortOption, RecruitPost, ContestDetail, Contest } from '../../../../src/types/contest';
 import { formatDDay } from '../../../../src/utils/dday';
 import { withAuth } from '../../../../src/utils/authGuard';
 import { resolveImageUrl } from '../../../../src/utils/imageUrl';
@@ -44,6 +44,7 @@ export default function ContestDetailScreen() {
   const [detail, setDetail] = useState<ContestDetail | null>(null);
   const [apiPosts, setApiPosts] = useState<RecruitPost[]>([]);
   const [isParticipant, setIsParticipant] = useState(false);
+  const [similarContests, setSimilarContests] = useState<Contest[]>([]);
   // 포스터 실제 가로세로 비율을 구해서 컨테이너에 꽉 차게(레터박스 없이) 보여준다
   const [posterAspectRatio, setPosterAspectRatio] = useState<number | null>(null);
 
@@ -72,6 +73,9 @@ export default function ContestDetailScreen() {
       .catch(() => {});
     checkIsParticipant(id)
       .then(setIsParticipant)
+      .catch(() => {});
+    getSimilarContests(id)
+      .then(setSimilarContests)
       .catch(() => {});
   }, [id]);
 
@@ -204,6 +208,48 @@ export default function ContestDetailScreen() {
               <Text style={styles.sectionTitle}>상세내용</Text>
             </View>
             <Text style={styles.contentText}>{detail.content}</Text>
+          </View>
+        )}
+
+        {/* ── 이 공모전은 어떠세요? (카테고리 겹치는 공모전 추천) ── */}
+        {similarContests.length > 0 && (
+          <View style={styles.similarSectionWrap}>
+            <Text style={styles.similarHeading}>이 공모전은 어떠세요?</Text>
+            <Text style={styles.similarSubheading}>비슷한 공모전을 추천해드릴게요</Text>
+
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.similarRow}>
+              {similarContests.map((rec) => (
+                <TouchableOpacity
+                  key={rec.contestId}
+                  style={styles.similarCard}
+                  activeOpacity={0.85}
+                  onPress={() => router.push(`/explore/contest/${rec.contestId}?source=similar_contest` as never)}
+                >
+                  {resolveImageUrl(rec.imageUrl) ? (
+                    <Image source={{ uri: resolveImageUrl(rec.imageUrl)! }} style={styles.similarThumb} resizeMode="cover" />
+                  ) : (
+                    <View style={styles.similarThumb}>
+                      <Text style={styles.similarThumbText}>공모전{'\n'}이미지</Text>
+                    </View>
+                  )}
+                  <View style={styles.similarBody}>
+                    <Text style={styles.similarOrg} numberOfLines={1}>{rec.organizer}</Text>
+                    <Text style={styles.similarTitle} numberOfLines={2}>{rec.title}</Text>
+                    <View style={styles.similarTags}>
+                      {rec.categoryLabels.map((label) => (
+                        <View key={label} style={styles.similarTag}>
+                          <Text style={styles.similarTagText}>{label}</Text>
+                        </View>
+                      ))}
+                    </View>
+                    <View style={styles.similarMeta}>
+                      <Text style={styles.similarDday}>{formatDDay(rec.dDay)}</Text>
+                      <Text style={styles.similarHeart}>♡ {rec.heartCount ?? 0}</Text>
+                    </View>
+                  </View>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
           </View>
         )}
 
@@ -517,6 +563,98 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: Colors.grayMedium,
     marginBottom: 16,
+  },
+
+  // ── 이 공모전은 어떠세요? (비슷한 공모전 추천) ──
+  similarSectionWrap: {
+    backgroundColor: Colors.white,
+    marginTop: 8,
+    paddingHorizontal: 20,
+    paddingVertical: 20,
+  },
+  similarHeading: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: Colors.dark,
+    marginBottom: 4,
+  },
+  similarSubheading: {
+    fontSize: 13,
+    color: Colors.grayMedium,
+    marginBottom: 14,
+  },
+  similarRow: {
+    gap: 10,
+  },
+  similarCard: {
+    width: 130,
+    backgroundColor: Colors.white,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#F0F0F0',
+    overflow: 'hidden',
+  },
+  similarThumb: {
+    width: 130,
+    height: 100,
+    backgroundColor: Colors.ogTint,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  similarThumbText: {
+    fontSize: 11,
+    color: Colors.grayMedium,
+    textAlign: 'center',
+  },
+  similarBody: {
+    padding: 10,
+  },
+  similarOrg: {
+    fontSize: 11,
+    color: Colors.grayMedium,
+    marginBottom: 3,
+  },
+  similarTitle: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: Colors.dark,
+    lineHeight: 17,
+    height: 34,
+    marginBottom: 6,
+  },
+  similarTags: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 4,
+    marginBottom: 6,
+  },
+  similarTag: {
+    backgroundColor: Colors.pageBg,
+    borderRadius: 999,
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+  },
+  similarTagText: {
+    fontSize: 10,
+    color: Colors.gray,
+  },
+  similarMeta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  similarDday: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: Colors.primary,
+    backgroundColor: Colors.ogTint,
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    borderRadius: 999,
+  },
+  similarHeart: {
+    fontSize: 11,
+    color: Colors.grayMedium,
   },
   loginNoticeBanner: {
     flexDirection: 'row',

@@ -91,6 +91,7 @@ public class SecurityConfig {
                         // 숫자 ID 상세 조회는 반드시 앵커 정규식으로 숫자만 매칭한다.
                         .requestMatchers(
                                 new RegexRequestMatcher("^/api/v1/contests/\\d+$", "GET"),
+                                new RegexRequestMatcher("^/api/v1/contests/\\d+/similar$", "GET"),
                                 new RegexRequestMatcher("^/api/v1/contests/\\d+/posts$", "GET"),
                                 new RegexRequestMatcher("^/api/v1/posts/\\d+$", "GET"),
                                 new RegexRequestMatcher("^/api/v1/posts/\\d+/comments$", "GET"),

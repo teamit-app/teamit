@@ -7,6 +7,7 @@ import jakarta.persistence.criteria.JoinType;
 import org.springframework.data.jpa.domain.Specification;
 
 import java.time.LocalDate;
+import java.util.Set;
 
 // findContestList가 예전엔 "(:param IS NULL OR column = :param)" 패턴의 네이티브 SQL 한 방으로
 // 돼 있었는데, 이 패턴은 파라미터가 실제로 있든 없든 MySQL이 인덱스를 포기하고 항상 풀스캔하게
@@ -25,6 +26,21 @@ public class ContestSpecifications {
             Join<Contest, ContestCategory> categoryJoin = root.join("categories");
             return cb.equal(categoryJoin, category);
         };
+    }
+
+    // 비슷한 공모전 추천(카테고리가 하나라도 겹치는 공모전) 후보를 뽑을 때 사용 —
+    // categories 중 하나라도 주어진 집합에 속하면 매칭.
+    public static Specification<Contest> categoryIn(Set<ContestCategory> categories) {
+        return (root, query, cb) -> {
+            if (categories == null || categories.isEmpty()) return null;
+            query.distinct(true);
+            Join<Contest, ContestCategory> categoryJoin = root.join("categories");
+            return categoryJoin.in(categories);
+        };
+    }
+
+    public static Specification<Contest> idNot(Long contestId) {
+        return (root, query, cb) -> contestId == null ? null : cb.notEqual(root.get("id"), contestId);
     }
 
     public static Specification<Contest> endDateGreaterThanOrEqual(LocalDate date) {
