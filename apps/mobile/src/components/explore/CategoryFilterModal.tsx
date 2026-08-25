@@ -9,6 +9,7 @@ import {
 } from 'react-native';
 import { Colors } from '../../constants/colors';
 import { ContestCategory } from '../../types/contest';
+import { CONTEST_CATEGORY_ORDER, CONTEST_CATEGORY_LABEL } from '../../constants/contestCategory';
 
 export type CategoryFilter = ContestCategory | 'ALL';
 
@@ -18,16 +19,24 @@ interface CategoryOption {
   emoji: string;
 }
 
+const CATEGORY_EMOJI: Record<ContestCategory, string> = {
+  IT: '💻',
+  MARKETING: '📢',
+  STARTUP: '🚀',
+  DESIGN: '🎨',
+  SOCIAL: '🌱',
+  ENGINEERING: '⚙️',
+  ARTS: '🎭',
+  ETC: '📌',
+};
+
 const CATEGORY_OPTIONS: CategoryOption[] = [
   { key: 'ALL', label: '전체', emoji: '📋' },
-  { key: 'IT', label: 'IT·개발', emoji: '💻' },
-  { key: 'STARTUP', label: '창업·비즈니스', emoji: '🚀' },
-  { key: 'DESIGN', label: '디자인', emoji: '🎨' },
-  { key: 'SOCIAL', label: '사회·환경', emoji: '🌱' },
-  { key: 'ENGINEERING', label: '공학·기술', emoji: '⚙️' },
-  { key: 'ARTS', label: '예술·문화', emoji: '🎭' },
-  { key: 'MARKETING', label: '마케팅', emoji: '📢' },
-  { key: 'ETC', label: '기타', emoji: '📌' },
+  ...CONTEST_CATEGORY_ORDER.map((cat) => ({
+    key: cat,
+    label: CONTEST_CATEGORY_LABEL[cat],
+    emoji: CATEGORY_EMOJI[cat],
+  })),
 ];
 
 interface CategoryFilterModalProps {

@@ -5,6 +5,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 
 import java.time.LocalDate;
+import java.util.List;
 
 // 관리자 공모전 등록/수정 공용 요청 (AdminContestController)
 @Getter
@@ -12,7 +13,7 @@ import java.time.LocalDate;
 public class ContestRequest {
     private String title;
     private String organizer;
-    private ContestCategory category;
+    private List<ContestCategory> categories;
     private String target;
     private String recruitField;
     private String prize;

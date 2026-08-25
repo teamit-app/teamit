@@ -9,6 +9,7 @@ import com.teamit.server.domain.contest.entity.ContestStatus;
 import com.teamit.server.domain.contest.repository.ContestHeartRepository;
 import com.teamit.server.domain.contest.repository.ContestParticipantRepository;
 import com.teamit.server.domain.contest.repository.ContestRepository;
+import com.teamit.server.domain.contest.repository.ContestSpecifications;
 import com.teamit.server.domain.chat.service.ChatService;
 import com.teamit.server.domain.post.repository.PostRepository;
 import com.teamit.server.domain.region.repository.UserRegionRepository;
@@ -25,13 +26,17 @@ import org.springframework.cache.annotation.Caching;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.time.LocalDate;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @Service
@@ -73,9 +78,7 @@ public class ContestService {
             key = "T(String).format('%s-%s-%s-%d-%d', #category, #status, #keyword, #page, #size)")
     @Transactional(readOnly = true)
     public ContestPageResponse getContestList(ContestCategory category, ContestStatus status, String keyword, int page, int size) {
-        Pageable pageable = PageRequest.of(page, size);
-
-        String categoryStr = category != null ? category.name() : null;
+        Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
 
         LocalDate today = LocalDate.now();
         LocalDate statusEndMin = null;
@@ -93,8 +96,16 @@ public class ContestService {
             }
         }
 
-        Page<Contest> contestPage = contestRepository.findContestList(
-                categoryStr, statusEndMin, statusEndMax, statusEndBefore, keyword, pageable);
+        // 조건이 실제로 있을 때만 WHERE절에 붙는다 — null인 조건은 SQL에 아예 안 들어가서
+        // 남은 조건들이 인덱스를 정상적으로 탈 수 있다(예전 네이티브 쿼리는 항상 풀스캔이었음).
+        Specification<Contest> spec = Specification
+                .where(ContestSpecifications.category(category))
+                .and(ContestSpecifications.endDateGreaterThanOrEqual(statusEndMin))
+                .and(ContestSpecifications.endDateLessThanOrEqual(statusEndMax))
+                .and(ContestSpecifications.endDateLessThan(statusEndBefore))
+                .and(ContestSpecifications.keyword(keyword));
+
+        Page<Contest> contestPage = contestRepository.findAll(spec, pageable);
 
         // 탐색 탭 "인기순" 정렬(explore/index.tsx)이 좋아요 수 기준으로 클라이언트에서
         // 정렬할 수 있도록, 목록에 있는 공모전들의 좋아요 수를 배치로 한 번에 조회한다
@@ -152,7 +163,7 @@ public class ContestService {
         Contest contest = contestRepository.save(Contest.builder()
                 .title(request.getTitle())
                 .organizer(request.getOrganizer())
-                .category(request.getCategory())
+                .categories(toCategorySet(request.getCategories()))
                 .target(request.getTarget())
                 .recruitField(request.getRecruitField())
                 .prize(request.getPrize())
@@ -174,11 +185,18 @@ public class ContestService {
         Contest contest = contestRepository.findById(contestId)
                 .orElseThrow(() -> new IllegalArgumentException("공모전을 찾을 수 없습니다"));
         contest.update(
-                request.getTitle(), request.getOrganizer(), request.getCategory(),
+                request.getTitle(), request.getOrganizer(), toCategorySet(request.getCategories()),
                 request.getTarget(), request.getRecruitField(), request.getPrize(),
                 request.getStartDate(), request.getEndDate(), request.getLinkUrl(),
                 request.getContent(), request.getImageUrl());
         return ContestDetailResponse.from(contest);
+    }
+
+    private Set<ContestCategory> toCategorySet(List<ContestCategory> categories) {
+        if (categories == null || categories.isEmpty()) {
+            throw new IllegalArgumentException("카테고리를 최소 1개 선택해야 합니다");
+        }
+        return new LinkedHashSet<>(categories);
     }
 
     @Caching(evict = {

@@ -105,9 +105,11 @@ const staticRoutes: Record<string, (query: URLSearchParams) => unknown> = {
 
   // 공모전 목록 (GET /contests?...)
   '/contests': (query) => {
-    const contests = dummyContests.map(({ isHearted: _h, categoryLabel: _l, status: _s, ...rest }) => rest);
+    const contests = dummyContests.map(({ isHearted: _h, categoryLabels: _l, status: _s, ...rest }) => rest);
     const category = query.get('category');
-    const byCategory = category ? contests.filter((c) => c.category === category) : contests;
+    const byCategory = category
+      ? contests.filter((c) => (c.categories as string[]).includes(category))
+      : contests;
     const filtered = filterByKeywordMock(byCategory, query, (c, kw) =>
       c.title.toLowerCase().includes(kw) || c.organizer.toLowerCase().includes(kw),
     );
@@ -118,7 +120,7 @@ const staticRoutes: Record<string, (query: URLSearchParams) => unknown> = {
   '/contests/popular': () => ({
     contests: dummyContests
       .slice(0, 3)
-      .map(({ isHearted: _h, categoryLabel: _l, status: _s, ...rest }) => rest),
+      .map(({ isHearted: _h, categoryLabels: _l, status: _s, ...rest }) => rest),
   }),
 
   // GET /users/notifications — @LoginUser 방식 (userId 없는 경로)
@@ -318,7 +320,7 @@ const dynamicRoutes: Array<
           contestId: detail.contestId,
           title: detail.title,
           organizer: detail.organizer,
-          category: detail.category,
+          categories: detail.categories,
           target: detail.targetAudience,
           recruitField: detail.fields,
           prize: detail.prizeScale,

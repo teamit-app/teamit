@@ -1,6 +1,7 @@
 import { apiRequest } from './api';
 import { Contest, ContestCategory, ContestStatus, ContestDetail } from '../types/contest';
 import { MatchingProfileData } from '../types/mypage';
+import { CONTEST_CATEGORY_ORDER, CONTEST_CATEGORY_LABEL } from '../constants/contestCategory';
 
 // ─── 백엔드 응답 타입 ─────────────────────────────────────────────────────────
 
@@ -8,7 +9,7 @@ interface BackendContest {
   contestId: number;
   title: string;
   organizer: string;
-  category: ContestCategory;
+  categories: ContestCategory[];
   endDate: string;
   dDay: number;
   isNew: boolean;
@@ -20,7 +21,7 @@ interface BackendContestDetail {
   contestId: number;
   title: string;
   organizer: string;
-  category: ContestCategory;
+  categories: ContestCategory[];
   target?: string;
   recruitField?: string;
   prize?: string;
@@ -45,16 +46,13 @@ interface HeartedContestsResponse {
 
 // ─── 어댑터 ──────────────────────────────────────────────────────────────────
 
-const CATEGORY_LABELS: Record<ContestCategory, string> = {
-  IT: 'IT·개발',
-  STARTUP: '창업·아이디어',
-  DESIGN: '디자인',
-  SOCIAL: '사회혁신',
-  ENGINEERING: '공학',
-  ARTS: '예술',
-  ETC: '기타',
-  MARKETING: '마케팅',
-};
+// 백엔드가 내려주는 categories 배열은 순서가 보장되지 않아서, 화면에 항상 같은
+// 순서로 알약이 뜨도록 고정 순서(CONTEST_CATEGORY_ORDER) 기준으로 정렬해 라벨을 만든다.
+function toCategoryLabels(categories: ContestCategory[]): string[] {
+  return [...categories]
+    .sort((a, b) => CONTEST_CATEGORY_ORDER.indexOf(a) - CONTEST_CATEGORY_ORDER.indexOf(b))
+    .map((cat) => CONTEST_CATEGORY_LABEL[cat] ?? cat);
+}
 
 function getContestStatus(dDay: number): ContestStatus {
   if (dDay < 0) return 'CLOSED';
@@ -65,7 +63,7 @@ function getContestStatus(dDay: number): ContestStatus {
 function adaptContest(c: BackendContest): Contest {
   return {
     ...c,
-    categoryLabel: CATEGORY_LABELS[c.category] ?? c.category,
+    categoryLabels: toCategoryLabels(c.categories),
     status: getContestStatus(c.dDay),
     isHearted: false, // 하트 목록 로드 후 덮어씀
     isRegisteredAsParticipant: false, // 참가 후보 등록 목록 로드 후 덮어씀
@@ -124,8 +122,8 @@ export const getContestDetail = async (contestId: number): Promise<ContestDetail
     contestId: c.contestId,
     title: c.title,
     organizer: c.organizer,
-    category: c.category,
-    categoryLabel: CATEGORY_LABELS[c.category] ?? c.category,
+    categories: c.categories,
+    categoryLabels: toCategoryLabels(c.categories),
     status: getContestStatus(c.dDay),
     endDate: c.endDate,
     dDay: c.dDay,

@@ -16,8 +16,8 @@ export interface Contest {
   contestId: number;
   title: string;
   organizer: string;
-  category: ContestCategory;
-  categoryLabel: string;
+  categories: ContestCategory[];
+  categoryLabels: string[];
   status: ContestStatus;
   endDate: string;
   dDay: number;
