@@ -33,6 +33,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.time.LocalDate;
+import java.util.Comparator;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -140,6 +141,43 @@ public class ContestService {
         return ContestDetailResponse.from(contest);
     }
 
+    // 카테고리가 하나라도 겹치는 다른 공모전을 추천한다 — 겹치는 카테고리 개수가 많을수록,
+    // 같으면 좋아요(하트) 수가 많을수록 우선순위가 높다. 이미 마감된 공모전은 추천하지 않는다.
+    @Cacheable(cacheNames = "contestsSimilar", key = "#contestId")
+    @Transactional(readOnly = true)
+    public List<ContestListItemResponse> getSimilarContests(Long contestId) {
+        Contest target = contestRepository.findById(contestId)
+                .orElseThrow(() -> new IllegalArgumentException("공모전을 찾을 수 없습니다"));
+        Set<ContestCategory> targetCategories = target.getCategories();
+
+        Specification<Contest> spec = Specification
+                .where(ContestSpecifications.categoryIn(targetCategories))
+                .and(ContestSpecifications.idNot(contestId))
+                .and(ContestSpecifications.endDateGreaterThanOrEqual(LocalDate.now()));
+        List<Contest> candidates = contestRepository.findAll(spec);
+
+        List<Long> candidateIds = candidates.stream().map(Contest::getId).collect(Collectors.toList());
+        Map<Long, Long> heartCountByContestId = contestHeartRepository.countGroupedByContestIdIn(candidateIds).stream()
+                .collect(Collectors.toMap(
+                        ContestHeartRepository.ContestHeartCountProjection::getContestId,
+                        ContestHeartRepository.ContestHeartCountProjection::getCount));
+
+        return candidates.stream()
+                .sorted(Comparator
+                        .comparingInt((Contest c) -> overlapCount(c.getCategories(), targetCategories))
+                        .reversed()
+                        .thenComparing(
+                                c -> heartCountByContestId.getOrDefault(c.getId(), 0L),
+                                Comparator.reverseOrder()))
+                .limit(3)
+                .map(c -> ContestListItemResponse.from(c, heartCountByContestId.getOrDefault(c.getId(), 0L)))
+                .collect(Collectors.toList());
+    }
+
+    private int overlapCount(Set<ContestCategory> categories, Set<ContestCategory> targetCategories) {
+        return (int) categories.stream().filter(targetCategories::contains).count();
+    }
+
     // ──────────────────────────────────────────────────────────────
     // 관리자 전용 — 공모전 등록/수정/삭제 (AdminContestController)
     // ──────────────────────────────────────────────────────────────
@@ -157,7 +195,7 @@ public class ContestService {
         return "/files/" + CONTEST_POSTER_SUB_DIR + "/" + storedFileName;
     }
 
-    @CacheEvict(cacheNames = {"contestsPopular", "contestsList"}, allEntries = true)
+    @CacheEvict(cacheNames = {"contestsPopular", "contestsList", "contestsSimilar"}, allEntries = true)
     @Transactional
     public ContestDetailResponse createContest(ContestRequest request) {
         Contest contest = contestRepository.save(Contest.builder()
@@ -177,7 +215,7 @@ public class ContestService {
     }
 
     @Caching(evict = {
-            @CacheEvict(cacheNames = {"contestsPopular", "contestsList"}, allEntries = true),
+            @CacheEvict(cacheNames = {"contestsPopular", "contestsList", "contestsSimilar"}, allEntries = true),
             @CacheEvict(cacheNames = "contestsDetail", key = "#contestId")
     })
     @Transactional
@@ -200,7 +238,7 @@ public class ContestService {
     }
 
     @Caching(evict = {
-            @CacheEvict(cacheNames = {"contestsPopular", "contestsList"}, allEntries = true),
+            @CacheEvict(cacheNames = {"contestsPopular", "contestsList", "contestsSimilar"}, allEntries = true),
             @CacheEvict(cacheNames = "contestsDetail", key = "#contestId")
     })
     @Transactional

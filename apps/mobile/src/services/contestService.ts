@@ -102,6 +102,13 @@ export const getContests = async (params?: ContestListParams): Promise<ContestPa
   };
 };
 
+// 공모전 상세 화면 "이 공모전은 어떠세요?" — 카테고리가 겹치는 공모전을 최대 3개까지 추천.
+// 정렬(겹치는 카테고리 개수 desc, 좋아요 수 desc)은 서버가 처리해서 그대로 내려준다.
+export const getSimilarContests = async (contestId: number): Promise<Contest[]> => {
+  const data = await apiRequest<BackendContest[]>(`/contests/${contestId}/similar`);
+  return data.map(adaptContest);
+};
+
 export const getPopularContests = async (): Promise<Contest[]> => {
   const data = await apiRequest<{ contests: Omit<BackendContest, 'isNew'>[] }>(
     '/contests/popular',

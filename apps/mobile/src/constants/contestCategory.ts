@@ -15,7 +15,7 @@ export const CONTEST_CATEGORY_ORDER: ContestCategory[] = [
 ];
 
 export const CONTEST_CATEGORY_LABEL: Record<ContestCategory, string> = {
-  IT: 'IT·개발',
+  IT: 'IT·개발·데이터',
   MARKETING: '마케팅',
   STARTUP: '기획·아이디어',
   DESIGN: '디자인',
