@@ -92,9 +92,10 @@ public class PostController {
     @GetMapping("/posts")
     public ApiResponse<PostPageResponse> getPostList(
             @RequestParam(defaultValue = "LATEST") PostSortOption sort,
+            @RequestParam(required = false) String keyword,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size) {
-        return ApiResponse.success(postService.getPostList(sort, page, size), "모집글 목록 조회 성공");
+        return ApiResponse.success(postService.getPostList(sort, keyword, page, size), "모집글 목록 조회 성공");
     }
 
     @Operation(summary = "공모전별 모집글 목록 조회")

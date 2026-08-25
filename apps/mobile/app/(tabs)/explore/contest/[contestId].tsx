@@ -47,7 +47,8 @@ export default function ContestDetailScreen() {
   // 포스터 실제 가로세로 비율을 구해서 컨테이너에 꽉 차게(레터박스 없이) 보여준다
   const [posterAspectRatio, setPosterAspectRatio] = useState<number | null>(null);
 
-  const { data: contests = [] } = useExploreContests();
+  const { data: contestsData } = useExploreContests();
+  const contests = contestsData?.pages.flatMap((p) => p.content) ?? [];
   const currentUserId = useAuthStore((s) => s.currentUserId);
 
   const id = Number(contestId);
@@ -179,7 +180,12 @@ export default function ContestDetailScreen() {
               >
                 <Text style={styles.infoLabel}>{row.label}</Text>
                 {row.isLink ? (
-                  <TouchableOpacity onPress={() => Linking.openURL(row.value)}>
+                  <TouchableOpacity
+                    onPress={() => {
+                      trackEvent('registration_url_click', { contest_id: id });
+                      Linking.openURL(row.value);
+                    }}
+                  >
                     <Text style={[styles.infoValue, styles.infoLink]}>{row.value}</Text>
                   </TouchableOpacity>
                 ) : (

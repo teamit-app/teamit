@@ -40,7 +40,7 @@ export function setUserId(userId: number | string | null) {
   }
 }
 
-const UTM_KEYS = ['source', 'medium', 'campaign', 'content'] as const;
+const UTM_KEYS = ['source', 'medium', 'campaign', 'content', 'term'] as const;
 
 // public/index.html이 최초 진입 시 sessionStorage에 남겨둔 session_utm_*
 // 값을 읽어온다 — "가입까지 이어진 이번 세션의 UTM"을 sign_up 같은 이벤트에

@@ -35,6 +35,7 @@ import com.teamit.server.domain.post.repository.PostCommentRepository;
 import com.teamit.server.domain.post.repository.PostHeartRepository;
 import com.teamit.server.domain.post.repository.PostRepository;
 import com.teamit.server.domain.post.repository.PostSkillRepository;
+import com.teamit.server.domain.post.repository.PostSpecifications;
 import com.teamit.server.domain.review.repository.TeamReviewRepository;
 import com.teamit.server.domain.region.entity.UserRegion;
 import com.teamit.server.domain.region.repository.UserRegionRepository;
@@ -53,6 +54,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -184,10 +186,11 @@ public class PostService {
     // 전체 모집글 목록 조회 (홈 화면 / 탐색 탭 모집글 서브탭)
     // ──────────────────────────────────────────────────────────────
     @Transactional(readOnly = true)
-    public PostPageResponse getPostList(PostSortOption sort, int page, int size) {
+    public PostPageResponse getPostList(PostSortOption sort, String keyword, int page, int size) {
         String sortProperty = sort == PostSortOption.POPULAR ? "viewCount" : "createdAt";
         Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, sortProperty));
-        Page<Post> postPage = postRepository.findAllWithOwner(pageable);
+        Specification<Post> spec = Specification.where(PostSpecifications.keyword(keyword));
+        Page<Post> postPage = postRepository.findAll(spec, pageable);
 
         List<PostListItemResponse> content = buildListItems(postPage.getContent());
 
@@ -222,13 +225,18 @@ public class PostService {
                 : contestRepository.findAllById(contestIds).stream().collect(Collectors.toMap(Contest::getId, c -> c));
         Map<Long, Integer> memberCountMap = chatService.getCurrentMemberCounts(chatRoomIds);
         Map<List<Long>, String> regionLabelByContestAndOwner = buildOwnerRegionLabels(contestIds, ownerIds);
+        // 목록 조회(getPostList)가 키워드 검색 지원을 위해 Specification 기반으로 바뀌면서
+        // owner를 더 이상 JOIN FETCH하지 않는다 — post.getOwner().getGender() 같은 필드 접근이
+        // 건당 추가 쿼리(N+1)를 내지 않도록, 다른 배치 조회들과 동일하게 한 번에 묶어서 가져온다.
+        Map<Long, User> ownerMap = userRepository.findAllById(ownerIds).stream()
+                .collect(Collectors.toMap(User::getId, u -> u));
 
         return posts.stream().map(post -> {
             Contest contest = post.getContestId() != null ? contestMap.get(post.getContestId()) : null;
             String region = post.getContestId() != null
                     ? regionLabelByContestAndOwner.get(List.of(post.getContestId(), post.getOwner().getId()))
                     : null;
-            return PostListItemResponse.from(post,
+            return PostListItemResponse.from(post, ownerMap.get(post.getOwner().getId()),
                     memberCountMap.getOrDefault(post.getChatRoomId(), 0),
                     skillsByPostId.getOrDefault(post.getId(), List.of()),
                     region,
