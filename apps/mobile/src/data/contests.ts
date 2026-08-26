@@ -28,6 +28,7 @@ export const dummyContests: Contest[] = [
     isNew: false,
     isHearted: true,
     isRegisteredAsParticipant: false,
+    imageUrl: 'https://placehold.co/400x300/4A90D9/FFFFFF?text=Contest+2',
     heartCount: 2,
   },
   {
@@ -42,6 +43,7 @@ export const dummyContests: Contest[] = [
     isNew: false,
     isHearted: false,
     isRegisteredAsParticipant: false,
+    imageUrl: 'https://placehold.co/400x300/9B59B6/FFFFFF?text=Contest+3',
     heartCount: 12,
   },
   {
@@ -56,6 +58,7 @@ export const dummyContests: Contest[] = [
     isNew: false,
     isHearted: false,
     isRegisteredAsParticipant: false,
+    imageUrl: 'https://placehold.co/400x300/27AE60/FFFFFF?text=Contest+4',
     heartCount: 0,
   },
   {
@@ -70,6 +73,7 @@ export const dummyContests: Contest[] = [
     isNew: true,
     isHearted: false,
     isRegisteredAsParticipant: false,
+    imageUrl: 'https://placehold.co/400x300/E74C3C/FFFFFF?text=Contest+5',
     heartCount: 8,
   },
   {
@@ -84,6 +88,7 @@ export const dummyContests: Contest[] = [
     isNew: false,
     isHearted: false,
     isRegisteredAsParticipant: false,
+    imageUrl: 'https://placehold.co/400x300/F39C12/FFFFFF?text=Contest+6',
     heartCount: 1,
   },
 ];
