@@ -7,6 +7,7 @@ import {
   StyleSheet,
   Linking,
   Image,
+  Modal,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams, useSegments } from 'expo-router';
@@ -45,6 +46,7 @@ export default function ContestDetailScreen() {
   const [apiPosts, setApiPosts] = useState<RecruitPost[]>([]);
   const [isParticipant, setIsParticipant] = useState(false);
   const [similarContests, setSimilarContests] = useState<Contest[]>([]);
+  const [imageViewerVisible, setImageViewerVisible] = useState(false);
   // 포스터 실제 가로세로 비율을 구해서 컨테이너에 꽉 차게(레터박스 없이) 보여준다
   const [posterAspectRatio, setPosterAspectRatio] = useState<number | null>(null);
 
@@ -145,24 +147,68 @@ export default function ContestDetailScreen() {
 
         {/* ── 공모전 이미지 ── */}
         {resolveImageUrl(detail?.imageUrl) ? (
-          <Image
-            source={{ uri: resolveImageUrl(detail?.imageUrl)! }}
-            style={
-              posterAspectRatio
-                ? { width: '100%' as const, aspectRatio: posterAspectRatio }
-                : styles.imagePlaceholder
-            }
-            resizeMode="contain"
-            onLoad={(e) => {
-              const { width, height } = e.nativeEvent.source;
-              if (width && height) setPosterAspectRatio(width / height);
-            }}
-          />
+          <View style={styles.posterWrap}>
+            <Image
+              source={{ uri: resolveImageUrl(detail?.imageUrl)! }}
+              style={
+                posterAspectRatio
+                  ? { width: '100%' as const, aspectRatio: posterAspectRatio }
+                  : styles.imagePlaceholder
+              }
+              resizeMode="contain"
+              onLoad={(e) => {
+                const { width, height } = e.nativeEvent.source ?? {};
+                if (width && height) setPosterAspectRatio(width / height);
+              }}
+            />
+            <View style={styles.expandBtnWrap}>
+              <TouchableOpacity
+                style={styles.expandBtn}
+                onPress={() => setImageViewerVisible(true)}
+                activeOpacity={0.8}
+                hitSlop={8}
+                accessibilityRole="button"
+                accessibilityLabel="이미지 확대"
+              >
+                <Text style={styles.expandBtnIcon}>⛶</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
         ) : (
           <View style={styles.imagePlaceholder}>
             <Text style={styles.imagePlaceholderText}>공모전 이미지</Text>
           </View>
         )}
+
+        {/* ── 이미지 전체보기 ── */}
+        <Modal
+          visible={imageViewerVisible}
+          transparent
+          animationType="fade"
+          statusBarTranslucent
+          onRequestClose={() => setImageViewerVisible(false)}
+        >
+          <TouchableOpacity
+            style={styles.imageViewerBackdrop}
+            activeOpacity={1}
+            onPress={() => setImageViewerVisible(false)}
+          >
+            <Image
+              source={{ uri: resolveImageUrl(detail?.imageUrl) ?? undefined }}
+              style={styles.imageViewerImage}
+              resizeMode="contain"
+            />
+            <TouchableOpacity
+              style={[styles.imageViewerCloseBtn, { top: insets.top + 12 }]}
+              onPress={() => setImageViewerVisible(false)}
+              hitSlop={12}
+              accessibilityRole="button"
+              accessibilityLabel="닫기"
+            >
+              <Text style={styles.imageViewerCloseIcon}>✕</Text>
+            </TouchableOpacity>
+          </TouchableOpacity>
+        </Modal>
 
         {/* ── 공모전 상세 정보 ── */}
         <View style={styles.sectionCard}>
@@ -471,6 +517,9 @@ const styles = StyleSheet.create({
   },
 
   // ── 공모전 이미지 ──
+  posterWrap: {
+    position: 'relative',
+  },
   imagePlaceholder: {
     height: 200,
     backgroundColor: Colors.ogTint,
@@ -480,6 +529,51 @@ const styles = StyleSheet.create({
   imagePlaceholderText: {
     fontSize: 14,
     color: Colors.grayMedium,
+  },
+  expandBtnWrap: {
+    position: 'absolute',
+    right: 12,
+    bottom: 12,
+    width: 34,
+    height: 34,
+  },
+  expandBtn: {
+    flex: 1,
+    borderRadius: 17,
+    backgroundColor: 'rgba(0,0,0,0.55)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  expandBtnIcon: {
+    fontSize: 16,
+    color: Colors.white,
+  },
+
+  // ── 이미지 전체보기 모달 ──
+  imageViewerBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.92)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  imageViewerImage: {
+    width: '100%',
+    height: '80%',
+  },
+  imageViewerCloseBtn: {
+    position: 'absolute',
+    right: 16,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  imageViewerCloseIcon: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: Colors.white,
   },
 
   // ── 공모전 상세 정보 ──
