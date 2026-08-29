@@ -4,6 +4,7 @@ import { QueryClientProvider } from '@tanstack/react-query';
 import { queryClient } from '../src/lib/queryClient';
 import { WebCenteredFrame } from '../src/components/common/WebCenteredFrame';
 import { AlertHost } from '../src/components/common/AlertHost';
+import { BugReportPromptModal } from '../src/components/common/BugReportPromptModal';
 
 export default function RootLayout() {
   return (
@@ -18,6 +19,7 @@ export default function RootLayout() {
           <Stack.Screen name="admin/contests" />
         </Stack>
         <AlertHost />
+        <BugReportPromptModal />
       </WebCenteredFrame>
     </QueryClientProvider>
   );
