@@ -8,6 +8,7 @@ import {
   StyleSheet,
   Image,
   ActivityIndicator,
+  Linking,
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -27,6 +28,7 @@ import { buildReviewStats, buildReviewKeywords } from '../../../src/utils/review
 import { useMyReceivedReviews } from '../../../src/hooks/useMyReceivedReviews';
 import { GuestPrompt } from '../../../src/components/common/GuestPrompt';
 import { trackEvent } from '../../../src/services/gtm';
+import { OPEN_CHAT_URL } from '../../../src/constants/links';
 
 function GridMenuItem({
   icon,
@@ -414,6 +416,22 @@ export default function ProfileScreen() {
             <View style={styles.notifTexts}>
               <Text style={[styles.notifTitle, styles.withdrawText]}>회원 탈퇴</Text>
             </View>
+          </TouchableOpacity>
+        </View>
+
+        {/* 오류/불편 신고 */}
+        <View style={styles.notifSection}>
+          <TouchableOpacity
+            style={styles.notifRow}
+            onPress={() => Linking.openURL(OPEN_CHAT_URL)}
+            activeOpacity={0.7}
+          >
+            <Text style={styles.notifIcon}>🐞</Text>
+            <View style={styles.notifTexts}>
+              <Text style={styles.notifTitle}>오류/불편 신고하기</Text>
+              <Text style={styles.notifSubtitle}>오픈채팅으로 알려주시면 확인 후 보상을 드려요</Text>
+            </View>
+            <Text style={styles.notifArrow}>›</Text>
           </TouchableOpacity>
         </View>
 
