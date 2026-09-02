@@ -59,9 +59,6 @@ services:
       KAKAO_CLIENT_SECRET: ${KAKAO_CLIENT_SECRET}
       KAKAO_REDIRECT_URI: ${KAKAO_REDIRECT_URI}
       JAVA_TOOL_OPTIONS: "-XX:MaxRAMPercentage=70.0 -XX:InitialRAMPercentage=50.0"
-      # CloudWatch로 메트릭을 보내는 리전. 자격증명은 EC2 인스턴스 IAM 역할에서 자동으로 가져오므로
-      # 액세스키를 여기 넣지 않는다.
-      AWS_REGION: ${AWS_REGION:-ap-northeast-2}
       SPRING_DATA_REDIS_HOST: redis
       SPRING_DATA_REDIS_PORT: 6379
 
