@@ -2,6 +2,7 @@ export type ContestCategory =
   | 'IT'
   | 'STARTUP'
   | 'DESIGN'
+  | 'MEDIA'
   | 'SOCIAL'
   | 'ENGINEERING'
   | 'ARTS'
