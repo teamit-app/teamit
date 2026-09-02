@@ -24,6 +24,7 @@ const CATEGORY_EMOJI: Record<ContestCategory, string> = {
   MARKETING: '📢',
   STARTUP: '🚀',
   DESIGN: '🎨',
+  MEDIA: '🎬',
   SOCIAL: '🌱',
   ENGINEERING: '⚙️',
   ARTS: '🎭',
