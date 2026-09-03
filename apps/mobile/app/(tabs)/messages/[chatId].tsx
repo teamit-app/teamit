@@ -242,6 +242,15 @@ export default function ChatDetailScreen() {
       return;
     }
     trackEvent('team_confirm', { post_id: chat?.postId ?? null });
+    // team_confirm은 북극성 지표 분자라 발생 시점/횟수/파라미터를 절대 바꾸지 않는다.
+    // "누가" 확정됐는지는 이 신규 이벤트로 별도 추적 — chat.teamInfo.members는 이미
+    // 위(초대하기 시트용 teamMemberIds 계산부)에서 filled=true를 "확정된 팀원"으로
+    // 취급하는 것과 동일한 기준을 재사용한다. host(모집자 본인)도 팀의 일원이라 포함한다.
+    (chat?.teamInfo?.members ?? [])
+      .filter((m) => m.filled)
+      .forEach((m) => {
+        trackEvent('team_confirm_member', { post_id: chat?.postId ?? null, target_user_id: m.id });
+      });
     setIsTeamConfirmed(true);
     const systemMsg: Message = {
       id: Date.now(),
