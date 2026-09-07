@@ -17,6 +17,7 @@ import { useAuthStore } from '../../../src/store/useAuthStore';
 import { withAuth } from '../../../src/utils/authGuard';
 import { Alert } from '../../../src/utils/alert';
 import { trackEvent } from '../../../src/services/gtm';
+import { useScrollDepthTracking } from '../../../src/hooks/useScrollDepthTracking';
 
 type StatusFilter = 'ALL' | ContestStatus;
 
@@ -41,6 +42,7 @@ export default function HomeScreen() {
   const insets = useSafeAreaInsets();
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('ALL');
   const currentUserId = useAuthStore((s) => s.currentUserId);
+  const scrollTracking = useScrollDepthTracking('home', 'home');
 
   const { data: contests = [] } = useQuery({
     queryKey: ['popularContests'],
@@ -81,6 +83,7 @@ export default function HomeScreen() {
       <ScrollView
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
+        {...scrollTracking}
       >
         {/* 배너 */}
         <View style={styles.banner}>
