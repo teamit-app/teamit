@@ -24,6 +24,7 @@ import { formatDDay } from '../../../../src/utils/dday';
 import { withAuth } from '../../../../src/utils/authGuard';
 import { resolveImageUrl } from '../../../../src/utils/imageUrl';
 import { trackEvent } from '../../../../src/services/gtm';
+import { useScrollDepthTracking } from '../../../../src/hooks/useScrollDepthTracking';
 
 const SORT_LABEL: Record<SortOption, string> = {
   LATEST: '최신순',
@@ -55,6 +56,7 @@ export default function ContestDetailScreen() {
   const currentUserId = useAuthStore((s) => s.currentUserId);
 
   const id = Number(contestId);
+  const scrollTracking = useScrollDepthTracking('contest_detail', id);
   const storeContest = contests.find((c) => c.contestId === id);
   const isHearted = storeContest?.isHearted ?? detail?.isHearted ?? false;
 
@@ -117,7 +119,11 @@ export default function ContestDetailScreen() {
     <View style={[styles.container, { paddingTop: insets.top }]}>
       <ScreenHeader title="공모전 세부 정보" onBack={() => router.back()} />
 
-      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        contentContainerStyle={styles.content}
+        showsVerticalScrollIndicator={false}
+        {...scrollTracking}
+      >
 
         {/* ── 상단 공모전 타이틀 카드 ── */}
         <View style={styles.titleCard}>
