@@ -107,7 +107,7 @@ function RecruitPostCard({ post }: { post: TalentRecruitPost }) {
 // ── 메인 화면 ─────────────────────────────────────────────────────────────────
 export default function TalentDetailScreen() {
   const insets = useSafeAreaInsets();
-  const { userId } = useLocalSearchParams<{ userId: string }>();
+  const { userId, contestId } = useLocalSearchParams<{ userId: string; contestId?: string }>();
   const [hearted, setHearted] = useState(false);
   const [detail, setDetail] = useState<TalentDetail | null>(null);
   const [loadError, setLoadError] = useState(false);
@@ -131,7 +131,9 @@ export default function TalentDetailScreen() {
     } else {
       // 서버 모드: API 호출. 실패 시 이전엔 console.error만 하고 넘어가서 화면이 로딩
       // 스피너에 계속 멈춰있는 것처럼 보였다 — 에러 상태를 보여주고 재시도할 수 있게 한다.
-      getUserDetail(Number(userId))
+      // contestId가 있으면(지원자/후보자 화면에서 진입) 그 공모전에 등록한 참여카드 스냅샷을
+      // 참여정보에 우선 사용한다 — 라이브 매칭 프로필이 비어있어도 지원 시점 정보가 보이도록.
+      getUserDetail(Number(userId), contestId ? Number(contestId) : undefined)
         .then((d) => {
           setDetail(d);
           setHearted(d.isHearted);
@@ -141,7 +143,7 @@ export default function TalentDetailScreen() {
           setLoadError(true);
         });
     }
-  }, [userId, reloadKey]);
+  }, [userId, contestId, reloadKey]);
 
   // useExploreData의 toggleTalentHeart를 통해 토글해야 탐색 > 인재풀 목록의 하트 상태도 함께 갱신된다
   // (그 쿼리 캐시가 인재 좋아요의 단일 진실 공급원 역할을 함)

@@ -154,14 +154,15 @@ public class UserController {
         return ApiResponse.success(response, "관심 공모전 목록 조회 성공");
     }
 
-    @Operation(summary = "유저 상세 프로필 조회")
+    @Operation(summary = "유저 상세 프로필 조회", description = "contestId를 넘기면 그 공모전에 등록한 참여카드(ContestParticipant) 스냅샷을 참여정보에 우선 사용한다. 지원자/후보자 화면처럼 특정 공모전 맥락에서 프로필을 볼 때 사용.")
     @GetMapping("/{userId}")
     public ApiResponse<UserDetailResponse> getUserDetail(
             @PathVariable Long userId,
+            @RequestParam(required = false) Long contestId,
             @LoginUser CustomUserDetails userDetails) {
         // 비로그인 사용자도 조회 가능(permitAll) — isHearted만 false로 빠진다
         Long viewerUserId = userDetails != null ? userDetails.getUserId() : null;
-        UserDetailResponse response = userService.getUserDetail(userId, viewerUserId);
+        UserDetailResponse response = userService.getUserDetail(userId, viewerUserId, contestId);
         return ApiResponse.success(response, "유저 상세 조회 성공");
     }
 

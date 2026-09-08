@@ -90,5 +90,5 @@ export const removeTalentHeart = (_userId: number, targetUserId: number): Promis
 
 // ─── 유저 상세 프로필 조회 ────────────────────────────────────────────────────
 
-export const getUserDetail = (userId: number): Promise<TalentDetail> =>
-  apiRequest<TalentDetail>(`/users/${userId}`);
+export const getUserDetail = (userId: number, contestId?: number): Promise<TalentDetail> =>
+  apiRequest<TalentDetail>(`/users/${userId}${contestId != null ? `?contestId=${contestId}` : ''}`);

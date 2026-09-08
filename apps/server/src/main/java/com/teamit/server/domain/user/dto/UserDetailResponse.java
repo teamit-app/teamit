@@ -1,6 +1,7 @@
 package com.teamit.server.domain.user.dto;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.teamit.server.domain.contest.entity.ContestParticipant;
 import com.teamit.server.domain.education.entity.Education;
 import com.teamit.server.domain.post.dto.PostListItemResponse;
 import com.teamit.server.domain.region.entity.UserRegion;
@@ -83,24 +84,64 @@ public class UserDetailResponse {
                                           List<UserSkill> userSkills,
                                           List<UserRegion> userRegions,
                                           MatchingProfile profile,
+                                          ContestParticipant contestSnapshot,
                                           List<com.teamit.server.domain.review.entity.TeamReview> receivedReviews,
                                           List<Career> careers,
                                           List<PostListItemResponse> myPosts,
                                           boolean isHearted) {
-        List<String> skillNames = (profile != null && profile.getSkillsCsv() != null && !profile.getSkillsCsv().isBlank())
-                ? Arrays.stream(profile.getSkillsCsv().split(","))
-                        .map(String::trim)
-                        .filter(s -> !s.isEmpty())
-                        .collect(Collectors.toList())
-                : userSkills.stream()
-                        .map(UserSkill::getEffectiveSkillName)
-                        .collect(Collectors.toList());
+        // 참여정보(기술/경험/강도/온오프라인/팀분위기/피드백/리더십)는 contestSnapshot이 있으면
+        // 그 공모전 등록 시점 스냅샷을 우선 쓰고, 없으면 기존처럼 라이브 매칭 프로필을 쓴다.
+        // contestId 없이 호출되는 기존 경로(contestSnapshot=null)는 아래 로직이 전부 profile로만
+        // 귀결되어 이전 동작과 동일하다.
+        List<String> skillNames;
+        if (contestSnapshot != null) {
+            skillNames = (contestSnapshot.getSkillsCsv() != null && !contestSnapshot.getSkillsCsv().isBlank())
+                    ? Arrays.stream(contestSnapshot.getSkillsCsv().split(","))
+                            .map(String::trim)
+                            .filter(s -> !s.isEmpty())
+                            .collect(Collectors.toList())
+                    : List.of();
+        } else {
+            skillNames = (profile != null && profile.getSkillsCsv() != null && !profile.getSkillsCsv().isBlank())
+                    ? Arrays.stream(profile.getSkillsCsv().split(","))
+                            .map(String::trim)
+                            .filter(s -> !s.isEmpty())
+                            .collect(Collectors.toList())
+                    : userSkills.stream()
+                            .map(UserSkill::getEffectiveSkillName)
+                            .collect(Collectors.toList());
+        }
 
         String regionsJoined = userRegions.stream()
                 .map(r -> r.getSigungu() != null ? r.getSido() + " " + r.getSigungu() : r.getSido())
                 .collect(Collectors.joining(", "));
 
-        // MatchingProfile에서 레이블 변환
+        // 참여 정보 섹션(meetingPreference)에 붙는 지역은 contestSnapshot이 있으면 그 등록 시점
+        // 스냅샷 지역을 쓴다. 상단 location 필드는 공모전과 무관한 일반 프로필 정보라 그대로 둔다.
+        String meetingRegionLabel = contestSnapshot != null
+                ? buildRegionLabel(contestSnapshot.getRegionsSnapshot())
+                : regionsJoined;
+
+        Integer experienceLevel = contestSnapshot != null ? contestSnapshot.getExperienceLevel()
+                : (profile != null ? profile.getExperienceLevel() : null);
+        String participationPurpose = contestSnapshot != null ? contestSnapshot.getParticipationPurpose()
+                : (profile != null ? profile.getParticipationPurpose() : null);
+        Integer intensityLevel = contestSnapshot != null ? contestSnapshot.getIntensityLevel()
+                : (profile != null ? profile.getIntensityLevel() : null);
+        String onlineOfflinePref = contestSnapshot != null ? contestSnapshot.getOnlineOfflinePref()
+                : (profile != null ? profile.getOnlineOfflinePref() : null);
+        Integer teamVibe = contestSnapshot != null ? contestSnapshot.getTeamVibe()
+                : (profile != null ? profile.getTeamVibe() : null);
+        Integer feedbackStyle = contestSnapshot != null ? contestSnapshot.getFeedbackStyle()
+                : (profile != null ? profile.getFeedbackStyle() : null);
+        String leadershipPref = contestSnapshot != null ? contestSnapshot.getLeadershipPref()
+                : (profile != null ? profile.getLeadershipPref() : null);
+        String rawAppealTitle = contestSnapshot != null ? contestSnapshot.getAppealTitle()
+                : (profile != null ? profile.getAppealTitle() : null);
+        String rawAppealContent = contestSnapshot != null ? contestSnapshot.getAppealContent()
+                : (profile != null ? profile.getAppealContent() : null);
+
+        // 레이블 변환
         String appealTitle = "";
         String appealContent = "";
         String contestExperienceDetail = "";
@@ -110,14 +151,13 @@ public class UserDetailResponse {
         String feedbackStyleDetail = "";
         String leadershipDetail = "";
 
-        if (profile != null) {
-            appealTitle = profile.getAppealTitle() != null ? profile.getAppealTitle() : "";
-            appealContent = profile.getAppealContent() != null ? profile.getAppealContent() : "";
+        if (contestSnapshot != null || profile != null) {
+            appealTitle = rawAppealTitle != null ? rawAppealTitle : "";
+            appealContent = rawAppealContent != null ? rawAppealContent : "";
 
-            contestExperienceDetail = ExperiencePurposeLabels.combined(
-                    profile.getExperienceLevel(), profile.getParticipationPurpose());
-            if (profile.getIntensityLevel() != null) {
-                intensityDetail = switch (profile.getIntensityLevel()) {
+            contestExperienceDetail = ExperiencePurposeLabels.combined(experienceLevel, participationPurpose);
+            if (intensityLevel != null) {
+                intensityDetail = switch (intensityLevel) {
                     case 1 -> "주 1~3h";
                     case 2 -> "주 4~7h";
                     case 3 -> "주 8~14h";
@@ -125,19 +165,19 @@ public class UserDetailResponse {
                     default -> "";
                 };
             }
-            if (profile.getOnlineOfflinePref() != null) {
-                String prefLabel = switch (profile.getOnlineOfflinePref()) {
+            if (onlineOfflinePref != null) {
+                String prefLabel = switch (onlineOfflinePref) {
                     case "ONLINE" -> "온라인";
                     case "OFFLINE" -> "오프라인";
                     case "MIXED" -> "온오프라인 모두 가능";
-                    default -> profile.getOnlineOfflinePref();
+                    default -> onlineOfflinePref;
                 };
-                meetingPreference = (!"ONLINE".equals(profile.getOnlineOfflinePref()) && !regionsJoined.isEmpty())
-                        ? prefLabel + " · " + regionsJoined
+                meetingPreference = (!"ONLINE".equals(onlineOfflinePref) && !meetingRegionLabel.isEmpty())
+                        ? prefLabel + " · " + meetingRegionLabel
                         : prefLabel;
             }
-            if (profile.getTeamVibe() != null) {
-                teamVibeDetail = switch (profile.getTeamVibe()) {
+            if (teamVibe != null) {
+                teamVibeDetail = switch (teamVibe) {
                     case 1 -> "팀 분위기 최우선";
                     case 2 -> "팀 분위기 우선";
                     case 3 -> "균형 중시";
@@ -146,8 +186,8 @@ public class UserDetailResponse {
                     default -> "";
                 };
             }
-            if (profile.getFeedbackStyle() != null) {
-                feedbackStyleDetail = switch (profile.getFeedbackStyle()) {
+            if (feedbackStyle != null) {
+                feedbackStyleDetail = switch (feedbackStyle) {
                     case 1 -> "매우 부드럽게";
                     case 2 -> "부드럽게";
                     case 3 -> "상황에 따라요";
@@ -156,12 +196,12 @@ public class UserDetailResponse {
                     default -> "";
                 };
             }
-            if (profile.getLeadershipPref() != null) {
-                leadershipDetail = switch (profile.getLeadershipPref()) {
+            if (leadershipPref != null) {
+                leadershipDetail = switch (leadershipPref) {
                     case "WANT" -> "리더 선호";
                     case "IF_NEEDED" -> "리더 가능";
                     case "DONT_WANT" -> "팔로워 선호";
-                    default -> profile.getLeadershipPref();
+                    default -> leadershipPref;
                 };
             }
         }
@@ -242,5 +282,19 @@ public class UserDetailResponse {
                 .reviewKeywords(reviewKeywords)
                 .teamReviews(teamReviews)
                 .build();
+    }
+
+    // ContestParticipant.regionsSnapshot 포맷("시도|시군구;시도|시군구")을 사람이 읽는 라벨로 변환
+    // (PostApplicantResponse.buildRegionLabel과 동일한 포맷 파서)
+    private static String buildRegionLabel(String regionsSnapshot) {
+        if (regionsSnapshot == null || regionsSnapshot.isBlank()) return "";
+        return Arrays.stream(regionsSnapshot.split(";"))
+                .map(entry -> {
+                    String[] parts = entry.split("\\|", -1);
+                    String sido = parts[0];
+                    String sigungu = parts.length > 1 && !parts[1].isEmpty() ? parts[1] : null;
+                    return sigungu != null ? sido + " " + sigungu : sido;
+                })
+                .collect(Collectors.joining(", "));
     }
 }

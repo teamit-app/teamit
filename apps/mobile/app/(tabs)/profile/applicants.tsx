@@ -212,8 +212,8 @@ const card = StyleSheet.create({
 
 export default function ApplicantsScreen() {
   const insets = useSafeAreaInsets();
-  const { postId, postTitle, contestTitle } =
-    useLocalSearchParams<{ postId: string; postTitle: string; contestTitle: string }>();
+  const { postId, postTitle, contestTitle, contestId } =
+    useLocalSearchParams<{ postId: string; postTitle: string; contestTitle: string; contestId?: string }>();
 
   const [tab, setTab] = useState<Tab>('applicants');
   const [applicants, setApplicants] = useState<PostApplicant[]>([]);
@@ -282,8 +282,12 @@ export default function ApplicantsScreen() {
 
   const navigateToDetail = (person: PostApplicant) => {
     // profile 탭 내부에서 탐색 탭으로 절대경로 push하면 뒤로가기가 탐색 탭으로 튀는 문제가 있어
-    // profile 탭 안에 alias 라우트(profile/talent/[userId])를 두고 그쪽으로 push한다
-    router.push(`/profile/talent/${person.userId}` as never);
+    // profile 탭 안에 alias 라우트(profile/talent/[userId])를 두고 그쪽으로 push한다.
+    // contestId를 같이 넘겨야 상세 화면이 이 공모전 참여카드 스냅샷을 참여정보에 쓸 수 있다.
+    const path = contestId
+      ? `/profile/talent/${person.userId}?contestId=${contestId}`
+      : `/profile/talent/${person.userId}`;
+    router.push(path as never);
   };
 
   return (
