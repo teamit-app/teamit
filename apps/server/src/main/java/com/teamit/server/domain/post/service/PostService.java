@@ -549,15 +549,37 @@ public class PostService {
                 .collect(Collectors.toMap(mp -> mp.getUser().getId(), mp -> mp));
         Map<Long, Double> ratingMap = averageRatingsOf(applicantIds);
 
+        // 지원자가 이 공모전에 참여카드(후보)로 등록할 때 저장한 스냅샷 — 참여정보는 지원 시점이
+        // 아니라 이 등록 시점 그대로 고정되어야 하므로(라이브 매칭 프로필은 비어 있거나 이후 바뀔 수 있음)
+        // "해당 공모전 후보" 탭과 동일하게 스냅샷을 우선 사용한다.
+        Map<Long, ContestParticipant> cpSnapshotMap = post.getContestId() != null
+                ? contestParticipantRepository
+                        .findAllByContestIdInAndUserIdIn(List.of(post.getContestId()), applicantIds).stream()
+                        .collect(Collectors.toMap(cp -> cp.getUser().getId(), cp -> cp))
+                : Map.of();
+
         return applicants.stream()
-                .map(u -> PostApplicantResponse.from(
-                        u,
-                        educationMap.get(u.getId()),
-                        skillMap.getOrDefault(u.getId(), List.of()),
-                        regionMap.getOrDefault(u.getId(), List.of()),
-                        profileMap.get(u.getId()),
-                        ratingMap.getOrDefault(u.getId(), 0.0)
-                ))
+                .map(u -> {
+                    ContestParticipant snapshot = cpSnapshotMap.get(u.getId());
+                    if (snapshot != null) {
+                        return PostApplicantResponse.fromSnapshot(
+                                u,
+                                educationMap.get(u.getId()),
+                                snapshot,
+                                ratingMap.getOrDefault(u.getId(), 0.0)
+                        );
+                    }
+                    // 스냅샷이 없는 예외 케이스(예: 지원 후 공모전 후보 등록을 취소한 경우) —
+                    // 완전히 빈 화면이 되지 않도록 라이브 매칭 프로필로 폴백
+                    return PostApplicantResponse.from(
+                            u,
+                            educationMap.get(u.getId()),
+                            skillMap.getOrDefault(u.getId(), List.of()),
+                            regionMap.getOrDefault(u.getId(), List.of()),
+                            profileMap.get(u.getId()),
+                            ratingMap.getOrDefault(u.getId(), 0.0)
+                    );
+                })
                 .collect(Collectors.toList());
     }
 
