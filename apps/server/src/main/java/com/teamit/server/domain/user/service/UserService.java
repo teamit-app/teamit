@@ -414,13 +414,18 @@ public class UserService {
     // 유저 상세 프로필 조회
     // ──────────────────────────────────────────────────────────────
     @Transactional(readOnly = true)
-    public UserDetailResponse getUserDetail(Long userId, Long viewerUserId) {
+    public UserDetailResponse getUserDetail(Long userId, Long viewerUserId, Long contestId) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new IllegalArgumentException("사용자를 찾을 수 없습니다"));
         Education education = educationRepository.findByUserId(userId).orElse(null);
         List<UserSkill> skills = userSkillRepository.findAllByUserIdInWithSkill(List.of(userId));
         List<UserRegion> regions = userRegionRepository.findAllByUserId(userId);
         MatchingProfile profile = matchingProfileRepository.findByUserId(userId).orElse(null);
+        // contestId가 넘어오면(지원자/후보자 화면 등 특정 공모전 맥락) 그 공모전에 등록한
+        // 참여카드 스냅샷을 참여정보에 우선 사용한다 — 라이브 매칭 프로필은 비어있을 수 있음
+        com.teamit.server.domain.contest.entity.ContestParticipant contestSnapshot = contestId != null
+                ? contestParticipantRepository.findByContestIdAndUserId(contestId, userId).orElse(null)
+                : null;
         List<com.teamit.server.domain.review.entity.TeamReview> receivedReviews =
                 teamReviewRepository.findByReceiverId(userId).stream()
                         .sorted(java.util.Comparator.comparing(
@@ -430,8 +435,8 @@ public class UserService {
                 && userHeartRepository.existsByUserIdAndTargetUserId(viewerUserId, userId);
         List<Career> careers = careerRepository.findAllByUserId(userId);
         List<PostListItemResponse> myPosts = postService.getMyPosts(userId);
-        return UserDetailResponse.from(user, education, skills, regions, profile, receivedReviews,
-                careers, myPosts, isHearted);
+        return UserDetailResponse.from(user, education, skills, regions, profile, contestSnapshot,
+                receivedReviews, careers, myPosts, isHearted);
     }
 
     // ──────────────────────────────────────────────────────────────

@@ -81,6 +81,7 @@ export default function ReceivedApplicationsScreen() {
         postId: selectedPost.postId,
         postTitle: selectedPost.title,
         contestTitle: selectedPost.contestTitle ?? '',
+        contestId: selectedPost.contestId != null ? String(selectedPost.contestId) : '',
       },
     });
   };
