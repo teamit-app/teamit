@@ -2,8 +2,11 @@ package com.teamit.server.domain.contest.repository;
 
 import com.teamit.server.domain.contest.entity.Contest;
 import com.teamit.server.domain.contest.entity.ContestCategory;
+import com.teamit.server.domain.contest.entity.ContestHeart;
 import jakarta.persistence.criteria.Join;
 import jakarta.persistence.criteria.JoinType;
+import jakarta.persistence.criteria.Root;
+import jakarta.persistence.criteria.Subquery;
 import org.springframework.data.jpa.domain.Specification;
 
 import java.time.LocalDate;
@@ -66,6 +69,24 @@ public class ContestSpecifications {
                     cb.like(cb.lower(root.get("organizer")), pattern),
                     cb.like(cb.lower(categoryJoin.as(String.class)), pattern)
             );
+        };
+    }
+
+    // "인기순" 목록 정렬 — 하트 수 내림차순, 동점이면 조회수, 그다음 최신순으로 tie-break.
+    // 하트 수는 컬럼이 아니라 ContestHeart 실시간 COUNT라 서브쿼리로 계산해서 정렬 기준으로 쓴다.
+    // Pageable에는 Sort를 넘기지 않아야 한다(여기서 이미 query.orderBy를 직접 세팅함).
+    // Predicate 자체는 필터링에 관여하지 않으므로 conjunction(항상 참)을 반환한다.
+    public static Specification<Contest> orderByPopularity() {
+        return (root, query, cb) -> {
+            Subquery<Long> heartCountSub = query.subquery(Long.class);
+            Root<ContestHeart> heartRoot = heartCountSub.from(ContestHeart.class);
+            heartCountSub.select(cb.count(heartRoot))
+                    .where(cb.equal(heartRoot.get("contest"), root));
+            query.orderBy(
+                    cb.desc(heartCountSub),
+                    cb.desc(root.get("viewCount")),
+                    cb.desc(root.get("createdAt")));
+            return cb.conjunction();
         };
     }
 }

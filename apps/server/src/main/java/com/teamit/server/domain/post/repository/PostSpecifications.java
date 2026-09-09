@@ -1,6 +1,7 @@
 package com.teamit.server.domain.post.repository;
 
 import com.teamit.server.domain.post.entity.Post;
+import com.teamit.server.domain.post.entity.PostHeart;
 import com.teamit.server.domain.post.entity.PostSkill;
 import jakarta.persistence.criteria.JoinType;
 import jakarta.persistence.criteria.Root;
@@ -30,6 +31,23 @@ public class PostSpecifications {
                     cb.like(cb.lower(root.get("title")), pattern),
                     root.get("id").in(skillSub)
             );
+        };
+    }
+
+    // "인기순" 목록 정렬 — 하트 수 내림차순, 동점이면 조회수, 그다음 최신순으로 tie-break.
+    // ContestSpecifications.orderByPopularity()와 동일한 패턴(하트 수는 컬럼이 아니라
+    // PostHeart 실시간 COUNT라 서브쿼리로 계산). Pageable에는 Sort를 넘기지 않아야 한다.
+    public static Specification<Post> orderByPopularity() {
+        return (root, query, cb) -> {
+            Subquery<Long> heartCountSub = query.subquery(Long.class);
+            Root<PostHeart> heartRoot = heartCountSub.from(PostHeart.class);
+            heartCountSub.select(cb.count(heartRoot))
+                    .where(cb.equal(heartRoot.get("post"), root));
+            query.orderBy(
+                    cb.desc(heartCountSub),
+                    cb.desc(root.get("viewCount")),
+                    cb.desc(root.get("createdAt")));
+            return cb.conjunction();
         };
     }
 }

@@ -64,22 +64,34 @@ public class ContestService {
     @Transactional(readOnly = true)
     public PopularContestListResponse getPopularContests() {
         LocalDate today = LocalDate.now();
-        List<PopularContestResponse> contests = contestRepository
-                .findMostHeartedActiveContests(today, PageRequest.of(0, 10))
-                .stream()
-                .map(PopularContestResponse::from)
+        List<Contest> contests = contestRepository.findMostHeartedActiveContests(today, PageRequest.of(0, 10));
+
+        List<Long> contestIds = contests.stream().map(Contest::getId).collect(Collectors.toList());
+        Map<Long, Long> heartCountByContestId = contestHeartRepository.countGroupedByContestIdIn(contestIds).stream()
+                .collect(Collectors.toMap(
+                        ContestHeartRepository.ContestHeartCountProjection::getContestId,
+                        ContestHeartRepository.ContestHeartCountProjection::getCount));
+
+        List<PopularContestResponse> content = contests.stream()
+                .map(contest -> PopularContestResponse.from(contest, heartCountByContestId.getOrDefault(contest.getId(), 0L)))
                 .collect(Collectors.toList());
         return PopularContestListResponse.builder()
-                .contests(contests)
+                .contests(content)
                 .build();
     }
 
     // 필터 조합이 많아 캐시 항목 수가 커질 수 있어 popular보다 TTL을 짧게(10분) 둠.
     @Cacheable(cacheNames = "contestsList",
-            key = "T(String).format('%s-%s-%s-%d-%d', #category, #status, #keyword, #page, #size)")
+            key = "T(String).format('%s-%s-%s-%s-%d-%d', #category, #status, #keyword, #sort, #page, #size)")
     @Transactional(readOnly = true)
-    public ContestPageResponse getContestList(ContestCategory category, ContestStatus status, String keyword, int page, int size) {
-        Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
+    public ContestPageResponse getContestList(ContestCategory category, ContestStatus status, String keyword,
+                                               ContestSortOption sort, int page, int size) {
+        // POPULAR는 ContestSpecifications.orderByPopularity()가 query.orderBy를 직접 세팅하므로
+        // Pageable에는 Sort를 넘기지 않는다(같이 넘기면 Spring이 둘 다 적용하려다 충돌한다).
+        boolean popular = sort == ContestSortOption.POPULAR;
+        Pageable pageable = popular
+                ? PageRequest.of(page, size)
+                : PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
 
         LocalDate today = LocalDate.now();
         LocalDate statusEndMin = null;
@@ -105,11 +117,14 @@ public class ContestService {
                 .and(ContestSpecifications.endDateLessThanOrEqual(statusEndMax))
                 .and(ContestSpecifications.endDateLessThan(statusEndBefore))
                 .and(ContestSpecifications.keyword(keyword));
+        if (popular) {
+            spec = spec.and(ContestSpecifications.orderByPopularity());
+        }
 
         Page<Contest> contestPage = contestRepository.findAll(spec, pageable);
 
-        // 탐색 탭 "인기순" 정렬(explore/index.tsx)이 좋아요 수 기준으로 클라이언트에서
-        // 정렬할 수 있도록, 목록에 있는 공모전들의 좋아요 수를 배치로 한 번에 조회한다
+        // 카드에 좋아요 수를 표시하고(정렬 자체는 위 orderByPopularity가 이미 서버에서 처리),
+        // 목록에 있는 공모전들의 좋아요 수를 배치로 한 번에 조회한다
         List<Long> contestIds = contestPage.getContent().stream()
                 .map(Contest::getId)
                 .collect(Collectors.toList());
@@ -139,6 +154,14 @@ public class ContestService {
         Contest contest = contestRepository.findById(contestId)
                 .orElseThrow(() -> new IllegalArgumentException("공모전을 찾을 수 없습니다"));
         return ContestDetailResponse.from(contest);
+    }
+
+    // 위 getContestDetail은 캐싱돼서 매 요청마다 실행되지 않으므로, 조회수는 컨트롤러에서
+    // 이 메서드를 별도로 항상 호출해 늘린다(Post.increaseViewCount는 캐싱 없는 getPostDetail
+    // 안에서 바로 증가시키지만, Contest는 캐시 때문에 그 방식을 쓸 수 없다).
+    @Transactional
+    public void increaseViewCount(Long contestId) {
+        contestRepository.increaseViewCount(contestId);
     }
 
     // 카테고리가 하나라도 겹치는 다른 공모전을 추천한다 — 겹치는 카테고리 개수가 많을수록,

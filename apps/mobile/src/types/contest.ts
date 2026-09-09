@@ -27,6 +27,7 @@ export interface Contest {
   isRegisteredAsParticipant: boolean;
   imageUrl?: string;
   heartCount?: number;
+  viewCount?: number;
 }
 
 export interface ContestDetail extends Contest {

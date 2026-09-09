@@ -426,6 +426,13 @@ public class UserService {
         com.teamit.server.domain.contest.entity.ContestParticipant contestSnapshot = contestId != null
                 ? contestParticipantRepository.findByContestIdAndUserId(contestId, userId).orElse(null)
                 : null;
+        // contestId 없이(인재풀 등 일반 진입) 봤는데 라이브 매칭 프로필도 없는 경우 — 매칭
+        // 프로필은 안 채웠어도 모집글을 쓰면 그 공모전에 자동으로 참여카드(ContestParticipant)가
+        // 등록되므로(PostService.createPost), 가장 최근 참여카드 스냅샷으로 대신 채운다.
+        // getLatestParticipationCard()와 동일한 폴백 원칙.
+        if (contestSnapshot == null && profile == null) {
+            contestSnapshot = contestParticipantRepository.findTopByUserIdOrderByCreatedAtDesc(userId).orElse(null);
+        }
         List<com.teamit.server.domain.review.entity.TeamReview> receivedReviews =
                 teamReviewRepository.findByReceiverId(userId).stream()
                         .sorted(java.util.Comparator.comparing(

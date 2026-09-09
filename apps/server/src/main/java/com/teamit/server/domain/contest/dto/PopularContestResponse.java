@@ -20,8 +20,10 @@ public class PopularContestResponse {
     private LocalDate endDate;
     private long dDay;
     private String imageUrl;
+    private long heartCount;
+    private int viewCount;
 
-    public static PopularContestResponse from(Contest contest) {
+    public static PopularContestResponse from(Contest contest, long heartCount) {
         long dDay = ChronoUnit.DAYS.between(LocalDate.now(), contest.getEndDate());
         return PopularContestResponse.builder()
                 .contestId(contest.getId())
@@ -31,6 +33,8 @@ public class PopularContestResponse {
                 .endDate(contest.getEndDate())
                 .dDay(dDay)
                 .imageUrl(contest.getImageUrl())
+                .heartCount(heartCount)
+                .viewCount(contest.getViewCount())
                 .build();
     }
 }

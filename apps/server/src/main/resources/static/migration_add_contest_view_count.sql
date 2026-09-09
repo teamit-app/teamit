@@ -1,0 +1,1 @@
+ALTER TABLE contests ADD COLUMN view_count INT NOT NULL DEFAULT 0;

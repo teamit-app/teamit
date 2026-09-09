@@ -187,9 +187,16 @@ public class PostService {
     // ──────────────────────────────────────────────────────────────
     @Transactional(readOnly = true)
     public PostPageResponse getPostList(PostSortOption sort, String keyword, int page, int size) {
-        String sortProperty = sort == PostSortOption.POPULAR ? "viewCount" : "createdAt";
-        Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, sortProperty));
+        // POPULAR는 PostSpecifications.orderByPopularity()가 query.orderBy를 직접 세팅하므로
+        // Pageable에는 Sort를 넘기지 않는다(같이 넘기면 Spring이 둘 다 적용하려다 충돌한다).
+        boolean popular = sort == PostSortOption.POPULAR;
+        Pageable pageable = popular
+                ? PageRequest.of(page, size)
+                : PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
         Specification<Post> spec = Specification.where(PostSpecifications.keyword(keyword));
+        if (popular) {
+            spec = spec.and(PostSpecifications.orderByPopularity());
+        }
         Page<Post> postPage = postRepository.findAll(spec, pageable);
 
         List<PostListItemResponse> content = buildListItems(postPage.getContent());
@@ -237,7 +244,10 @@ public class PostService {
                     ? regionLabelByContestAndOwner.get(List.of(post.getContestId(), post.getOwner().getId()))
                     : null;
             return PostListItemResponse.from(post, ownerMap.get(post.getOwner().getId()),
-                    memberCountMap.getOrDefault(post.getChatRoomId(), 0),
+                    // chatRoomId가 null인 글만 있으면(팀 미확정) chatRoomIds가 비어서 memberCountMap이
+                    // Map.of()(null 키를 거부하는 불변 Map)가 되고, getOrDefault(null, ...)가 NPE를
+                    // 낸다 — null이면 아예 조회하지 않고 0으로 바로 처리한다.
+                    post.getChatRoomId() != null ? memberCountMap.getOrDefault(post.getChatRoomId(), 0) : 0,
                     skillsByPostId.getOrDefault(post.getId(), List.of()),
                     region,
                     likeCountMap.getOrDefault(post.getId(), 0L),

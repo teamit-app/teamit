@@ -55,6 +55,11 @@ export function ContestCard({ contest, variant, onPress, onPressHeart }: Contest
               </View>
             </View>
 
+            <View style={styles.statsRow}>
+              <Text style={styles.stat}>조회 {contest.viewCount ?? 0}</Text>
+              <Text style={styles.stat}>♥ {contest.heartCount ?? 0}</Text>
+            </View>
+
             <View style={styles.bottomRow}>
               <Text style={styles.deadline}>마감: {formattedDeadline}</Text>
               {contest.isRegisteredAsParticipant && (
@@ -92,6 +97,11 @@ export function ContestCard({ contest, variant, onPress, onPressHeart }: Contest
             </View>
 
             <Text style={styles.title} numberOfLines={1}>{contest.title}</Text>
+
+            <View style={styles.statsRow}>
+              <Text style={styles.stat}>조회 {contest.viewCount ?? 0}</Text>
+              <Text style={styles.stat}>♥ {contest.heartCount ?? 0}</Text>
+            </View>
 
             <View style={styles.bottomRow}>
               <Text style={styles.deadline}>마감: {formattedDeadline}</Text>
@@ -221,6 +231,15 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '700',
     color: Colors.primary,
+  },
+  statsRow: {
+    flexDirection: 'row',
+    gap: 10,
+    marginTop: 8,
+  },
+  stat: {
+    fontSize: 12,
+    color: Colors.grayMedium,
   },
   bottomRow: {
     flexDirection: 'row',
