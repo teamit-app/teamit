@@ -15,6 +15,7 @@ interface BackendContest {
   isNew: boolean;
   imageUrl?: string;
   heartCount?: number;
+  viewCount?: number;
 }
 
 interface BackendContestDetail {
@@ -76,6 +77,7 @@ export interface ContestListParams {
   category?: ContestCategory;
   status?: ContestStatus;
   keyword?: string;
+  sort?: 'LATEST' | 'POPULAR';
   page?: number;
   size?: number;
 }
@@ -91,6 +93,7 @@ export const getContests = async (params?: ContestListParams): Promise<ContestPa
   if (params?.category) query.set('category', params.category);
   if (params?.status) query.set('status', params.status);
   if (params?.keyword) query.set('keyword', params.keyword);
+  query.set('sort', params?.sort ?? 'LATEST');
   query.set('page', String(params?.page ?? 0));
   query.set('size', String(params?.size ?? 10));
 

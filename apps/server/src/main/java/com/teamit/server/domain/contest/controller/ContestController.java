@@ -4,6 +4,7 @@ import com.teamit.server.domain.contest.dto.ContestDetailResponse;
 import com.teamit.server.domain.contest.dto.ContestListItemResponse;
 import com.teamit.server.domain.contest.dto.ContestPageResponse;
 import com.teamit.server.domain.contest.dto.PopularContestListResponse;
+import com.teamit.server.domain.contest.dto.ContestSortOption;
 import com.teamit.server.domain.contest.entity.ContestCategory;
 import com.teamit.server.domain.contest.entity.ContestStatus;
 import com.teamit.server.domain.contest.service.ContestService;
@@ -40,6 +41,9 @@ public class ContestController {
     @Operation(summary = "공모전 상세 조회", description = "공모전 ID로 공모전 상세 정보를 조회합니다.")
     @GetMapping("/{contestId}")
     public ApiResponse<ContestDetailResponse> getContestDetail(@PathVariable Long contestId) {
+        // getContestDetail은 캐싱돼서 캐시 히트 시엔 실행되지 않으므로, 조회수 증가는
+        // 캐시와 무관하게 항상 실행되도록 별도로 호출한다
+        contestService.increaseViewCount(contestId);
         ContestDetailResponse response = contestService.getContestDetail(contestId);
         return ApiResponse.success(response, "공모전 상세 조회 성공");
     }
@@ -93,15 +97,16 @@ public class ContestController {
         return ApiResponse.success(Map.of("contestIds", contestIds), "참가 공모전 목록 조회 성공");
     }
 
-    @Operation(summary = "공모전 목록 조회", description = "카테고리, 상태, 키워드(공모전명/주최기관/카테고리) 필터로 공모전을 조회합니다.")
+    @Operation(summary = "공모전 목록 조회", description = "카테고리, 상태, 키워드(공모전명/주최기관/카테고리), 정렬(LATEST/POPULAR) 필터로 공모전을 조회합니다.")
     @GetMapping
     public ApiResponse<ContestPageResponse> getContestList(
             @RequestParam(required = false) ContestCategory category,
             @RequestParam(required = false) ContestStatus status,
             @RequestParam(required = false) String keyword,
+            @RequestParam(defaultValue = "LATEST") ContestSortOption sort,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size) {
-        ContestPageResponse response = contestService.getContestList(category, status, keyword, page, size);
+        ContestPageResponse response = contestService.getContestList(category, status, keyword, sort, page, size);
         return ApiResponse.success(response, "공모전 목록 조회 성공");
     }
 }

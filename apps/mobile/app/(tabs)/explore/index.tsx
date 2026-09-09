@@ -58,6 +58,7 @@ export default function ExploreScreen() {
   const contestsQuery = useExploreContests(
     categoryFilter === 'ALL' ? undefined : categoryFilter,
     debouncedKeyword || undefined,
+    sortFilter,
   );
   const postsQuery = useExplorePosts(sortFilter, debouncedKeyword || undefined);
 
@@ -105,15 +106,9 @@ export default function ExploreScreen() {
     return () => clearTimeout(timer);
   }, [keyword, mainTab]);
 
-  // 검색어(keyword)/카테고리/모집글 정렬은 전부 서버 쿼리 파라미터로 넘어가서 이미 필터링돼
-  // 오므로 여기서 다시 거를 필요가 없다. 공모전 "인기순"만 서버가 지원하지 않아(항상
-  // 최신순으로만 페이징) 지금까지 로드된 페이지 안에서 좋아요 수 기준으로 클라이언트가
-  // 재정렬한다(홈 화면 "인기 공모전"과 동일한 기준 — ContestService 참고) — 더 불러올수록
-  // 정렬 대상도 늘어난다.
-  const sortedContests = [...contests].sort((a, b) => {
-    if (sortFilter === 'POPULAR') return (b.heartCount ?? 0) - (a.heartCount ?? 0);
-    return 0;
-  });
+  // 검색어(keyword)/카테고리/정렬은 전부 서버 쿼리 파라미터로 넘어가서 이미 필터링·정렬돼
+  // 온다(공모전 인기순도 이제 서버가 하트수→조회수 순으로 정렬해서 내려준다) — 여기서
+  // 다시 거르거나 재정렬할 필요가 없다.
 
   if (isLoading && talents.length === 0 && contests.length === 0 && posts.length === 0) {
     return (
@@ -236,7 +231,7 @@ export default function ExploreScreen() {
 
       {mainTab === 'CONTEST' && (
         <FlatList
-          data={sortedContests}
+          data={contests}
           keyExtractor={(contest) => String(contest.contestId)}
           contentContainerStyle={styles.content}
           showsVerticalScrollIndicator={false}

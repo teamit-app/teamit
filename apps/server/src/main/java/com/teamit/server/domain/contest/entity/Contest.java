@@ -67,6 +67,12 @@ public class Contest extends BaseTimeEntity {
     @Column(name = "image_url", columnDefinition = "TEXT")
     private String imageUrl;
 
+    // 상세 조회수 — getContestDetail이 오래 캐싱돼서(@Cacheable) 엔티티 메서드로 증가시키면
+    // 캐시 히트 시 반영이 안 된다. 그래서 Post.increaseViewCount()와 달리 여기선 엔티티에
+    // 증가 메서드를 두지 않고, ContestRepository의 원자적 UPDATE 쿼리로 캐시와 무관하게 늘린다.
+    @Column(name = "view_count", nullable = false)
+    private Integer viewCount = 0;
+
     @Builder
     public Contest(String title, String organizer, Set<ContestCategory> categories,
                    String target, String recruitField, String prize,

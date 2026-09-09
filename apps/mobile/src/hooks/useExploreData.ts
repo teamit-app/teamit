@@ -40,8 +40,13 @@ function getNextPageParam(lastPage: { currentPage: number; totalPages: number })
   return lastPage.currentPage + 1 < lastPage.totalPages ? lastPage.currentPage + 1 : undefined;
 }
 
-async function fetchContestsPage(pageParam: number, category?: ContestCategory, keyword?: string): Promise<ContestPage> {
-  const contestsPromise = getContests({ category, keyword, page: pageParam, size: PAGE_SIZE });
+async function fetchContestsPage(
+  pageParam: number,
+  category?: ContestCategory,
+  keyword?: string,
+  sort: 'LATEST' | 'POPULAR' = 'LATEST',
+): Promise<ContestPage> {
+  const contestsPromise = getContests({ category, keyword, sort, page: pageParam, size: PAGE_SIZE });
   // 로그인 유저 조회가 끝나기 전에 currentUserId를 읽으면 아직 null인 걸 "비로그인"으로
   // 오판해서 isRegisteredAsParticipant 등을 전부 false로 캐싱해버리는 레이스 컨디션을 막는다.
   await useAuthStore.getState().fetchCurrentUserId();
@@ -95,10 +100,10 @@ async function fetchPostsPage(pageParam: number, sort: 'LATEST' | 'POPULAR', key
 // 로드했던 페이지들을 다시 쓸 수 있게 한다. 검색어는 서버가 keyword 파라미터로 전체
 // 데이터셋에서 필터링해주므로(지금까지 로드한 페이지 안에서만 찾는 게 아님), 호출하는 쪽에서
 // 타이핑이 멈춘 뒤(debounce) 값을 넘겨야 매 키 입력마다 새 쿼리가 뜨지 않는다.
-export function useExploreContests(category?: ContestCategory, keyword?: string) {
+export function useExploreContests(category?: ContestCategory, keyword?: string, sort: 'LATEST' | 'POPULAR' = 'LATEST') {
   return useInfiniteQuery({
-    queryKey: [...EXPLORE_CONTESTS_BASE_KEY, category ?? 'ALL', keyword ?? ''],
-    queryFn: ({ pageParam }) => fetchContestsPage(pageParam, category, keyword),
+    queryKey: [...EXPLORE_CONTESTS_BASE_KEY, category ?? 'ALL', keyword ?? '', sort],
+    queryFn: ({ pageParam }) => fetchContestsPage(pageParam, category, keyword, sort),
     initialPageParam: 0,
     getNextPageParam,
     staleTime: Infinity,

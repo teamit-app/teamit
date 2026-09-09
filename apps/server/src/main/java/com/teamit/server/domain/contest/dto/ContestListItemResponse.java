@@ -23,9 +23,10 @@ public class ContestListItemResponse {
     @JsonProperty("isNew")
     private boolean isNew;
     private String imageUrl;
-    // 탐색 탭 "인기순" 정렬은 목록을 한 번만 불러와 클라이언트에서 필터링·정렬하는
-    // 구조라(useExploreData.ts), 정렬에 쓸 좋아요 수를 목록 응답에 같이 내려준다.
+    // 카드에 좋아요 수를 표시하기 위해 목록 응답에 같이 내려준다(실제 정렬은 서버가
+    // ContestSpecifications.orderByPopularity()로 처리, 이 값은 표시용).
     private long heartCount;
+    private int viewCount;
 
     public static ContestListItemResponse from(Contest contest) {
         return from(contest, 0L);
@@ -46,6 +47,7 @@ public class ContestListItemResponse {
                 .isNew(isNew)
                 .imageUrl(contest.getImageUrl())
                 .heartCount(heartCount)
+                .viewCount(contest.getViewCount())
                 .build();
     }
 }
