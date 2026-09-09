@@ -16,6 +16,8 @@
 
 USE teamit;
 
+SET NAMES utf8mb4;
+
 START TRANSACTION;
 
 DROP TEMPORARY TABLE IF EXISTS tmp_cleanup_user_ids;
