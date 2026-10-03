@@ -19,6 +19,7 @@ export interface Message {
   senderId: number;
   senderName: string;
   senderAvatar: string;
+  senderAvatarUrl?: string | null; // 보낸 사람 프로필 사진 (없으면 senderAvatar 이모지)
   content: string;
   createdAt: string;
   isSent: boolean; // 현재 사용자가 보낸 메시지인지 여부
@@ -31,6 +32,7 @@ export interface ChatRoom {
   type: 'group' | 'direct';
   name: string;
   avatar: string;
+  avatarUrl?: string | null; // 1:1 채팅방 상대 프로필 사진 (없으면 avatar 이모지)
   lastMessage: string;
   lastMessageBy: string; // 마지막 메시지를 보낸 사람 이름
   lastMessageAt: string;
@@ -50,6 +52,7 @@ export interface TeamMemberStatus {
   realName?: string; // 리뷰 작성 시 "닉네임(본명)"으로 표기하기 위한 실명
   role: string;
   avatar: string;
+  avatarUrl?: string | null; // 프로필 사진 (없으면 avatar 이모지)
   filled: boolean;
   isHost?: boolean; // true = 이 채팅방의 모집자(팀장)
 }

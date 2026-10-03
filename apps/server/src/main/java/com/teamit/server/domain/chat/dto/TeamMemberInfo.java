@@ -10,6 +10,7 @@ public class TeamMemberInfo {
     private Long id;       // null이면 빈 슬롯
     private String name;
     private String realName;  // 리뷰 작성 시 "닉네임(본명)"으로 표기하기 위한 실명 (빈 슬롯이면 null)
+    private String profileImageUrl;  // 빈 슬롯이거나 사진 미등록이면 null
     @JsonProperty("isHost")
     private boolean isHost;
     private boolean filled;

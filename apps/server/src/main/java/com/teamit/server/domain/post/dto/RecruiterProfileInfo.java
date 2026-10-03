@@ -15,6 +15,8 @@ import java.util.stream.Collectors;
 public class RecruiterProfileInfo {
 
     private String name;
+    // 프로필 사진만은 스냅샷이 아니라 라이브 값
+    private String profileImageUrl;
     private List<String> skills;
     private String experienceCount;
     private String intensity;
@@ -89,6 +91,7 @@ public class RecruiterProfileInfo {
 
         return RecruiterProfileInfo.builder()
                 .name(owner.getNickname())
+                .profileImageUrl(owner.getProfileImageUrl())
                 .skills(skillNames)
                 .experienceCount(experienceCount)
                 .intensity(intensity)

@@ -16,6 +16,7 @@ import { useAuthStore } from '../../../../../src/store/useAuthStore';
 import { toggleTalentHeart as toggleTalentHeartInStore } from '../../../../../src/hooks/useExploreData';
 import { TalentDetail } from '../../../../../src/types/talent';
 import { ReviewStatsCard } from '../../../../../src/components/profile/ReviewStatsCard';
+import { UserAvatar } from '../../../../../src/components/common/UserAvatar';
 
 const IS_MOCK = process.env.EXPO_PUBLIC_API_MODE === 'mock';
 const GENDER_LABEL: Record<string, string> = { MALE: '남성', FEMALE: '여성' };
@@ -130,9 +131,12 @@ export default function CandidateDetailScreen() {
 
         {/* ── 프로필 카드 (하트 우측) ── */}
         <View style={s.profileCard}>
-          <View style={s.avatar}>
-            <Text style={s.avatarEmoji}>🧑‍💻</Text>
-          </View>
+          <UserAvatar
+            uri={detail.profileImageUrl}
+            fallback="🧑‍💻"
+            style={s.avatar}
+            textStyle={s.avatarEmoji}
+          />
 
           <View style={s.profileInfo}>
             <View style={s.nameRow}>

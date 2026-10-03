@@ -25,7 +25,14 @@ interface BackendGroupChat {
   teamConfirmed?: boolean;
   currentCount?: number;
   totalCount?: number;
-  members?: Array<{ id: number | null; name: string; realName?: string | null; isHost: boolean; filled: boolean }>;
+  members?: Array<{
+    id: number | null;
+    name: string;
+    realName?: string | null;
+    profileImageUrl?: string | null;
+    isHost: boolean;
+    filled: boolean;
+  }>;
   statusLabel?: string;
 }
 
@@ -34,6 +41,7 @@ interface BackendDirectChat {
   roomType: 'DIRECT';
   opponentUserId?: number | null;
   opponentNickname: string;
+  opponentProfileImageUrl?: string | null;
   lastMessage: string;
   lastMessageAt: string;
   unreadCount: number;
@@ -48,6 +56,7 @@ export interface BackendChatMessage {
   messageId: number;
   senderId: number;
   senderNickname: string;
+  senderProfileImageUrl?: string | null;
   content: string;
   isRead: boolean;
   createdAt: string;
@@ -83,6 +92,7 @@ function adaptGroupChat(c: BackendGroupChat): ChatRoom {
             realName: m.realName ?? undefined,
             role: '',
             avatar: '👤',
+            avatarUrl: m.profileImageUrl,
             filled: m.filled,
             isHost: m.isHost,
           })),
@@ -112,6 +122,7 @@ function adaptDirectChat(c: BackendDirectChat): ChatRoom {
     type: 'direct',
     name: c.opponentNickname,
     avatar: '👤',
+    avatarUrl: c.opponentProfileImageUrl,
     lastMessage: c.lastMessage ?? '',
     lastMessageBy: '',
     lastMessageAt: c.lastMessageAt ?? '',
@@ -129,6 +140,7 @@ export function adaptMessage(msg: BackendChatMessage, currentUserId: number): Me
     senderId: msg.senderId,
     senderName: msg.senderNickname,
     senderAvatar: '👤',
+    senderAvatarUrl: msg.senderProfileImageUrl,
     content: msg.content,
     createdAt: msg.createdAt,
     isSent: msg.senderId === currentUserId,

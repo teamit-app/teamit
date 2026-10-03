@@ -63,12 +63,14 @@ export interface PostListItem {
 export interface PostMemberInfo {
   id?: number;
   name: string;
+  profileImageUrl?: string | null;
   isHost: boolean;
   filled: boolean;
 }
 
 export interface RecruiterProfileInfo {
   name: string;
+  profileImageUrl?: string | null;
   skills: string[];
   experienceCount: string;
   intensity: string;
@@ -82,6 +84,7 @@ export interface RecruiterProfileInfo {
 export interface PostDetail extends PostListItem {
   schoolCondition?: string;
   ownerNickname?: string;
+  ownerProfileImageUrl?: string | null;
   contestTitle?: string;
   contestPeriod?: string;
   currentMembers?: number;
@@ -212,6 +215,7 @@ export function adaptToRecruitPostDetail(d: PostDetail): RecruitPostDetail {
     members: (d.members ?? []).map((m: PostMemberInfo, idx: number) => ({
       memberId: m.id ?? -(idx + 1),
       name: m.name,
+      profileImageUrl: m.profileImageUrl,
       isHost: m.isHost,
       isRecruiting: !m.filled,
     })),
@@ -219,6 +223,7 @@ export function adaptToRecruitPostDetail(d: PostDetail): RecruitPostDetail {
     schoolCondition: d.schoolCondition ?? '',
     recruiter: d.recruiter ?? {
       name: d.ownerNickname ?? '',
+      profileImageUrl: d.ownerProfileImageUrl,
       skills: [],
       experienceCount: '',
       intensity: '',

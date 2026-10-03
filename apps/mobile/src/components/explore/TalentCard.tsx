@@ -1,9 +1,9 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Image } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { Colors } from '../../constants/colors';
 import { EDUCATION_STATUS_LABEL } from '../../constants/education';
 import { PoolUser } from '../../types/talent';
-import { resolveImageUrl } from '../../utils/imageUrl';
+import { UserAvatar } from '../common/UserAvatar';
 
 interface TalentCardProps {
   talent: PoolUser;
@@ -19,17 +19,15 @@ const GENDER_LABEL: Record<PoolUser['gender'], string> = {
 };
 
 export function TalentCard({ talent, isMe, onPress, onPressHeart, onPressPropose }: TalentCardProps) {
-  const imageUrl = resolveImageUrl(talent.profileImageUrl);
   return (
     <TouchableOpacity style={styles.card} onPress={onPress} activeOpacity={0.85}>
       <View style={styles.topRow}>
-        <View style={styles.avatar}>
-          {imageUrl ? (
-            <Image source={{ uri: imageUrl }} style={styles.avatarImage} />
-          ) : (
-            <Text style={styles.avatarEmoji}>🧑‍💻</Text>
-          )}
-        </View>
+        <UserAvatar
+          uri={talent.profileImageUrl}
+          fallback="🧑‍💻"
+          style={styles.avatar}
+          textStyle={styles.avatarEmoji}
+        />
 
         <View style={styles.info}>
           <View style={styles.nameRow}>
@@ -105,10 +103,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     overflow: 'hidden',
-  },
-  avatarImage: {
-    width: 56,
-    height: 56,
   },
   avatarEmoji: {
     fontSize: 26,

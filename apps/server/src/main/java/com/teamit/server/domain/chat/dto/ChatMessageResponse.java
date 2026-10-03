@@ -14,6 +14,7 @@ public class ChatMessageResponse {
     private Long messageId;
     private Long senderId;
     private String senderNickname;
+    private String senderProfileImageUrl;
     private String content;
 
     // boolean 필드에 @JsonProperty를 명시해 JSON key를 "isRead"로 고정
@@ -46,6 +47,7 @@ public class ChatMessageResponse {
                 .messageId(message.getId())
                 .senderId(message.getSender().getId())
                 .senderNickname(message.getSender().getNickname())
+                .senderProfileImageUrl(message.getSender().getProfileImageUrl())
                 .content(message.getContent())
                 .isRead(read)
                 .isSystem(message.getMessageType() == MessageType.SYSTEM)

@@ -46,6 +46,7 @@ export interface SentInvitation {
   invitationId: number;
   receiverId: number;
   receiverNickname: string;
+  receiverProfileImageUrl?: string | null;
   status: 'PENDING' | 'ACCEPTED' | 'REJECTED';
 }
 

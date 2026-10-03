@@ -3,6 +3,7 @@ import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { router, useSegments } from 'expo-router';
 import { Colors } from '../../constants/colors';
 import { PostCommentsSection } from './PostCommentsSection';
+import { UserAvatar } from '../common/UserAvatar';
 import { TeamMember, RecruitPostDetail } from '../../types/contest';
 
 // 모집글 상세 콘텐츠(배너~댓글) — explore/post/[postId].tsx(지원하기 화면)와
@@ -23,9 +24,12 @@ function MemberAvatar({ member }: { member: TeamMember }) {
   }
   return (
     <View style={avatarStyles.wrap}>
-      <View style={[avatarStyles.circle, member.isHost && avatarStyles.hostCircle]}>
-        <Text style={avatarStyles.emoji}>{member.isHost ? '👑' : '👤'}</Text>
-      </View>
+      <UserAvatar
+        uri={member.profileImageUrl}
+        fallback={member.isHost ? '👑' : '👤'}
+        style={[avatarStyles.circle, member.isHost && avatarStyles.hostCircle]}
+        textStyle={avatarStyles.emoji}
+      />
       <Text style={avatarStyles.name} numberOfLines={1}>{member.name}</Text>
     </View>
   );
@@ -171,9 +175,12 @@ export function PostDetailContent({
           activeOpacity={0.85}
           onPress={() => router.push(`/${sourceTab}/post/recruiter-profile?postId=${postId}` as never)}
         >
-          <View style={styles.recruiterAvatarCircle}>
-            <Text style={styles.recruiterAvatarEmoji}>👑</Text>
-          </View>
+          <UserAvatar
+            uri={post?.recruiter.profileImageUrl}
+            fallback="👑"
+            style={styles.recruiterAvatarCircle}
+            textStyle={styles.recruiterAvatarEmoji}
+          />
           <Text style={styles.recruiterName}>{post?.recruiter.name ?? ''}</Text>
           {isOwner ? (
             <View style={styles.meBadge}>

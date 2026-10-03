@@ -22,6 +22,11 @@
 
 USE teamit;
 
+-- mysql 클라이언트/GUI 도구의 세션 charset이 UTF-8이 아니면(cp949, latin1 등) 이 파일의 한글이
+-- INSERT되는 순간 깨져서 저장된다(터미널 표시 문제가 아니라 실제 DB 저장 값이 깨짐) — 클라이언트
+-- 설정과 무관하게 이 세션만큼은 항상 UTF-8을 쓰도록 강제한다.
+SET NAMES utf8mb4;
+
 START TRANSACTION;
 
 SET @seed_start_time = NOW();

@@ -2,6 +2,7 @@ import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { Colors } from '../../constants/colors';
 import { ChatRoom } from '../../types/message';
+import { UserAvatar } from '../common/UserAvatar';
 
 interface ChatRoomItemProps {
   chatRoom: ChatRoom;
@@ -26,9 +27,12 @@ export const ChatRoomItem: React.FC<ChatRoomItemProps> = ({ chatRoom, onPress })
       activeOpacity={0.7}
     >
       <View style={styles.avatarWrap}>
-        <View style={styles.avatar}>
-          <Text style={styles.avatarText}>{chatRoom.avatar}</Text>
-        </View>
+        <UserAvatar
+          uri={chatRoom.avatarUrl}
+          fallback={chatRoom.avatar}
+          style={styles.avatar}
+          textStyle={styles.avatarText}
+        />
       </View>
 
       <View style={styles.content}>

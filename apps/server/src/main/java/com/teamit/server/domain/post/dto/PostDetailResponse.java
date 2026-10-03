@@ -32,6 +32,7 @@ public class PostDetailResponse {
     private String createdAt;
     private Long ownerUserId;
     private String ownerNickname;
+    private String ownerProfileImageUrl;
     // 공모전 정보 (contestId로 조회한 결과)
     private String contestTitle;
     private String contestPeriod;
@@ -84,6 +85,7 @@ public class PostDetailResponse {
                         : null)
                 .ownerUserId(post.getOwner().getId())
                 .ownerNickname(post.getOwner().getNickname())
+                .ownerProfileImageUrl(post.getOwner().getProfileImageUrl())
                 .contestTitle(contestTitle)
                 .contestPeriod(contestPeriod)
                 .skills(skills)

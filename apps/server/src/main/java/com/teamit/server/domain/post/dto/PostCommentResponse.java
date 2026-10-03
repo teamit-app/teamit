@@ -12,6 +12,7 @@ import java.time.format.DateTimeFormatter;
 public class PostCommentResponse {
     private Long commentId;
     private String authorName;
+    private String authorProfileImageUrl;
     private String content;
     private String createdAt;
     @JsonProperty("isAuthor")
@@ -23,6 +24,7 @@ public class PostCommentResponse {
         return PostCommentResponse.builder()
                 .commentId(comment.getId())
                 .authorName(comment.getAuthor().getNickname())
+                .authorProfileImageUrl(comment.getAuthor().getProfileImageUrl())
                 .content(comment.getContent())
                 .createdAt(comment.getCreatedAt() != null
                         ? comment.getCreatedAt().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm"))

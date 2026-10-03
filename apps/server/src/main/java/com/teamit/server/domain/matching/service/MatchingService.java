@@ -149,6 +149,7 @@ public class MatchingService {
                         .invitationId(i.getId())
                         .receiverId(i.getReceiver().getId())
                         .receiverNickname(i.getReceiver().getNickname())
+                        .receiverProfileImageUrl(i.getReceiver().getProfileImageUrl())
                         .status(i.getStatus().name())
                         .build())
                 .collect(Collectors.toList());

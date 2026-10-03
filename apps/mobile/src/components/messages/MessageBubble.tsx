@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, TouchableOpacity, useWindowDimensions } from 'r
 import { useRouter } from 'expo-router';
 import { Colors } from '../../constants/colors';
 import { Message } from '../../types/message';
+import { UserAvatar } from '../common/UserAvatar';
 
 // 웹 데스크톱에서는 브라우저 창 폭이 그대로 window width가 되어버려서
 // WebCenteredFrame이 만드는 480px 모바일 프레임 폭 기준으로 clamp해야 함
@@ -40,11 +41,16 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message, showSende
       <View style={[styles.row, isOwn ? styles.rowOwn : styles.rowOther]}>
         {!isOwn && (
           <TouchableOpacity
-            style={styles.avatar}
+            style={styles.avatarTouch}
             onPress={() => onPressAvatar?.(message.senderId)}
             activeOpacity={onPressAvatar ? 0.7 : 1}
           >
-            <Text style={styles.avatarText}>{message.senderAvatar}</Text>
+            <UserAvatar
+              uri={message.senderAvatarUrl}
+              fallback={message.senderAvatar}
+              style={styles.avatar}
+              textStyle={styles.avatarText}
+            />
           </TouchableOpacity>
         )}
         <View style={[styles.group, isOwn && styles.groupOwn]}>
@@ -100,11 +106,16 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message, showSende
     <View style={[styles.row, isOwn ? styles.rowOwn : styles.rowOther]}>
       {!isOwn && (
         <TouchableOpacity
-          style={styles.avatar}
+          style={styles.avatarTouch}
           onPress={() => onPressAvatar?.(message.senderId)}
           activeOpacity={onPressAvatar ? 0.7 : 1}
         >
-          <Text style={styles.avatarText}>{message.senderAvatar}</Text>
+          <UserAvatar
+            uri={message.senderAvatarUrl}
+            fallback={message.senderAvatar}
+            style={styles.avatar}
+            textStyle={styles.avatarText}
+          />
         </TouchableOpacity>
       )}
       <View style={[styles.group, isOwn && styles.groupOwn]}>
@@ -145,6 +156,11 @@ const styles = StyleSheet.create({
   rowOther: {
     justifyContent: 'flex-start',
   },
+  avatarTouch: {
+    marginRight: 8,
+    flexShrink: 0,
+    marginBottom: 4,
+  },
   avatar: {
     width: 36,
     height: 36,
@@ -152,9 +168,6 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.ogTint,
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 8,
-    flexShrink: 0,
-    marginBottom: 4,
   },
   avatarText: {
     fontSize: 18,
