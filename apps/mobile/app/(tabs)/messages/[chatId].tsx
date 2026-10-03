@@ -18,6 +18,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Colors } from '../../../src/constants/colors';
 import { MessageBubble } from '../../../src/components/messages/MessageBubble';
 import { MessageInput } from '../../../src/components/messages/MessageInput';
+import { UserAvatar } from '../../../src/components/common/UserAvatar';
 import { getChat, sendMessage, leaveChatRoom, deleteChatRoom, getChatRooms, adaptMessage, markChatRoomAsRead } from '../../../src/services/messageService';
 import { subscribeToChatRoom } from '../../../src/services/socket';
 import { Chat, Message } from '../../../src/types/message';
@@ -37,6 +38,7 @@ interface InvitedUser {
   name: string;
   role: string;
   status: 'pending' | 'rejected';
+  avatarUrl?: string | null;
   directChatId?: number;
   invitationId?: number;
 }
@@ -46,6 +48,7 @@ interface DirectContact {
   chatId: number;
   name: string;
   avatar: string;
+  avatarUrl?: string | null;
   role: string;
   isTeamMember: boolean;
 }
@@ -164,6 +167,7 @@ export default function ChatDetailScreen() {
             chatId: r.id,
             name: r.name,
             avatar: r.avatar,
+            avatarUrl: r.avatarUrl,
             role: '',
             isTeamMember: teamMemberIds.has(r.opponentUserId as number),
           }));
@@ -175,6 +179,7 @@ export default function ChatDetailScreen() {
             .map((i) => ({
               id: i.receiverId,
               name: i.receiverNickname,
+              avatarUrl: i.receiverProfileImageUrl,
               role: '',
               status: i.status === 'PENDING' ? 'pending' : 'rejected',
               // 1:1 채팅을 나눠본 적 있어야 초대 가능하므로 항상 존재해야 하지만,
@@ -282,6 +287,7 @@ export default function ChatDetailScreen() {
           {
             id: contact.id,
             name: contact.name,
+            avatarUrl: contact.avatarUrl,
             role: contact.role,
             status: 'pending',
             directChatId: contact.chatId,
@@ -639,9 +645,12 @@ export default function ChatDetailScreen() {
                         u.status === 'pending' ? inviteSheet.invitedCardPending : inviteSheet.invitedCardRejected,
                       ]}
                     >
-                      <View style={inviteSheet.invitedAvatar}>
-                        <Text style={inviteSheet.invitedAvatarText}>👤</Text>
-                      </View>
+                      <UserAvatar
+                        uri={u.avatarUrl}
+                        fallback="👤"
+                        style={inviteSheet.invitedAvatar}
+                        textStyle={inviteSheet.invitedAvatarText}
+                      />
                       <View style={inviteSheet.invitedInfo}>
                         <Text style={inviteSheet.invitedName}>{u.name}</Text>
                         <Text style={inviteSheet.invitedRole}>{u.role}</Text>
@@ -700,9 +709,12 @@ export default function ChatDetailScreen() {
                     const isDone = alreadyInvited || c.isTeamMember;
                     return (
                       <View key={c.id} style={[inviteSheet.contactRow, isDone && inviteSheet.contactRowDone]}>
-                        <View style={[inviteSheet.contactAvatar, isDone && inviteSheet.contactAvatarDone]}>
-                          <Text style={inviteSheet.contactAvatarText}>{c.avatar}</Text>
-                        </View>
+                        <UserAvatar
+                          uri={c.avatarUrl}
+                          fallback={c.avatar}
+                          style={[inviteSheet.contactAvatar, isDone && inviteSheet.contactAvatarDone]}
+                          textStyle={inviteSheet.contactAvatarText}
+                        />
                         <View style={inviteSheet.contactInfo}>
                           <Text style={inviteSheet.contactName}>{c.name}</Text>
                           <Text style={inviteSheet.contactRole}>{c.role}</Text>
@@ -806,9 +818,12 @@ export default function ChatDetailScreen() {
               {chat.teamInfo.members.map((m, idx) =>
                 m.filled ? (
                   <View key={m.id ?? `filled-${idx}`} style={teamCard.memberItem}>
-                    <View style={[teamCard.memberAvatar, m.isHost && teamCard.hostAvatar]}>
-                      <Text style={teamCard.memberAvatarText}>{m.avatar}</Text>
-                    </View>
+                    <UserAvatar
+                      uri={m.avatarUrl}
+                      fallback={m.avatar}
+                      style={[teamCard.memberAvatar, m.isHost && teamCard.hostAvatar]}
+                      textStyle={teamCard.memberAvatarText}
+                    />
                     <Text style={teamCard.memberName} numberOfLines={1}>{m.name}</Text>
                   </View>
                 ) : isTeamConfirmed ? null : amIRecruiter && !isExpired ? (

@@ -19,6 +19,7 @@ import { useAuthStore } from '../../../../src/store/useAuthStore';
 import { toggleTalentHeart as toggleTalentHeartInStore } from '../../../../src/hooks/useExploreData';
 import { TalentDetail, TalentRecruitPost } from '../../../../src/types/talent';
 import { StarRating } from '../../../../src/components/common/StarRating';
+import { UserAvatar } from '../../../../src/components/common/UserAvatar';
 import { requireAuthForChat } from '../../../../src/utils/authGuard';
 import { useScrollDepthTracking } from '../../../../src/hooks/useScrollDepthTracking';
 import { trackEvent } from '../../../../src/services/gtm';
@@ -235,9 +236,12 @@ export default function RecruiterProfileScreen() {
         {/* ── 프로필 카드 ── */}
         <View style={s.profileCard}>
           <View style={s.profileTop}>
-            <View style={s.avatar}>
-              <Text style={s.avatarEmoji}>👑</Text>
-            </View>
+            <UserAvatar
+              uri={detail.profileImageUrl}
+              fallback="👑"
+              style={s.avatar}
+              textStyle={s.avatarEmoji}
+            />
 
             <View style={s.profileInfo}>
               <View style={s.nameRow}>

@@ -44,6 +44,7 @@ export interface ContestDetail extends Contest {
 export interface TeamMember {
   memberId: number;
   name: string;
+  profileImageUrl?: string | null;
   isHost: boolean;
   isRecruiting: boolean;
 }
@@ -51,6 +52,7 @@ export interface TeamMember {
 export interface PostComment {
   commentId: number;
   authorName: string;
+  authorProfileImageUrl?: string | null;
   content: string;
   createdAt: string;
   isAuthor: boolean;
@@ -93,6 +95,7 @@ export interface RecruitPostDetail extends RecruitPost {
   schoolCondition: string;
   recruiter: {
     name: string;
+    profileImageUrl?: string | null;
     skills: string[];
     experienceCount: string;
     intensity: string;

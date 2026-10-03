@@ -9,5 +9,6 @@ public class SentInvitationResponse {
     private Long invitationId;
     private Long receiverId;
     private String receiverNickname;
+    private String receiverProfileImageUrl;
     private String status;
 }

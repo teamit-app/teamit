@@ -10,6 +10,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
 import { Colors } from '../../../src/constants/colors';
 import { ScreenHeader } from '../../../src/components/common/ScreenHeader';
+import { UserAvatar } from '../../../src/components/common/UserAvatar';
 import { getPostApplicants, getContestCandidates, getAllContestCandidates } from '../../../src/services/mypageService';
 import { getHeartedTalents } from '../../../src/services/talentService';
 import { toggleTalentHeart as toggleTalentHeartInStore } from '../../../src/hooks/useExploreData';
@@ -51,9 +52,12 @@ function ApplicantCard({
       </View>
 
       <View style={card.bodyRow}>
-        <View style={card.avatar}>
-          <Text style={card.avatarEmoji}>🧑‍💻</Text>
-        </View>
+        <UserAvatar
+          uri={person.profileImageUrl}
+          fallback="🧑‍💻"
+          style={card.avatar}
+          textStyle={card.avatarEmoji}
+        />
         <View style={card.info}>
           <View style={card.nameRow}>
             <Text style={card.name}>{person.nickname}</Text>

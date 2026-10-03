@@ -12,6 +12,7 @@ public class DirectChatRoomResponse {
     private String roomType;
     private Long opponentUserId;
     private String opponentNickname;
+    private String opponentProfileImageUrl;
     private String lastMessage;
     private LocalDateTime lastMessageAt;
     private long unreadCount;

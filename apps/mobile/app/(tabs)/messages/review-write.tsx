@@ -13,6 +13,7 @@ import { Colors } from '../../../src/constants/colors';
 import { useReviewStore } from '../../../src/store/useReviewStore';
 import { postReview } from '../../../src/services/reviewService';
 import { TeamMemberStatus } from '../../../src/types/message';
+import { UserAvatar } from '../../../src/components/common/UserAvatar';
 import { getChat } from '../../../src/services/messageService';
 import { useAuthStore } from '../../../src/store/useAuthStore';
 import { trackEvent } from '../../../src/services/gtm';
@@ -282,7 +283,12 @@ export default function ReviewWriteScreen() {
                     onPress={() => !done && setSelectedMember(m)}
                     activeOpacity={done ? 1 : 0.85}
                   >
-                    <Text style={s.memberAvatar}>{m.avatar}</Text>
+                    <UserAvatar
+                      uri={m.avatarUrl}
+                      fallback={m.avatar}
+                      style={s.memberAvatarCircle}
+                      textStyle={s.memberAvatar}
+                    />
                     <View style={{ flex: 1 }}>
                       <Text style={[s.memberName, done && s.memberNameDone]}>{formatMemberName(m.name, m.realName)}</Text>
                       <Text style={s.memberRole}>{m.role}</Text>
@@ -520,6 +526,7 @@ const s = StyleSheet.create({
   },
   memberCardSelected: { borderColor: Colors.primary, backgroundColor: Colors.ogTint },
   memberCardDone:     { opacity: 0.45 },
+  memberAvatarCircle: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
   memberAvatar:       { fontSize: 28 },
   memberName:         { fontSize: 15, fontWeight: '700', color: Colors.dark },
   memberNameDone:     { color: Colors.grayMedium },

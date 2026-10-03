@@ -156,6 +156,7 @@ export interface TalentPoolCandidate {
 export interface PostApplicant {
   userId: number;
   nickname: string;
+  profileImageUrl?: string | null;
   averageRating: number;
   gender: Gender;
   school: string;

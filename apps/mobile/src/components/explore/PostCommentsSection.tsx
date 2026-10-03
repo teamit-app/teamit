@@ -4,6 +4,7 @@ import { Colors } from '../../constants/colors';
 import { getPostComments, addPostComment } from '../../services/postService';
 import { PostComment } from '../../types/contest';
 import { trackEvent } from '../../services/gtm';
+import { UserAvatar } from '../common/UserAvatar';
 
 // 모집글 댓글 섹션 — 모집글 상세(explore/post/[postId].tsx)와 초대장 상세
 // (messages/invitation-detail/[invitationId].tsx)에서 공용으로 사용한다.
@@ -28,15 +29,16 @@ function CommentItem({
     >
       <View style={styles.headerRow}>
         <View style={styles.authorLeft}>
-          <View style={[
-            styles.avatar,
-            comment.isAuthor && styles.avatarHost,
-            comment.isReply && styles.avatarReply,
-          ]}>
-            <Text style={[styles.avatarEmoji, comment.isReply && styles.avatarEmojiReply]}>
-              {comment.isAuthor ? '👑' : '🙋'}
-            </Text>
-          </View>
+          <UserAvatar
+            uri={comment.authorProfileImageUrl}
+            fallback={comment.isAuthor ? '👑' : '🙋'}
+            style={[
+              styles.avatar,
+              comment.isAuthor && styles.avatarHost,
+              comment.isReply && styles.avatarReply,
+            ]}
+            textStyle={[styles.avatarEmoji, comment.isReply && styles.avatarEmojiReply]}
+          />
           <View style={styles.nameWrap}>
             <View style={styles.nameRow}>
               <Text style={styles.authorName}>{comment.authorName}</Text>

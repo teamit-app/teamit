@@ -20,6 +20,8 @@ public class PostApplicantResponse {
 
     private Long userId;
     private String nickname;
+    // 프로필 사진은 스냅샷이 아니라 라이브 값 — 사진을 바꾸면 모든 화면에 바로 반영돼야 한다
+    private String profileImageUrl;
     private double averageRating;
     private String gender;
     private String school;
@@ -102,6 +104,7 @@ public class PostApplicantResponse {
         return PostApplicantResponse.builder()
                 .userId(user.getId())
                 .nickname(user.getNickname())
+                .profileImageUrl(user.getProfileImageUrl())
                 .averageRating(averageRating)
                 .gender(user.getGender() != null ? user.getGender().name() : null)
                 .school(school)
@@ -192,6 +195,7 @@ public class PostApplicantResponse {
         return PostApplicantResponse.builder()
                 .userId(user.getId())
                 .nickname(user.getNickname())
+                .profileImageUrl(user.getProfileImageUrl())
                 .averageRating(averageRating)
                 .gender(user.getGender() != null ? user.getGender().name() : null)
                 .school(school)

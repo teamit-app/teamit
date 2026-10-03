@@ -6,7 +6,6 @@ import {
   TouchableOpacity,
   StyleSheet,
   ActivityIndicator,
-  Image,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams, useSegments } from 'expo-router';
@@ -20,7 +19,7 @@ import { TalentDetail, TalentRecruitPost } from '../../../../src/types/talent';
 import { ReviewStatsCard } from '../../../../src/components/profile/ReviewStatsCard';
 import { requireAuthForChat } from '../../../../src/utils/authGuard';
 import { Alert } from '../../../../src/utils/alert';
-import { resolveImageUrl } from '../../../../src/utils/imageUrl';
+import { UserAvatar } from '../../../../src/components/common/UserAvatar';
 import { useScrollDepthTracking } from '../../../../src/hooks/useScrollDepthTracking';
 import { trackEvent } from '../../../../src/services/gtm';
 
@@ -220,13 +219,12 @@ export default function TalentDetailScreen() {
         {/* ── 프로필 카드 ── */}
         <View style={s.profileCard}>
           <View style={s.profileTop}>
-            <View style={s.avatar}>
-              {resolveImageUrl(detail.profileImageUrl) ? (
-                <Image source={{ uri: resolveImageUrl(detail.profileImageUrl)! }} style={s.avatarImage} />
-              ) : (
-                <Text style={s.avatarEmoji}>🧑‍💻</Text>
-              )}
-            </View>
+            <UserAvatar
+              uri={detail.profileImageUrl}
+              fallback="🧑‍💻"
+              style={s.avatar}
+              textStyle={s.avatarEmoji}
+            />
 
             <View style={s.profileInfo}>
               <View style={s.nameRow}>
@@ -423,7 +421,6 @@ const s = StyleSheet.create({
     justifyContent: 'center',
     overflow: 'hidden',
   },
-  avatarImage: { width: 60, height: 60 },
   avatarEmoji: { fontSize: 30 },
   profileInfo: { flex: 1, gap: 5 },
   nameRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 5 },

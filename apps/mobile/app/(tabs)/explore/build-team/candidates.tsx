@@ -18,6 +18,7 @@ import { sendInvitation } from '../../../../src/services/invitationService';
 import { getContestCandidates, getAllContestCandidates } from '../../../../src/services/mypageService';
 import { trackEvent } from '../../../../src/services/gtm';
 import { REALTIME_STALE_TIME } from '../../../../src/services/realtimeEvents';
+import { UserAvatar } from '../../../../src/components/common/UserAvatar';
 
 const IS_MOCK = process.env.EXPO_PUBLIC_API_MODE === 'mock';
 
@@ -25,6 +26,7 @@ function adaptCandidate(a: PostApplicant): Candidate {
   return {
     id: a.userId,
     name: a.nickname,
+    profileImageUrl: a.profileImageUrl,
     gender: a.gender === 'FEMALE' ? '여성' : '남성',
     school: a.school,
     location: a.regionLabel,
@@ -114,9 +116,12 @@ function CandidateCard({
       <View style={styles.profileRow}>
         {/* 아바타 + 온도 pill 오버레이 */}
         <View style={styles.avatarWrap}>
-          <View style={styles.avatar}>
-            <Text style={styles.avatarEmoji}>🧑‍💻</Text>
-          </View>
+          <UserAvatar
+            uri={candidate.profileImageUrl}
+            fallback="🧑‍💻"
+            style={styles.avatar}
+            textStyle={styles.avatarEmoji}
+          />
           <View style={styles.tempPillWrap}>
             <View style={styles.tempPill}>
               <Text style={styles.tempText}>★ {candidate.averageRating.toFixed(1)}</Text>

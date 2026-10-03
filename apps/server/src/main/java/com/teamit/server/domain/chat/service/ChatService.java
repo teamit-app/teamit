@@ -106,6 +106,7 @@ public class ChatService {
                         .roomType("DIRECT")
                         .opponentUserId(opponent.map(User::getId).orElse(null))
                         .opponentNickname(opponent.map(User::getNickname).orElse(null))
+                        .opponentProfileImageUrl(opponent.map(User::getProfileImageUrl).orElse(null))
                         .lastMessage(lastMessage)
                         .lastMessageAt(lastMessageAt)
                         .unreadCount(unreadCount)
@@ -211,6 +212,7 @@ public class ChatService {
                     .id(m.getUser().getId())
                     .name(m.getUser().getNickname())
                     .realName(m.getUser().getName())
+                    .profileImageUrl(m.getUser().getProfileImageUrl())
                     .isHost(m.getUser().getId().equals(post.getOwner().getId()))
                     .filled(true)
                     .build());
@@ -317,6 +319,7 @@ public class ChatService {
                 .messageId(base.getMessageId())
                 .senderId(base.getSenderId())
                 .senderNickname(base.getSenderNickname())
+                .senderProfileImageUrl(base.getSenderProfileImageUrl())
                 .content("")
                 .isRead(base.isRead())
                 .isSystem(false)

@@ -22,6 +22,7 @@ export interface TeamReviewItem {
 export interface Candidate {
   id: number;
   name: string;
+  profileImageUrl?: string | null;
   gender: string;
   school: string;
   location: string;
